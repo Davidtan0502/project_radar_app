@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <application
         android:label="project_radar_app"
         android:name="${applicationName}"
@@ -19,6 +21,8 @@
             <meta-data
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
+              android:name="com.google.android.geo.AIzaSyBqQ7oSt2AxBHjNMV88dMse9tyREz3wVS0"
+              android:value="AIzaSyBqQ7oSt2AxBHjNMV88dMse9tyREz3wVS0"
               />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
