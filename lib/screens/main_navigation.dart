@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/screens/home_screen.dart';
 import 'package:project_radar_app/screens/map_screen.dart';
-// Import your other screen files here (once created)
-// import 'package:project_radar/screens/search_screen.dart';
-// import 'package:project_radar/screens/maps_screen.dart';
-// import 'package:project_radar/screens/profile_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -19,7 +15,8 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<Widget> _screens = const [
     HomeScreen(),
     Placeholder(), // SearchScreen(),
-    MapScreen(), // MapsScreen(),
+    Placeholder(), // AlertScreen(),
+    MapScreen(),
     Placeholder(), // ProfileScreen(),
   ];
 
@@ -29,20 +26,11 @@ class _MainNavigationState extends State<MainNavigation> {
     });
   }
 
-  void _onAlertPressed() {
-    // Handle alert button action here
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("ALERT button tapped!")),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 6.0,
         child: SizedBox(
           height: 70,
           child: Row(
@@ -50,19 +38,13 @@ class _MainNavigationState extends State<MainNavigation> {
             children: [
               _navItem(icon: Icons.home, label: "Home", index: 0),
               _navItem(icon: Icons.search, label: "Search", index: 1),
-              const SizedBox(width: 48), // Space for FAB
-              _navItem(icon: Icons.map, label: "Maps", index: 2),
-              _navItem(icon: Icons.person, label: "Profile", index: 3),
+              _alertButton(index: 2), // Special styled alert button
+              _navItem(icon: Icons.map, label: "Maps", index: 3),
+              _navItem(icon: Icons.person, label: "Profile", index: 4),
             ],
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _onAlertPressed,
-        backgroundColor: const Color(0xFF3F73A3),
-        child: const Icon(Icons.warning_amber_rounded, size: 32),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 
@@ -72,14 +54,58 @@ class _MainNavigationState extends State<MainNavigation> {
       onTap: () => _onTabTapped(index),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: isSelected ? Colors.blue : Colors.black),
+          Icon(
+            icon,
+            color: isSelected ? Colors.blue : Colors.grey,
+            size: 28,
+          ),
+          const SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
+              color: isSelected ? Colors.blue : Colors.grey,
               fontSize: 12,
-              color: isSelected ? Colors.blue : Colors.black,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _alertButton({required int index}) {
+    final isSelected = _currentIndex == index;
+    return GestureDetector(
+      onTap: () => _onTabTapped(index),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: isSelected ? const Color(0xFFC62828) : const Color(0xFFE53935),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                )
+              ],
+            ),
+            padding: const EdgeInsets.all(10),
+            child: Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "ALERT",
+            style: TextStyle(
+              color: isSelected ? const Color(0xFFE53935) : Colors.grey,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
