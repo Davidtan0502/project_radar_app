@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/screens/login_screen.dart';
-import 'screens/main_navigation.dart';
+import 'package:project_radar_app/screens/main_navigation.dart';
 
 void main() {
   runApp(const MyApp());

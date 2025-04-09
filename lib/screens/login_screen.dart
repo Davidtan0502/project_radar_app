@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:project_radar_app/screens/main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,6 +12,8 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<Color?> _colorAnimation;
+  final TextEditingController _phoneController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -30,7 +33,53 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void dispose() {
     _controller.dispose();
+    _phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    if (_phoneController.text.isEmpty) {
+      _showErrorDialog('Please enter your mobile number');
+      return;
+    }
+
+    if (_phoneController.text.length != 10) {
+      _showErrorDialog('Please enter a valid 10-digit mobile number');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Simulate network request
+    await Future.delayed(const Duration(seconds: 2));
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    // Navigate to MainNavigation after successful login
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const MainNavigation()),
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -86,7 +135,8 @@ class _LoginScreenState extends State<LoginScreen>
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 600),
                   curve: Curves.easeInOut,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                   width: double.infinity,
                   decoration: const BoxDecoration(
                     color: Colors.white,
@@ -127,17 +177,21 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         child: Row(
                           children: [
-                            Image.asset('assets/ph_flag.png', width: 32),
+                            Image.asset(
+                              'assets/ph_flag.png',
+                              height: 20,
+                            ),
                             const SizedBox(width: 8),
                             const Text(
                               '+63',
                               style: TextStyle(fontSize: 16),
                             ),
                             const SizedBox(width: 8),
-                            const Expanded(
+                            Expanded(
                               child: TextField(
+                                controller: _phoneController,
                                 keyboardType: TextInputType.phone,
-                                decoration: InputDecoration(
+                                decoration: const InputDecoration(
                                   hintText: 'Enter your mobile number',
                                   border: InputBorder.none,
                                 ),
@@ -148,16 +202,39 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                       const SizedBox(height: 20),
 
+                      // Login Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _handleLogin,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _colorAnimation.value,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                          child: _isLoading
+                              ? const CircularProgressIndicator(
+                                  color: Colors.white)
+                              : const Text(
+                                  'Login',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
                       // Social Buttons
                       Row(
                         children: [
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () {},
-                              icon: Image.asset(
-                                'assets/google_icon.png',
-                                height: 20,
-                              ),
+                              onPressed: _isLoading ? null : () {},
+                              icon: const Icon(Icons.g_mobiledata, size: 24),
                               label: const Text("Google"),
                               style: OutlinedButton.styleFrom(
                                 shape: RoundedRectangleBorder(
@@ -171,11 +248,8 @@ class _LoginScreenState extends State<LoginScreen>
                           const SizedBox(width: 12),
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () {},
-                              icon: Image.asset(
-                                'assets/facebook_icon.png',
-                                height: 20,
-                              ),
+                              onPressed: _isLoading ? null : () {},
+                              icon: const Icon(Icons.facebook, size: 24),
                               label: const Text("Facebook"),
                               style: OutlinedButton.styleFrom(
                                 shape: RoundedRectangleBorder(
@@ -188,7 +262,7 @@ class _LoginScreenState extends State<LoginScreen>
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 8),
 
                       // Quote
                       const Center(

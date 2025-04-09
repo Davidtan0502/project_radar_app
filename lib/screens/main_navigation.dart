@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/screens/alert_screen.dart';
 import 'package:project_radar_app/screens/home_screen.dart';
+import 'package:project_radar_app/screens/hotline_page.dart';
 import 'package:project_radar_app/screens/map_screen.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -14,10 +15,10 @@ class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = const [
-    HomeScreen(),
-    Placeholder(), // Search
+    HomeScreen(), // Home
+    MapScreen(), // Hotline
     AlertScreen(), // Alert
-    MapScreen(),
+    HotlinesPage(), //Hazard Mapping
     Placeholder(), // Profile
   ];
 
@@ -49,9 +50,9 @@ class _MainNavigationState extends State<MainNavigation> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             _navItem(icon: Icons.home, label: "Home", index: 0),
-            _navItem(icon: Icons.search, label: "Search", index: 1),
+            _navItem(icon: Icons.map, label: "Maps", index: 1),
             _alertButton(index: 2),
-            _navItem(icon: Icons.map, label: "Maps", index: 3),
+            _navItem(icon: Icons.call, label: "Hotlines", index: 3),
             _navItem(icon: Icons.person, label: "Profile", index: 4),
           ],
         ),

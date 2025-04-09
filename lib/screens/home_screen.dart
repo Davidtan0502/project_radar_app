@@ -52,14 +52,12 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       });
 
-      if (_mapController != null) {
-        _mapController.animateCamera(
-          CameraUpdate.newLatLng(
-            LatLng(position.latitude, position.longitude),
-          ),
-        );
-      }
-    } catch (e) {
+      _mapController.animateCamera(
+        CameraUpdate.newLatLng(
+          LatLng(position.latitude, position.longitude),
+        ),
+      );
+        } catch (e) {
       debugPrint("Error getting location: $e");
     }
   }
@@ -238,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 16),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Container(
+                          child: SizedBox(
                             width: 150,
                             height: 100,
                             child: GoogleMap(

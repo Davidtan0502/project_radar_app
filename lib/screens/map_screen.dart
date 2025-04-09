@@ -12,7 +12,7 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   late GoogleMapController mapController;
-  TextEditingController _searchController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   LatLng _currentPosition = LatLng(14.5995, 120.9842); // Default position, will update to user's location
   late Position _userPosition; // To store the user's position
 

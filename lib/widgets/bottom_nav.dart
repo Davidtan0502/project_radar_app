@@ -27,9 +27,9 @@ class _BottomNavState extends State<BottomNav> {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _navItem(icon: Icons.home, label: "Home", index: 0),
-            _navItem(icon: Icons.search, label: "Search", index: 1),
+            _navItem(icon: Icons.map, label: "Maps", index: 1),
             const SizedBox(width: 48), // space for FAB
-            _navItem(icon: Icons.map, label: "Maps", index: 2),
+            _navItem(icon: Icons.call, label: "Hotline", index: 2),
             _navItem(icon: Icons.person, label: "Profile", index: 3),
           ],
         ),
