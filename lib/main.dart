@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:project_radar_app/screens/login_screen.dart';
 import 'screens/main_navigation.dart';
 
 void main() {
@@ -16,7 +17,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const MainNavigation(), // 👈 This shows the nav bar + screens
+      home: const LoginScreen(), // 👈 This shows the nav bar + screens
     );
   }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -10,11 +12,86 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   late GoogleMapController mapController;
-
-  final LatLng _center = const LatLng(14.5995, 120.9842); // Manila
+  TextEditingController _searchController = TextEditingController();
+  LatLng _currentPosition = LatLng(14.5995, 120.9842); // Default position, will update to user's location
+  late Position _userPosition; // To store the user's position
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
+  }
+
+  // Function to get the user's current location
+  Future<void> _getCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        // If location services are not enabled, handle accordingly
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Location services are disabled.")),
+        );
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Location permission denied.")),
+          );
+          return;
+        }
+      }
+
+      // Get the user's current position
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      setState(() {
+        _userPosition = position;
+        _currentPosition = LatLng(position.latitude, position.longitude);
+      });
+
+      mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(_currentPosition, 15),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    }
+  }
+
+  // Function to search for a location
+  Future<void> _searchLocation() async {
+    String query = _searchController.text;
+    try {
+      List<Location> locations = await locationFromAddress(query);
+      if (locations.isNotEmpty) {
+        Location location = locations.first;
+        setState(() {
+          _currentPosition = LatLng(location.latitude, location.longitude);
+        });
+        mapController.animateCamera(
+          CameraUpdate.newLatLngZoom(_currentPosition, 15),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("No results found for \"$query\"")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation(); // Fetch user's current location when the screen is initialized
   }
 
   @override
@@ -26,11 +103,17 @@ class _MapScreenState extends State<MapScreen> {
           GoogleMap(
             onMapCreated: _onMapCreated,
             initialCameraPosition: CameraPosition(
-              target: _center,
+              target: _currentPosition, // Set initial camera position to the user's location
               zoom: 15.0,
             ),
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
+            markers: {
+              Marker(
+                markerId: MarkerId("userLocation"),
+                position: _currentPosition,
+              ),
+            },
           ),
 
           // Top Left Menu Button
@@ -78,51 +161,24 @@ class _MapScreenState extends State<MapScreen> {
                 ],
               ),
               child: Row(
-                children: const [
-                  Icon(Icons.search, color: Colors.grey),
+                children: [
+                  const Icon(Icons.search, color: Colors.grey),
                   SizedBox(width: 8),
                   Expanded(
                     child: TextField(
+                      controller: _searchController,
                       decoration: InputDecoration(
                         hintText: "Search Destination",
                         border: InputBorder.none,
                       ),
+                      onSubmitted: (_) => _searchLocation(),
                     ),
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.search),
+                    onPressed: _searchLocation,
+                  ),
                 ],
-              ),
-            ),
-          ),
-
-          // Center ALERT Button (Floating style)
-          Positioned(
-            bottom: 60,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: GestureDetector(
-                onTap: () {
-                  // TODO: Alert action
-                },
-                child: Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    color: Color(0xFF3F73A3),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 8,
-                      )
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.warning_amber_rounded,
-                    color: Colors.white,
-                    size: 40,
-                  ),
-                ),
               ),
             ),
           ),

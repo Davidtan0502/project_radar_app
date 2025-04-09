@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart'; // Add this dependency
+import 'package:intl/intl.dart'; // Add this import
 
 void main() => runApp(const MyApp());
 
@@ -24,10 +26,39 @@ class AlertScreen extends StatefulWidget {
 
 class _AlertScreenState extends State<AlertScreen> {
   late GoogleMapController _mapController;
-  final CameraPosition _initialPosition = const CameraPosition(
-    target: LatLng(14.6365, 121.0745), // Example: Manila
-    zoom: 14,
-  );
+  late Position _currentPosition;
+  late CameraPosition _initialPosition;
+  bool _locationReady = false;
+  String _currentTime = "";
+  
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+    _setCurrentTime();
+  }
+
+  // Fetch current location
+  Future<void> _getCurrentLocation() async {
+    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    setState(() {
+      _currentPosition = position;
+      _initialPosition = CameraPosition(
+        target: LatLng(_currentPosition.latitude, _currentPosition.longitude),
+        zoom: 14,
+      );
+      _locationReady = true;
+    });
+  }
+
+  // Set current time in 12-hour format with AM/PM
+  void _setCurrentTime() {
+    setState(() {
+      final now = DateTime.now();
+      final formatter = DateFormat('yyyy-MM-dd hh:mm a'); // 12-hour format with AM/PM
+      _currentTime = formatter.format(now);
+    });
+  }
 
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
@@ -40,14 +71,43 @@ class _AlertScreenState extends State<AlertScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Header with date/time
+            Container(
+              color: const Color(0xFF3F73A3), // Color of the alert button
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Emergency Alerts',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    _currentTime,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Map display
             SizedBox(
               height: MediaQuery.of(context).size.height * 0.35,
-              child: GoogleMap(
-                onMapCreated: _onMapCreated,
-                initialCameraPosition: _initialPosition,
-                myLocationEnabled: true,
-                zoomControlsEnabled: false,
-              ),
+              child: _locationReady
+                  ? GoogleMap(
+                      onMapCreated: _onMapCreated,
+                      initialCameraPosition: _initialPosition,
+                      myLocationEnabled: true,
+                      zoomControlsEnabled: false,
+                    )
+                  : const Center(child: CircularProgressIndicator()), // Show loading until location is fetched
             ),
             const SizedBox(height: 16),
             Expanded(
