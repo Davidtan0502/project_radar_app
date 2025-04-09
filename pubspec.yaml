@@ -74,6 +74,7 @@ flutter:
     - assets/ph_flag.png
     - assets/google_icon.png
     - assets/facebook_icon.png
+    - assets/report.png
 
 
   # To add assets to your application, add an assets section, like this:
