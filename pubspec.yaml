@@ -57,6 +57,21 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
 
+  # ← Add these two:
+  flutter_launcher_icons: ^0.10.0
+  rename: ^2.0.1
+
+# Launcher icon configuration
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"
+  adaptive_icon_background: "#3F73A3"   # your Project RADAR primary color
+  adaptive_icon_foreground: "assets/logo.png"
+
+# App name configuration
+flutter_launcher_name:
+  name: "Project Radar"
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:project_radar_app/screens/help_and_support.dart';
 import 'login_screen.dart';
 import 'emergency_contacts_screen.dart';
 
@@ -69,9 +70,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               onPressed: () {
                 Navigator.of(context).pop();
                 Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) => LoginScreen(onTap: () {}),
-                  ),
+                  _createRoute(LoginScreen(onTap: () {})),
                 );
               },
             ),
@@ -180,13 +179,19 @@ class _ProfileScreenState extends State<ProfileScreen>
                       _buildOptionTile(
                         icon: Icons.settings,
                         text: 'Settings',
-                        onTap: () {},
+                        onTap: () {
+                          // Placeholder or future screen
+                        },
                       ),
                       const Divider(),
                       _buildOptionTile(
                         icon: Icons.help_outline,
                         text: 'Help & Support',
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.of(context).push(
+                            _createRoute(const HelpSupportScreen()),
+                          );
+                        },
                       ),
                       const Divider(),
                       _buildOptionTile(
@@ -194,10 +199,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         text: 'SOS Contacts',
                         onTap: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  const EmergencyContactsScreen(),
-                            ),
+                            _createRoute(const EmergencyContactsScreen()),
                           );
                         },
                       ),
@@ -240,6 +242,29 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
       onTap: onTap,
+    );
+  }
+
+  // 🔁 Custom route with fade + slide transition
+  Route _createRoute(Widget screen) {
+    return PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => screen,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        const begin = Offset(0.0, 1.0); // Slide from bottom
+        const end = Offset.zero;
+        const curve = Curves.ease;
+
+        final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+        final fadeTween = Tween<double>(begin: 0.0, end: 1.0);
+
+        return SlideTransition(
+          position: animation.drive(tween),
+          child: FadeTransition(
+            opacity: animation.drive(fadeTween),
+            child: child,
+          ),
+        );
+      },
     );
   }
 }

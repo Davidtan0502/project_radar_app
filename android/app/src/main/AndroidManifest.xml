@@ -5,7 +5,7 @@
 
 
     <application
-        android:label="project_radar_app"
+        android:label="Project Radar"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
