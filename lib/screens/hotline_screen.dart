@@ -185,16 +185,17 @@ class _HotlinesPageState extends State<HotlinesPage> {
                                         children: [
                                           ElevatedButton.icon(
                                             onPressed: () async {
-                                              final Uri url =
-                                                  Uri.parse(hotline['phoneUri']);
+                                              final Uri url = Uri.parse(hotline['phoneUri']);
                                               if (await canLaunchUrl(url)) {
                                                 await launchUrl(url);
                                               }
                                             },
-                                            icon: const Icon(Icons.call),
-                                            label: const Text('Call'),
+                                            icon: const Icon(Icons.call, color: Colors.white),
+                                            label: const Text('Call',
+                                                style: TextStyle(color: Colors.white)),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: hotline['color'],
+                                              foregroundColor: Colors.white,
                                               shape: RoundedRectangleBorder(
                                                 borderRadius:
                                                     BorderRadius.circular(30),
@@ -203,10 +204,12 @@ class _HotlinesPageState extends State<HotlinesPage> {
                                           ),
                                           OutlinedButton.icon(
                                             onPressed: () async {
-                                              final Uri url =
-                                                  Uri.parse(hotline['facebookUrl']);
+                                              final Uri url = Uri.parse(hotline['facebookUrl']);
                                               if (await canLaunchUrl(url)) {
-                                                await launchUrl(url);
+                                                await launchUrl(
+                                                  url,
+                                                  mode: LaunchMode.externalApplication,
+                                                );
                                               }
                                             },
                                             icon: const Icon(Icons.facebook),
