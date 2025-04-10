@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:project_radar_app/screens/About_us.dart';
-
+import 'about_us.dart';
+import 'account_info.dart';
+import 'change_password.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -18,7 +19,9 @@ class SettingsScreen extends StatelessWidget {
             leading: const Icon(Icons.person),
             title: const Text('Account'),
             onTap: () {
-             
+              Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const AccountInfo()),
+              );
             },
           ),
           const Divider(),
@@ -26,7 +29,9 @@ class SettingsScreen extends StatelessWidget {
             leading: const Icon(Icons.lock),
             title: const Text('Privacy & Security'),
             onTap: () {
-            
+            Navigator.of(context).push(
+              _createRoute(const ChangePassword()),
+              );
             },
           ),
           const Divider(),
@@ -34,7 +39,6 @@ class SettingsScreen extends StatelessWidget {
             leading: const Icon(Icons.info_outline),
             title: const Text('About Us'),
             onTap: () {
-              // Navigate to About Us screen when tapped
               Navigator.of(context).push(
                 _createRoute(const AboutUs()), 
               );

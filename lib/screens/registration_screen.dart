@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'verify_info_screen.dart'; // Make sure this is correctly imported
+import 'verify_info_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
