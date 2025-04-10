@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/screens/alert_screen.dart';
 import 'package:project_radar_app/screens/home_screen.dart';
-import 'package:project_radar_app/screens/hotline_page.dart';
+import 'package:project_radar_app/screens/hotline_screen.dart';
 import 'package:project_radar_app/screens/map_screen.dart';
+import 'package:project_radar_app/screens/profile_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -19,7 +20,7 @@ class _MainNavigationState extends State<MainNavigation> {
     MapScreen(), // Hotline
     AlertScreen(), // Alert
     HotlinesPage(), //Hazard Mapping
-    Placeholder(), // Profile
+    ProfileScreen(), // Profile
   ];
 
   void _onTabTapped(int index) {
