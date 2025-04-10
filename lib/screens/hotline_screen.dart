@@ -11,27 +11,6 @@ class HotlinesPage extends StatefulWidget {
 class _HotlinesPageState extends State<HotlinesPage> {
   String _searchText = '';
   final _scrollController = ScrollController();
-  bool _showFullHeader = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_scrollListener);
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _scrollListener() {
-    if (_scrollController.offset > 20 && _showFullHeader) {
-      setState(() => _showFullHeader = false);
-    } else if (_scrollController.offset <= 20 && !_showFullHeader) {
-      setState(() => _showFullHeader = true);
-    }
-  }
 
   final List<Map<String, dynamic>> _hotlines = [
     {
@@ -84,63 +63,37 @@ class _HotlinesPageState extends State<HotlinesPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F8FC),
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(_showFullHeader ? 100 : 70),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeInOut,
-          padding: EdgeInsets.only(
-            top: _showFullHeader ? 40 : 20,
-            left: 16,
-            right: 16,
-            bottom: 12,
-          ),
+        preferredSize: const Size.fromHeight(80),
+        child: Container(
           decoration: const BoxDecoration(
             color: Color(0xFF336699),
             borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(24),
-              bottomRight: Radius.circular(24),
+              bottomLeft: Radius.circular(16),
+              bottomRight: Radius.circular(16),
             ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black26,
-                blurRadius: 6,
-                offset: Offset(0, 3),
+                blurRadius: 4,
+                offset: Offset(0, 2),
               ),
             ],
           ),
-          child: AnimatedCrossFade(
-            duration: const Duration(milliseconds: 200),
-            crossFadeState: _showFullHeader 
-                ? CrossFadeState.showFirst 
-                : CrossFadeState.showSecond,
-            firstChild: const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Emergency Hotlines',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            secondChild: const Center(
-              child: Text(
+          padding: const EdgeInsets.only(top: 36, left: 16, right: 16, bottom: 12),
+          alignment: Alignment.centerLeft,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: const [
+              Text(
                 'Emergency Hotlines',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ),
+              Icon(Icons.phone_in_talk_rounded, color: Colors.white),
+            ],
           ),
         ),
       ),
@@ -148,168 +101,136 @@ class _HotlinesPageState extends State<HotlinesPage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Search Field with animation
-            AnimatedSlide(
-              duration: const Duration(milliseconds: 300),
-              offset: _showFullHeader ? Offset.zero : const Offset(0, -0.2),
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 300),
-                opacity: _showFullHeader ? 1 : 0.9,
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search hotline...',
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  onChanged: (text) {
-                    setState(() {
-                      _searchText = text;
-                    });
-                  },
+            // Search Field
+            TextField(
+              decoration: InputDecoration(
+                hintText: 'Search hotline...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
                 ),
               ),
+              onChanged: (text) {
+                setState(() {
+                  _searchText = text;
+                });
+              },
             ),
             const SizedBox(height: 16),
 
-            // Hotline Cards with animations
+            // Hotline Cards
             Expanded(
-              child: NotificationListener<ScrollNotification>(
-                onNotification: (notification) {
-                  if (notification is ScrollUpdateNotification) {
-                    _scrollListener();
-                  }
-                  return true;
-                },
-                child: filteredHotlines.isEmpty
-                    ? const Center(
-                        child: Text(
-                          "No results found.",
-                          style: TextStyle(fontSize: 16),
-                        ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        itemCount: filteredHotlines.length,
-                        itemBuilder: (context, index) {
-                          final hotline = filteredHotlines[index];
-                          return AnimatedPadding(
-                            duration: const Duration(milliseconds: 200),
-                            padding: EdgeInsets.only(
-                              bottom: index == filteredHotlines.length - 1 ? 0 : 16,
+              child: filteredHotlines.isEmpty
+                  ? const Center(
+                      child: Text(
+                        "No results found.",
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      itemCount: filteredHotlines.length,
+                      itemBuilder: (context, index) {
+                        final hotline = filteredHotlines[index];
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            bottom: index == filteredHotlines.length - 1 ? 0 : 16,
+                          ),
+                          child: Card(
+                            margin: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
                             ),
-                            child: ScaleTransition(
-                              scale: AlwaysStoppedAnimation(1),
-                              child: Card(
-                                margin: EdgeInsets.zero,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
+                            elevation: 4,
+                            shadowColor: hotline['color'].withOpacity(0.3),
+                            child: ExpansionTile(
+                              tilePadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              title: Text(
+                                hotline['name'],
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
                                 ),
-                                elevation: 4,
-                                shadowColor: hotline['color'].withOpacity(0.3),
-                                child: ExpansionTile(
-                                  tilePadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
-                                  title: Text(
-                                    hotline['name'],
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    hotline['number'],
-                                    style: TextStyle(color: hotline['color']),
-                                  ),
-                                  leading: CircleAvatar(
-                                    backgroundColor: hotline['color'],
-                                    child: const Icon(Icons.local_phone,
-                                        color: Colors.white),
-                                  ),
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 16.0, vertical: 10),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                              ),
+                              subtitle: Text(
+                                hotline['number'],
+                                style: TextStyle(color: hotline['color']),
+                              ),
+                              leading: CircleAvatar(
+                                backgroundColor: hotline['color'],
+                                child: const Icon(Icons.local_phone, color: Colors.white),
+                              ),
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16.0, vertical: 10),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        hotline['description'],
+                                        style: const TextStyle(color: Colors.black87),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Text(
-                                            hotline['description'],
-                                            style: const TextStyle(
-                                                color: Colors.black87),
+                                          ElevatedButton.icon(
+                                            onPressed: () async {
+                                              final Uri url =
+                                                  Uri.parse(hotline['phoneUri']);
+                                              if (await canLaunchUrl(url)) {
+                                                await launchUrl(url);
+                                              }
+                                            },
+                                            icon: const Icon(Icons.call),
+                                            label: const Text('Call'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: hotline['color'],
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(30),
+                                              ),
+                                            ),
                                           ),
-                                          const SizedBox(height: 12),
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              AnimatedScale(
-                                                duration: const Duration(milliseconds: 200),
-                                                scale: 1,
-                                                child: ElevatedButton.icon(
-                                                  onPressed: () async {
-                                                    final Uri url =
-                                                        Uri.parse(hotline['phoneUri']);
-                                                    if (await canLaunchUrl(url)) {
-                                                      await launchUrl(url);
-                                                    }
-                                                  },
-                                                  icon: const Icon(Icons.call),
-                                                  label: const Text('Call'),
-                                                  style: ElevatedButton.styleFrom(
-                                                    backgroundColor: hotline['color'],
-                                                    shape: RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(30),
-                                                    ),
-                                                  ),
-                                                ),
+                                          OutlinedButton.icon(
+                                            onPressed: () async {
+                                              final Uri url =
+                                                  Uri.parse(hotline['facebookUrl']);
+                                              if (await canLaunchUrl(url)) {
+                                                await launchUrl(url);
+                                              }
+                                            },
+                                            icon: const Icon(Icons.facebook),
+                                            label: const Text('Facebook'),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: hotline['color'],
+                                              side: BorderSide(color: hotline['color']),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(30),
                                               ),
-                                              AnimatedScale(
-                                                duration: const Duration(milliseconds: 200),
-                                                scale: 1,
-                                                child: OutlinedButton.icon(
-                                                  onPressed: () async {
-                                                    final Uri url = Uri.parse(
-                                                        hotline['facebookUrl']);
-                                                    if (await canLaunchUrl(url)) {
-                                                      await launchUrl(url);
-                                                    }
-                                                  },
-                                                  icon: const Icon(Icons.facebook),
-                                                  label: const Text('Facebook'),
-                                                  style: OutlinedButton.styleFrom(
-                                                    foregroundColor: hotline['color'],
-                                                    side: BorderSide(
-                                                      color: hotline['color'],
-                                                    ),
-                                                    shape: RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(30),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
+                                            ),
                                           ),
                                         ],
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
-                          );
-                        },
-                      ),
-              ),
+                          ),
+                        );
+                      },
+                    ),
             ),
           ],
         ),

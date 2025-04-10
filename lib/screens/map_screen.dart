@@ -13,19 +13,18 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   late GoogleMapController mapController;
   final TextEditingController _searchController = TextEditingController();
-  LatLng _currentPosition = LatLng(14.5995, 120.9842); // Default position, will update to user's location
-  late Position _userPosition; // To store the user's position
+  LatLng? _currentPosition; // Nullable to check if it's been set
+  late Position _userPosition;
+  bool _isLoading = true;
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
   }
 
-  // Function to get the user's current location
   Future<void> _getCurrentLocation() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        // If location services are not enabled, handle accordingly
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Location services are disabled.")),
         );
@@ -43,7 +42,6 @@ class _MapScreenState extends State<MapScreen> {
         }
       }
 
-      // Get the user's current position
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
@@ -51,19 +49,24 @@ class _MapScreenState extends State<MapScreen> {
       setState(() {
         _userPosition = position;
         _currentPosition = LatLng(position.latitude, position.longitude);
+        _isLoading = false;
       });
-
-      mapController.animateCamera(
-        CameraUpdate.newLatLngZoom(_currentPosition, 15),
-      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
       );
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
-  // Function to search for a location
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+  }
+
   Future<void> _searchLocation() async {
     String query = _searchController.text;
     try {
@@ -74,7 +77,7 @@ class _MapScreenState extends State<MapScreen> {
           _currentPosition = LatLng(location.latitude, location.longitude);
         });
         mapController.animateCamera(
-          CameraUpdate.newLatLngZoom(_currentPosition, 15),
+          CameraUpdate.newLatLngZoom(_currentPosition!, 15),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -89,13 +92,13 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    _getCurrentLocation(); // Fetch user's current location when the screen is initialized
-  }
-
-  @override
   Widget build(BuildContext context) {
+    if (_isLoading || _currentPosition == null) {
+      return Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
@@ -103,7 +106,7 @@ class _MapScreenState extends State<MapScreen> {
           GoogleMap(
             onMapCreated: _onMapCreated,
             initialCameraPosition: CameraPosition(
-              target: _currentPosition, // Set initial camera position to the user's location
+              target: _currentPosition!,
               zoom: 15.0,
             ),
             myLocationEnabled: true,
@@ -111,7 +114,7 @@ class _MapScreenState extends State<MapScreen> {
             markers: {
               Marker(
                 markerId: MarkerId("userLocation"),
-                position: _currentPosition,
+                position: _currentPosition!,
               ),
             },
           ),
