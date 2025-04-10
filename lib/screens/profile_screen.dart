@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'login_screen.dart'; // Make sure the path is correct
-import 'emergency_contacts_screen.dart'; // ← import your SOS contacts screen
+import 'login_screen.dart';
+import 'emergency_contacts_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -48,12 +48,36 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   void _logout() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => LoginScreen(
-          onTap: () {}, // Provide actual logic if needed
-        ),
-      ),
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Confirm Logout"),
+          content: const Text("Are you sure you want to log out?"),
+          actions: [
+            TextButton(
+              child: const Text("Cancel"),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
+              child: const Text("Logout", style: TextStyle(color: Colors.white)),
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => LoginScreen(onTap: () {}),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -65,7 +89,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          // Header gradient
           Stack(
             clipBehavior: Clip.none,
             children: [
@@ -83,8 +106,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                 ),
               ),
-
-              // Animated profile section
               Positioned(
                 top: screenHeight * 0.18,
                 left: 0,
@@ -144,10 +165,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
             ],
           ),
-
           const SizedBox(height: 120),
-
-          // Options section
           Expanded(
             child: SingleChildScrollView(
               child: Padding(
@@ -165,28 +183,25 @@ class _ProfileScreenState extends State<ProfileScreen>
                         onTap: () {},
                       ),
                       const Divider(),
-
                       _buildOptionTile(
                         icon: Icons.help_outline,
                         text: 'Help & Support',
                         onTap: () {},
                       ),
                       const Divider(),
-
-                      // ← New SOS Contacts tile
                       _buildOptionTile(
                         icon: Icons.contact_phone,
                         text: 'SOS Contacts',
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => const EmergencyContactsScreen(),
+                              builder: (_) =>
+                                  const EmergencyContactsScreen(),
                             ),
                           );
                         },
                       ),
                       const Divider(),
-
                       _buildOptionTile(
                         icon: Icons.logout,
                         text: 'Logout',
@@ -213,7 +228,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     return ListTile(
       leading: Icon(
         icon,
-        color: isLogout ? Colors.red : const Color(0xFF3F73A3),
+        color: isLogout ? Colors.red : const Color.fromARGB(255, 0, 0, 0),
         size: 26,
       ),
       title: Text(

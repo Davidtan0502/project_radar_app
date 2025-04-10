@@ -14,7 +14,7 @@ class _HotlinesPageState extends State<HotlinesPage> {
 
   final List<Map<String, dynamic>> _hotlines = [
     {
-      'name': 'Manila City DRRMO',
+      'name': 'Manila City Disaster Risk Reduction Management Office',
       'number': '+63 950 700 3710',
       'description':
           'Handles disaster preparedness, response, and mitigation in Manila.',
@@ -41,7 +41,7 @@ class _HotlinesPageState extends State<HotlinesPage> {
       'color': Colors.indigo,
     },
     {
-      'name': 'Manila Bureau of Fire Protection (BFP)',
+      'name': 'Manila District Fire and Rescue Volunteer',
       'number': '+63 2 527-6951',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
