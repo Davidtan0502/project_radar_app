@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'incident_report_screen.dart';
+import 'emergency_contacts_screen.dart'; // ← new import
 
 void main() => runApp(const MyApp());
 
@@ -41,7 +42,8 @@ class _AlertScreenState extends State<AlertScreen> {
   }
 
   Future<void> _getCurrentLocation() async {
-    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
     setState(() {
       _currentPosition = position;
       _initialPosition = CameraPosition(
@@ -91,16 +93,16 @@ class _AlertScreenState extends State<AlertScreen> {
     final sidePadding = screenWidth * 0.05;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8), // Light gray background
+      backgroundColor: const Color(0xFFF0F4F8),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header with Project RADAR color
+              // Header
               Container(
                 height: headerHeight,
-                color: const Color(0xFF3F73A3), // Project RADAR Header color
+                color: const Color(0xFF3F73A3),
                 padding: EdgeInsets.symmetric(
                   vertical: headerHeight * 0.3,
                   horizontal: sidePadding,
@@ -142,7 +144,7 @@ class _AlertScreenState extends State<AlertScreen> {
 
               SizedBox(height: sectionSpacing),
 
-              // Service Buttons: Ambulance, Fire Truck, Police with equal sizes and margins
+              // Service Buttons
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: sidePadding),
                 child: Row(
@@ -169,19 +171,25 @@ class _AlertScreenState extends State<AlertScreen> {
 
               SizedBox(height: sectionSpacing),
 
-              // SOS Full-Width Button
+              // SOS Full-Width Button → now navigates to EmergencyContactsScreen
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: sidePadding),
                 child: _buildFullWidthButton(
                   icon: 'assets/sos.png',
                   label: 'SOS',
-                  onTap: () => _launchPhone('09777788472'),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const EmergencyContactsScreen(),
+                      ),
+                    );
+                  },
                 ),
               ),
 
               SizedBox(height: sectionSpacing),
 
-              // Incident Report Full-Width Button
+              // Incident Report Button
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: sidePadding),
                 child: _buildFullWidthButton(
@@ -191,7 +199,7 @@ class _AlertScreenState extends State<AlertScreen> {
                 ),
               ),
 
-              const SizedBox(height: 20), // Bottom Spacer
+              const SizedBox(height: 20),
             ],
           ),
         ),
@@ -212,21 +220,17 @@ class _AlertScreenState extends State<AlertScreen> {
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(8), // Equal margins around buttons
+          padding: const EdgeInsets.all(8),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 80, // Fixed width
-                height: 80, // Fixed height to make it square
+                width: 80,
+                height: 80,
                 decoration: BoxDecoration(
-                  shape: BoxShape.rectangle,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Image.asset(
-                  icon,
-                  fit: BoxFit.contain,
-                ),
+                child: Image.asset(icon, fit: BoxFit.contain),
               ),
               const SizedBox(height: 8),
               Text(
@@ -263,10 +267,7 @@ class _AlertScreenState extends State<AlertScreen> {
             children: [
               SizedBox(
                 height: 35,
-                child: Image.asset(
-                  icon,
-                  fit: BoxFit.contain,
-                ),
+                child: Image.asset(icon, fit: BoxFit.contain),
               ),
               const SizedBox(width: 15),
               Text(

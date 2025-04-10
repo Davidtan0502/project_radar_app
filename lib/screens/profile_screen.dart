@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart'; // Make sure the path is correct
+import 'emergency_contacts_screen.dart'; // ← import your SOS contacts screen
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -164,12 +165,28 @@ class _ProfileScreenState extends State<ProfileScreen>
                         onTap: () {},
                       ),
                       const Divider(),
+
                       _buildOptionTile(
                         icon: Icons.help_outline,
                         text: 'Help & Support',
                         onTap: () {},
                       ),
                       const Divider(),
+
+                      // ← New SOS Contacts tile
+                      _buildOptionTile(
+                        icon: Icons.contact_phone,
+                        text: 'SOS Contacts',
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const EmergencyContactsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const Divider(),
+
                       _buildOptionTile(
                         icon: Icons.logout,
                         text: 'Logout',
