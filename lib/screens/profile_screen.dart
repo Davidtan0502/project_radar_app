@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:project_radar_app/screens/help_and_support.dart';
 import 'login_screen.dart';
 import 'emergency_contacts_screen.dart';
+import 'settings_screen.dart';
+
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -176,11 +178,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                   elevation: 4,
                   child: Column(
                     children: [
-                      _buildOptionTile(
+                     _buildOptionTile(
                         icon: Icons.settings,
                         text: 'Settings',
                         onTap: () {
-                          // Placeholder or future screen
+                          Navigator.of(context).push(
+                            _createRoute(const SettingsScreen()),
+                          );
                         },
                       ),
                       const Divider(),
@@ -245,7 +249,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // 🔁 Custom route with fade + slide transition
+  // Custom route with fade + slide transition
   Route _createRoute(Widget screen) {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => screen,
