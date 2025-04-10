@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'login_screen.dart'; // Make sure the path is correct
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -43,6 +44,16 @@ class _ProfileScreenState extends State<ProfileScreen>
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  void _logout() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => LoginScreen(
+          onTap: () {}, // Provide actual logic if needed
+        ),
+      ),
+    );
   }
 
   @override
@@ -94,7 +105,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           child: const CircleAvatar(
                             radius: 60,
                             backgroundImage: NetworkImage(
-                              'https://via.placeholder.com/150', // Replace with actual image
+                              'https://via.placeholder.com/150',
                             ),
                             backgroundColor: Colors.grey,
                           ),
@@ -162,7 +173,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       _buildOptionTile(
                         icon: Icons.logout,
                         text: 'Logout',
-                        onTap: () {},
+                        onTap: _logout,
                         isLogout: true,
                       ),
                     ],

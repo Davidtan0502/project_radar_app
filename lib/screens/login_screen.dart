@@ -3,7 +3,7 @@ import 'package:project_radar_app/screens/main_navigation.dart';
 import 'package:project_radar_app/screens/registration_screen.dart'; // NEW import
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, required Null Function() onTap});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();

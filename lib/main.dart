@@ -16,7 +16,9 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const LoginScreen(), // 👈 This shows the nav bar + screens
+      home: LoginScreen(
+      onTap: () {}, // or provide actual logic here
+      ),
     );
   }
 }
