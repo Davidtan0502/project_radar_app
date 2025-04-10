@@ -84,16 +84,27 @@ class _AlertScreenState extends State<AlertScreen> {
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
-    
+
+    // Define dynamic sizes for better UX
+    final headerHeight = screenHeight * 0.07;
+    final mapHeight = screenHeight * 0.30;
+    final sectionSpacing = screenHeight * 0.02;
+    final sidePadding = screenWidth * 0.04;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Header
             Container(
+              height: headerHeight,
               color: const Color(0xFF3F73A3),
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
+              padding: EdgeInsets.symmetric(
+                vertical: headerHeight * 0.2,
+                horizontal: sidePadding,
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -101,7 +112,7 @@ class _AlertScreenState extends State<AlertScreen> {
                     'Emergency Alerts',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 14,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -109,7 +120,7 @@ class _AlertScreenState extends State<AlertScreen> {
                     _currentTime,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 10,
+                      fontSize: 12,
                     ),
                   ),
                 ],
@@ -118,7 +129,7 @@ class _AlertScreenState extends State<AlertScreen> {
 
             // Map
             SizedBox(
-              height: screenHeight * 0.25,
+              height: mapHeight,
               child: _locationReady
                   ? GoogleMap(
                       onMapCreated: _onMapCreated,
@@ -129,74 +140,75 @@ class _AlertScreenState extends State<AlertScreen> {
                   : const Center(child: CircularProgressIndicator()),
             ),
 
-            // Button Grid
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.01,
-                  vertical: 1,
-                ),
-                child: Column(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: GridView.count(
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 2,
-                        crossAxisSpacing: screenWidth * 0.01,
-                        mainAxisSpacing: screenWidth * 0.01,
-                        childAspectRatio: 1.0,
-                        padding: EdgeInsets.zero,
-                        children: [
-                          _buildGridButton(
-                            icon: 'assets/ambulance.png',
-                            label: 'Ambulance',
-                            onTap: () => _launchPhone('09123456789'),
-                            iconSize: 40,  // Adjust this value
-                            fontSize: 14,   // Adjust this value
-                          ),
-                          _buildGridButton(
-                            icon: 'assets/firetruck.png',
-                            label: 'Fire Truck',
-                            onTap: () => _launchPhone('09123456789'),
-                            iconSize: 40,
-                            fontSize: 14,
-                          ),
-                          _buildGridButton(
-                            icon: 'assets/police.png',
-                            label: 'Police',
-                            onTap: () => _launchPhone('09123456789'),
-                            iconSize: 40,
-                            fontSize: 14,
-                          ),
-                          _buildGridButton(
-                            icon: 'assets/sos.png',
-                            label: 'SOS',
-                            onTap: () => _launchPhone('09777788472'),
-                            iconSize: 40,
-                            fontSize: 14,
-                          ),
-                        ],
-                      ),
+            SizedBox(height: sectionSpacing),
+
+            // Three-button row: Ambulance, Fire Truck, Police
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: sidePadding),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildGridButton(
+                      icon: 'assets/ambulance.png',
+                      label: 'Ambulance',
+                      onTap: () => _launchPhone('09123456789'),
+                      iconSize: 45,
+                      fontSize: 15,
                     ),
-                    SizedBox(height: screenWidth * 0.01),
-                    Expanded(
-                      flex: 1,
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.01),
-                        child: _buildFullWidthButton(
-                          icon: 'assets/report.png',
-                          label: 'Incident Report',
-                          onTap: () => _navigateToIncidentReport(context),
-                          iconSize: 28,  // Adjust this value
-                          fontSize: 14,  // Adjust this value
-                        ),
-                      ),
+                  ),
+                  SizedBox(width: sidePadding),
+                  Expanded(
+                    child: _buildGridButton(
+                      icon: 'assets/firetruck.png',
+                      label: 'Fire Truck',
+                      onTap: () => _launchPhone('09123456789'),
+                      iconSize: 45,
+                      fontSize: 15,
                     ),
-                  ],
-                ),
+                  ),
+                  SizedBox(width: sidePadding),
+                  Expanded(
+                    child: _buildGridButton(
+                      icon: 'assets/police.png',
+                      label: 'Police',
+                      onTap: () => _launchPhone('09123456789'),
+                      iconSize: 45,
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
               ),
             ),
+
+            SizedBox(height: sectionSpacing),
+
+            // SOS full-width button
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: sidePadding),
+              child: _buildFullWidthButton(
+                icon: 'assets/sos.png',
+                label: 'SOS',
+                onTap: () => _launchPhone('09777788472'),
+                iconSize: 30,
+                fontSize: 16,
+              ),
+            ),
+
+            SizedBox(height: sectionSpacing * 0.5),
+
+            // Incident Report full-width button
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: sidePadding),
+              child: _buildFullWidthButton(
+                icon: 'assets/report.png',
+                label: 'Incident Report',
+                onTap: () => _navigateToIncidentReport(context),
+                iconSize: 30,
+                fontSize: 16,
+              ),
+            ),
+
+            const Spacer(),
           ],
         ),
       ),
@@ -212,29 +224,29 @@ class _AlertScreenState extends State<AlertScreen> {
   }) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(6),
-      elevation: 1,
+      borderRadius: BorderRadius.circular(8),
+      elevation: 2,
       child: InkWell(
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(4), // Reduced padding
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               SizedBox(
-                height: iconSize, // Controlled by parameter
+                height: iconSize,
                 child: Image.asset(
                   icon,
                   fit: BoxFit.contain,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 label,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: fontSize, // Controlled by parameter
+                  fontSize: fontSize,
                   fontWeight: FontWeight.w600,
                   color: const Color(0xFF333333),
                 ),
@@ -255,28 +267,28 @@ class _AlertScreenState extends State<AlertScreen> {
   }) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(6),
-      elevation: 1,
+      borderRadius: BorderRadius.circular(8),
+      elevation: 2,
       child: InkWell(
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               SizedBox(
-                height: iconSize, // Controlled by parameter
+                height: iconSize,
                 child: Image.asset(
                   icon,
                   fit: BoxFit.contain,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: fontSize, // Controlled by parameter
+                  fontSize: fontSize,
                   fontWeight: FontWeight.w600,
                   color: const Color(0xFF333333),
                 ),
