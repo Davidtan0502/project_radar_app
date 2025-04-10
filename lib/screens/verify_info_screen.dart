@@ -29,7 +29,7 @@ class VerifyInfoScreen extends StatelessWidget {
           children: [
             const Text('Please verify your information below:', style: TextStyle(fontSize: 16)),
             const SizedBox(height: 20),
-            _buildInfoTile('Name', '$lastName, $firstName ${middleInitial.isNotEmpty ? middleInitial[0] + '.' : ''}'),
+            _buildInfoTile('Name', '$lastName, $firstName ${middleInitial.isNotEmpty ? '${middleInitial[0]}.' : ''}'),
             _buildInfoTile('Email', email),
             _buildInfoTile('Phone', '+63 $phone'),
             const Spacer(),

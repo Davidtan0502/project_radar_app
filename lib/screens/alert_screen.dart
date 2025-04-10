@@ -46,7 +46,7 @@ class _AlertScreenState extends State<AlertScreen> {
       _currentPosition = position;
       _initialPosition = CameraPosition(
         target: LatLng(_currentPosition.latitude, _currentPosition.longitude),
-        zoom: 14,
+        zoom: 16,
       );
       _locationReady = true;
     });
@@ -85,170 +85,156 @@ class _AlertScreenState extends State<AlertScreen> {
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
 
-    // Define dynamic sizes for better UX
-    final headerHeight = screenHeight * 0.07;
-    final mapHeight = screenHeight * 0.30;
+    final headerHeight = screenHeight * 0.08;
+    final mapHeight = screenHeight * 0.35;
     final sectionSpacing = screenHeight * 0.02;
-    final sidePadding = screenWidth * 0.04;
+    final sidePadding = screenWidth * 0.05;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: const Color(0xFFF0F4F8), // Light gray background
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header
-            Container(
-              height: headerHeight,
-              color: const Color(0xFF3F73A3),
-              padding: EdgeInsets.symmetric(
-                vertical: headerHeight * 0.2,
-                horizontal: sidePadding,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Emergency Alerts',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header with Project RADAR color
+              Container(
+                height: headerHeight,
+                color: const Color(0xFF3F73A3), // Project RADAR Header color
+                padding: EdgeInsets.symmetric(
+                  vertical: headerHeight * 0.3,
+                  horizontal: sidePadding,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Emergency Alerts',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  Text(
-                    _currentTime,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
+                    Text(
+                      _currentTime,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-            // Map
-            SizedBox(
-              height: mapHeight,
-              child: _locationReady
-                  ? GoogleMap(
-                      onMapCreated: _onMapCreated,
-                      initialCameraPosition: _initialPosition,
-                      myLocationEnabled: true,
-                      zoomControlsEnabled: false,
-                    )
-                  : const Center(child: CircularProgressIndicator()),
-            ),
+              // Map
+              SizedBox(
+                height: mapHeight,
+                child: _locationReady
+                    ? GoogleMap(
+                        onMapCreated: _onMapCreated,
+                        initialCameraPosition: _initialPosition,
+                        myLocationEnabled: true,
+                        zoomControlsEnabled: false,
+                      )
+                    : const Center(child: CircularProgressIndicator()),
+              ),
 
-            SizedBox(height: sectionSpacing),
+              SizedBox(height: sectionSpacing),
 
-            // Three-button row: Ambulance, Fire Truck, Police
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: sidePadding),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildGridButton(
+              // Service Buttons: Ambulance, Fire Truck, Police with equal sizes and margins
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: sidePadding),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildSquareButton(
                       icon: 'assets/ambulance.png',
                       label: 'Ambulance',
                       onTap: () => _launchPhone('09123456789'),
-                      iconSize: 45,
-                      fontSize: 15,
                     ),
-                  ),
-                  SizedBox(width: sidePadding),
-                  Expanded(
-                    child: _buildGridButton(
+                    _buildSquareButton(
                       icon: 'assets/firetruck.png',
                       label: 'Fire Truck',
                       onTap: () => _launchPhone('09123456789'),
-                      iconSize: 45,
-                      fontSize: 15,
                     ),
-                  ),
-                  SizedBox(width: sidePadding),
-                  Expanded(
-                    child: _buildGridButton(
+                    _buildSquareButton(
                       icon: 'assets/police.png',
                       label: 'Police',
                       onTap: () => _launchPhone('09123456789'),
-                      iconSize: 45,
-                      fontSize: 15,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-            SizedBox(height: sectionSpacing),
+              SizedBox(height: sectionSpacing),
 
-            // SOS full-width button
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: sidePadding),
-              child: _buildFullWidthButton(
-                icon: 'assets/sos.png',
-                label: 'SOS',
-                onTap: () => _launchPhone('09777788472'),
-                iconSize: 30,
-                fontSize: 16,
+              // SOS Full-Width Button
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: sidePadding),
+                child: _buildFullWidthButton(
+                  icon: 'assets/sos.png',
+                  label: 'SOS',
+                  onTap: () => _launchPhone('09777788472'),
+                ),
               ),
-            ),
 
-            SizedBox(height: sectionSpacing * 0.5),
+              SizedBox(height: sectionSpacing),
 
-            // Incident Report full-width button
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: sidePadding),
-              child: _buildFullWidthButton(
-                icon: 'assets/report.png',
-                label: 'Incident Report',
-                onTap: () => _navigateToIncidentReport(context),
-                iconSize: 30,
-                fontSize: 16,
+              // Incident Report Full-Width Button
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: sidePadding),
+                child: _buildFullWidthButton(
+                  icon: 'assets/report.png',
+                  label: 'Incident Report',
+                  onTap: () => _navigateToIncidentReport(context),
+                ),
               ),
-            ),
 
-            const Spacer(),
-          ],
+              const SizedBox(height: 20), // Bottom Spacer
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildGridButton({
+  Widget _buildSquareButton({
     required String icon,
     required String label,
     required VoidCallback onTap,
-    required double iconSize,
-    required double fontSize,
   }) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(8),
-      elevation: 2,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 8,
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.all(8), // Equal margins around buttons
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(
-                height: iconSize,
+              Container(
+                width: 80, // Fixed width
+                height: 80, // Fixed height to make it square
+                decoration: BoxDecoration(
+                  shape: BoxShape.rectangle,
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Image.asset(
                   icon,
                   fit: BoxFit.contain,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: fontSize,
+                style: const TextStyle(
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: const Color(0xFF333333),
+                  color: Color(0xFF333333),
                 ),
               ),
             ],
@@ -262,35 +248,33 @@ class _AlertScreenState extends State<AlertScreen> {
     required String icon,
     required String label,
     required VoidCallback onTap,
-    required double iconSize,
-    required double fontSize,
   }) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(8),
-      elevation: 2,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 8,
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: const EdgeInsets.symmetric(vertical: 18),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               SizedBox(
-                height: iconSize,
+                height: 35,
                 child: Image.asset(
                   icon,
                   fit: BoxFit.contain,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 15),
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: fontSize,
+                style: const TextStyle(
+                  fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: const Color(0xFF333333),
+                  color: Color(0xFF333333),
                 ),
               ),
             ],
