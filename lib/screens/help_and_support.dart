@@ -5,18 +5,27 @@ class HelpSupportScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeColor = Colors.redAccent;
+    const Color themeColor = Color(0xFFB71C1C); // Project RADAR deep red
+    const Color backgroundColor = Color(0xFFF9F9F9);
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        title: const Text("Help & Support"),
-        backgroundColor: themeColor,
+        title: const Text("Help & Support", style: TextStyle(color: Colors.white)),
         centerTitle: true,
-        elevation: 0,
+        elevation: 4,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFD32F2F), Color(0xFFB71C1C)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -34,19 +43,19 @@ class HelpSupportScreen extends StatelessWidget {
                 "Yes, use the Alert button (⚠️) at the center of the bottom navigation bar to report an emergency quickly.",
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _sectionTitle("📞 Contact Us"),
             const SizedBox(height: 12),
             _buildCard(
               child: Column(
                 children: [
-                  _contactItem(Icons.email, "support@projectradar.com"),
-                  const Divider(),
-                  _contactItem(Icons.phone, "+1 800 123 4567"),
+                  _contactItem(Icons.email_outlined, "support@projectradar.com"),
+                  const Divider(height: 1),
+                  _contactItem(Icons.phone_outlined, "+1 800 123 4567"),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _sectionTitle("🛠️ Support Tools"),
             const SizedBox(height: 12),
             _buildButton(
@@ -55,10 +64,10 @@ class HelpSupportScreen extends StatelessWidget {
               backgroundColor: themeColor,
               textColor: Colors.white,
               onPressed: () {
-                // navigate to feedback form
+                // Navigate to feedback
               },
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             _buildButton(
               icon: Icons.bug_report_outlined,
               label: "Report an Issue",
@@ -66,7 +75,7 @@ class HelpSupportScreen extends StatelessWidget {
               textColor: themeColor,
               border: BorderSide(color: themeColor),
               onPressed: () {
-                // navigate to issue report
+                // Navigate to report
               },
             ),
           ],
@@ -75,11 +84,24 @@ class HelpSupportScreen extends StatelessWidget {
     );
   }
 
+  Widget _sectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+        color: Colors.black87,
+      ),
+    );
+  }
+
   Widget _buildCard({required Widget child}) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 4,
+      elevation: 3,
       margin: const EdgeInsets.only(bottom: 16),
+      color: Colors.white,
+      shadowColor: Colors.black26,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: child,
@@ -87,26 +109,21 @@ class HelpSupportScreen extends StatelessWidget {
     );
   }
 
-  Widget _sectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-    );
-  }
-
   Widget _buildFAQItem(String question, String answer) {
     return ExpansionTile(
       tilePadding: EdgeInsets.zero,
+      collapsedIconColor: Colors.grey[700],
+      iconColor: Colors.redAccent,
       title: Text(
         question,
-        style: const TextStyle(fontWeight: FontWeight.w600),
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
       ),
       children: [
         Padding(
-          padding: const EdgeInsets.only(top: 8.0),
+          padding: const EdgeInsets.only(top: 8),
           child: Text(
             answer,
-            style: const TextStyle(color: Colors.black87),
+            style: const TextStyle(fontSize: 15, color: Colors.black87),
           ),
         ),
       ],
@@ -115,8 +132,11 @@ class HelpSupportScreen extends StatelessWidget {
 
   Widget _contactItem(IconData icon, String info) {
     return ListTile(
-      leading: Icon(icon, color: Colors.redAccent),
-      title: Text(info),
+      leading: Icon(icon, color: Color(0xFFD32F2F)),
+      title: Text(
+        info,
+        style: const TextStyle(fontSize: 15),
+      ),
       dense: true,
     );
   }
@@ -132,16 +152,17 @@ class HelpSupportScreen extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
-        onPressed: onPressed,
         icon: Icon(icon, color: textColor),
-        label: Text(label, style: TextStyle(color: textColor)),
+        label: Text(
+          label,
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: textColor),
+        ),
+        onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           backgroundColor: backgroundColor,
           side: border,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
           padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
     );

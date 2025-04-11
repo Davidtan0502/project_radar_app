@@ -116,7 +116,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                       const Text(
                                         'R.A.D.A.R',
                                         style: TextStyle(
-                                          fontSize: 40,
+                                          fontSize: 56,
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
                                           letterSpacing: 1.5,
