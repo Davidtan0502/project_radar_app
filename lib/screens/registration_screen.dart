@@ -50,6 +50,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
     super.dispose();
   }
 
+  // ignore: unused_element
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -112,55 +113,55 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.stretch,
                                     children: [
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: _buildTextField(
-                                                _lastNameController,
-                                                'Last Name',
-                                                Icons.person,
-                                                validator: (val) {
-                                                  if (val == null || val.trim().isEmpty) {
-                                                    return 'Enter last name';
-                                                  }
-                                                  return null;
-                                                },
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: _buildTextField(
-                                                _firstNameController,
-                                                'First Name',
-                                                Icons.person_outline,
-                                                validator: (val) {
-                                                  if (val == null || val.trim().isEmpty) {
-                                                    return 'Enter first name';
-                                                  }
-                                                  return null;
-                                                },
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            // Make the M.I. field a little larger and ensure it fits properly
-                                            SizedBox(
-                                              width: 80, // Increase width if necessary
-                                              child: _buildTextField(
-                                                _middleInitialController,
-                                                'M.I.',
-                                                Icons.text_fields,
-                                                validator: (val) {
-                                                  if (val == null || val.isEmpty || val.length > 1) {
-                                                    return '1 letter';
-                                                  }
-                                                  return null;
-                                                },
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-
+                                      // Last Name Field
+                                      _buildTextField(
+                                        _lastNameController,
+                                        'Last Name',
+                                        Icons.person,
+                                        validator: (val) {
+                                          if (val == null || val.trim().isEmpty) {
+                                            return 'Enter last name';
+                                          }
+                                          return null;
+                                        },
+                                      ),
                                       const SizedBox(height: 12),
+                                      
+                                      // First Name Field
+                                      _buildTextField(
+                                        _firstNameController,
+                                        'First Name',
+                                        Icons.person_outline,
+                                        validator: (val) {
+                                          if (val == null || val.trim().isEmpty) {
+                                            return 'Enter first name';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 12),
+                                      
+                                      // Middle Initial Field
+                                      Row(
+                                        children: [
+                                          SizedBox(
+                                            width: 250,
+                                            child: _buildTextField(
+                                              _middleInitialController,
+                                              'Middle Name',
+                                              Icons.text_fields,
+                                              validator: (val) {
+                                                if (val == null || val.isEmpty || val.length > 1) {
+                                                  return 'Enter full middle initial';
+                                                }
+                                                return null;
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 24),
+
                                       _buildTextField(
                                         _emailController,
                                         'Email',
@@ -207,7 +208,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                                         obscureText: true,
                                         validator: (val) {
                                           if (val != _passwordController.text) {
-                                            return 'Passwords don’t match';
+                                            return 'Passwords do not match';
                                           }
                                           return null;
                                         },
