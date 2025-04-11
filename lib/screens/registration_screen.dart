@@ -8,20 +8,25 @@ class RegisterScreen extends StatefulWidget {
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProviderStateMixin {
+class _RegisterScreenState extends State<RegisterScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<Color?> _colorAnimation;
 
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _firstNameController = TextEditingController();
-  final TextEditingController _middleInitialController = TextEditingController();
+  final TextEditingController _middleInitialController =
+      TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
   bool _isLoading = false;
+  bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
 
   @override
   void initState() {
@@ -50,24 +55,6 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
     super.dispose();
   }
 
-  Future<void> _handleRegister() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    FocusScope.of(context).unfocus();
-    setState(() => _isLoading = true);
-
-    await Future.delayed(const Duration(seconds: 2)); // Simulate network call
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Registration successful!')),
-    );
-
-    Navigator.pop(context); // Go back to login
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -80,13 +67,28 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   return SingleChildScrollView(
-                    padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).viewInsets.bottom,
+                    ),
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
                       child: IntrinsicHeight(
                         child: Column(
                           children: [
-                            const SizedBox(height: 40),
+                            Align(
+                              alignment: Alignment.topLeft,
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.arrow_back,
+                                  color: Colors.white,
+                                ),
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                },
+                              ),
+                            ),
                             const Text(
                               "Create an Account",
                               style: TextStyle(
@@ -102,53 +104,54 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                                 padding: const EdgeInsets.all(24),
                                 decoration: const BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                                  borderRadius: BorderRadius.vertical(
+                                    top: Radius.circular(30),
+                                  ),
                                   boxShadow: [
-                                    BoxShadow(color: Colors.black26, offset: Offset(0, -3), blurRadius: 6),
+                                    BoxShadow(
+                                      color: Colors.black26,
+                                      offset: Offset(0, -3),
+                                      blurRadius: 6,
+                                    ),
                                   ],
                                 ),
                                 child: Form(
                                   key: _formKey,
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
                                     children: [
-                                      // Last Name Field
                                       _buildTextField(
                                         _lastNameController,
                                         'Last Name',
                                         Icons.person,
                                         validator: (val) {
-                                          if (val == null || val.trim().isEmpty) {
+                                          if (val == null || val.trim().isEmpty)
                                             return 'Enter last name';
-                                          }
                                           return null;
                                         },
                                       ),
                                       const SizedBox(height: 12),
-                                      
-                                      // First Name Field
+
                                       _buildTextField(
                                         _firstNameController,
                                         'First Name',
                                         Icons.person_outline,
                                         validator: (val) {
-                                          if (val == null || val.trim().isEmpty) {
+                                          if (val == null || val.trim().isEmpty)
                                             return 'Enter first name';
-                                          }
                                           return null;
                                         },
                                       ),
                                       const SizedBox(height: 12),
-                                      
-                                      // Middle Initial Field
+
                                       _buildTextField(
                                         _middleInitialController,
                                         'Middle Name',
                                         Icons.person_outline,
                                         validator: (val) {
-                                          if (val == null || val.trim().isEmpty) {
+                                          if (val == null || val.trim().isEmpty)
                                             return 'Enter middle name';
-                                          }
                                           return null;
                                         },
                                       ),
@@ -158,77 +161,180 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                                         _emailController,
                                         'Email',
                                         Icons.email,
-                                        keyboardType: TextInputType.emailAddress,
+                                        keyboardType:
+                                            TextInputType.emailAddress,
                                         validator: (val) {
-                                          if (val == null || !val.contains('@')) {
+                                          if (val == null || !val.contains('@'))
                                             return 'Enter valid email';
-                                          }
                                           return null;
                                         },
                                       ),
                                       const SizedBox(height: 12),
-                                      _buildTextField(
-                                        _phoneController,
-                                        'Phone Number',
-                                        Icons.phone,
+
+                                      TextFormField(
+                                        controller: _phoneController,
                                         keyboardType: TextInputType.phone,
                                         validator: (val) {
-                                          if (val == null || val.length != 10) {
+                                          if (val == null || val.length != 10)
                                             return 'Enter 10-digit number';
-                                          }
                                           return null;
                                         },
+                                        decoration: InputDecoration(
+                                          labelText: 'Phone Number',
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                vertical: 14,
+                                                horizontal: 16,
+                                              ),
+                                          prefixIcon: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: const [
+                                                Image(
+                                                  image: AssetImage(
+                                                    'assets/ph_flag.png',
+                                                  ),
+                                                  width: 24,
+                                                  height: 24,
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text('+63'),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                       const SizedBox(height: 12),
-                                      _buildTextField(
-                                        _passwordController,
-                                        'Password',
-                                        Icons.lock,
-                                        obscureText: true,
+
+                                      // Password field with toggle
+                                      TextFormField(
+                                        controller: _passwordController,
+                                        obscureText: !_isPasswordVisible,
                                         validator: (val) {
-                                          if (val == null || val.length < 6) {
+                                          if (val == null || val.length < 6)
                                             return 'At least 6 characters';
-                                          }
                                           return null;
                                         },
+                                        decoration: InputDecoration(
+                                          labelText: 'Password',
+                                          prefixIcon: const Icon(Icons.lock),
+                                          suffixIcon: IconButton(
+                                            icon: Icon(
+                                              _isPasswordVisible
+                                                  ? Icons.visibility
+                                                  : Icons.visibility_off,
+                                            ),
+                                            onPressed: () {
+                                              setState(() {
+                                                _isPasswordVisible =
+                                                    !_isPasswordVisible;
+                                              });
+                                            },
+                                          ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                vertical: 14,
+                                                horizontal: 16,
+                                              ),
+                                        ),
                                       ),
                                       const SizedBox(height: 12),
-                                      _buildTextField(
-                                        _confirmPasswordController,
-                                        'Confirm Password',
-                                        Icons.lock_outline,
-                                        obscureText: true,
+
+                                      // Confirm Password field with toggle
+                                      TextFormField(
+                                        controller: _confirmPasswordController,
+                                        obscureText: !_isConfirmPasswordVisible,
                                         validator: (val) {
-                                          if (val != _passwordController.text) {
+                                          if (val != _passwordController.text)
                                             return 'Passwords don\'t match';
-                                          }
                                           return null;
                                         },
+                                        decoration: InputDecoration(
+                                          labelText: 'Confirm Password',
+                                          prefixIcon: const Icon(
+                                            Icons.lock_outline,
+                                          ),
+                                          suffixIcon: IconButton(
+                                            icon: Icon(
+                                              _isConfirmPasswordVisible
+                                                  ? Icons.visibility
+                                                  : Icons.visibility_off,
+                                            ),
+                                            onPressed: () {
+                                              setState(() {
+                                                _isConfirmPasswordVisible =
+                                                    !_isConfirmPasswordVisible;
+                                              });
+                                            },
+                                          ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                vertical: 14,
+                                                horizontal: 16,
+                                              ),
+                                        ),
                                       ),
                                       const SizedBox(height: 24),
+
                                       ElevatedButton(
-                                        onPressed: _isLoading
-                                            ? null
-                                            : () {
-                                                if (_formKey.currentState!.validate()) {
-                                                  Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder: (_) => VerifyInfoScreen(
-                                                        lastName: _lastNameController.text,
-                                                        firstName: _firstNameController.text,
-                                                        middleInitial: _middleInitialController.text,
-                                                        email: _emailController.text,
-                                                        phone: _phoneController.text,
-                                                        password: _passwordController.text,
+                                        onPressed:
+                                            _isLoading
+                                                ? null
+                                                : () {
+                                                  if (_formKey.currentState!
+                                                      .validate()) {
+                                                    Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder:
+                                                            (
+                                                              _,
+                                                            ) => VerifyInfoScreen(
+                                                              lastName:
+                                                                  _lastNameController
+                                                                      .text,
+                                                              firstName:
+                                                                  _firstNameController
+                                                                      .text,
+                                                              middleInitial:
+                                                                  _middleInitialController
+                                                                      .text,
+                                                              email:
+                                                                  _emailController
+                                                                      .text,
+                                                              phone:
+                                                                  _phoneController
+                                                                      .text,
+                                                              password:
+                                                                  _passwordController
+                                                                      .text,
+                                                            ),
                                                       ),
-                                                    ),
-                                                  );
-                                                }
-                                              },
-                                        child: _isLoading
-                                            ? const CircularProgressIndicator()
-                                            : const Text('Register'),
+                                                    );
+                                                  }
+                                                },
+                                        child:
+                                            _isLoading
+                                                ? const CircularProgressIndicator()
+                                                : const Text('Register'),
                                       ),
                                     ],
                                   ),
@@ -266,7 +372,10 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         prefixIcon: Icon(icon),
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 14,
+          horizontal: 16,
+        ),
       ),
     );
   }

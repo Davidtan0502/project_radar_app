@@ -116,7 +116,7 @@ class _AccountInfoState extends State<AccountInfo> {
                 'Phone Number',
                 _phoneController,
                 keyboardType: TextInputType.phone,
-                hint: '+63 xxxxxxxxxx',
+                hint: '09123456789',
               ),
               _buildEditableField(
                 'Date of Birth',
