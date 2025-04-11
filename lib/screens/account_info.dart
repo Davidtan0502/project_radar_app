@@ -55,7 +55,10 @@ class _AccountInfoState extends State<AccountInfo> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Account Information', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Account Information',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: radarBlue,
       ),
       backgroundColor: Colors.grey[100],
@@ -69,41 +72,85 @@ class _AccountInfoState extends State<AccountInfo> {
                 onTap: () => _pickImage(ImageSource.gallery, true),
                 child: CircleAvatar(
                   radius: 50,
-                  backgroundImage: _profileImage != null
-                      ? FileImage(_profileImage!)
-                      : const NetworkImage('https://via.placeholder.com/150') as ImageProvider,
-                  child: _profileImage == null
-                      ? const Icon(Icons.camera_alt, size: 30, color: Colors.white70)
-                      : null,
+                  backgroundImage:
+                      _profileImage != null
+                          ? FileImage(_profileImage!)
+                          : const NetworkImage(
+                                'https://via.placeholder.com/150',
+                              )
+                              as ImageProvider,
+                  child:
+                      _profileImage == null
+                          ? const Icon(
+                            Icons.camera_alt,
+                            size: 30,
+                            color: Colors.white70,
+                          )
+                          : null,
                 ),
               ),
               const SizedBox(height: 20),
               _buildSectionTitle('Personal Information'),
-              _buildEditableField('First Name', _firstNameController, hint: 'John'),
-              _buildEditableField('Middle Name', _middleNameController, hint: 'Felix'),
-              _buildEditableField('Last Name', _lastNameController, hint: 'Doe'),
-              _buildEditableField('Email', _emailController, keyboardType: TextInputType.emailAddress, hint: 'john.doe@example.com'),
-              _buildEditableField('Phone Number', _phoneController, keyboardType: TextInputType.phone, hint: '+1234567890'),
-              _buildEditableField('Date of Birth', _dobController, hint: 'January 1, 1990'),
-              _buildEditableField('Address', _addressController, hint: '123 Main St, Manila City, Philippines'),
+              _buildEditableField(
+                'First Name',
+                _firstNameController,
+                hint: 'John',
+              ),
+              _buildEditableField(
+                'Middle Name',
+                _middleNameController,
+                hint: 'Felix',
+              ),
+              _buildEditableField(
+                'Last Name',
+                _lastNameController,
+                hint: 'Doe',
+              ),
+              _buildEditableField(
+                'Email',
+                _emailController,
+                keyboardType: TextInputType.emailAddress,
+                hint: 'yourname@example.com',
+              ),
+              _buildEditableField(
+                'Phone Number',
+                _phoneController,
+                keyboardType: TextInputType.phone,
+                hint: '+63 xxxxxxxxxx',
+              ),
+              _buildEditableField(
+                'Date of Birth',
+                _dobController,
+                hint: 'January 1, 1990',
+              ),
+              _buildEditableField(
+                'Address',
+                _addressController,
+                hint: '123 Main St, Manila City, Philippines',
+              ),
               const SizedBox(height: 10),
               _buildSectionTitle('ID Upload'),
               GestureDetector(
                 onTap: () => _pickImage(ImageSource.gallery, false),
-                child: _idImage != null
-                    ? Image.file(_idImage!, height: 150)
-                    : Container(
-                        height: 150,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(10),
+                child:
+                    _idImage != null
+                        ? Image.file(_idImage!, height: 150)
+                        : Container(
+                          height: 150,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Center(child: Text('Tap to upload ID')),
                         ),
-                        child: const Center(child: Text('Tap to upload ID')),
-                      ),
               ),
               const SizedBox(height: 20),
               _buildSectionTitle('Health Information'),
-              _buildEditableField('Blood Type', _bloodTypeController, hint: 'O+'),
+              _buildEditableField(
+                'Blood Type',
+                _bloodTypeController,
+                hint: 'O+',
+              ),
               _buildEditableField('Height', _heightController, hint: '170 cm'),
               _buildEditableField('Weight', _weightController, hint: '65 kg'),
               const SizedBox(height: 20),
@@ -116,7 +163,10 @@ class _AccountInfoState extends State<AccountInfo> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text('Save', style: TextStyle(fontSize: 16, color: Colors.white)),
+                child: const Text(
+                  'Save',
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
               ),
             ],
           ),
@@ -151,7 +201,10 @@ class _AccountInfoState extends State<AccountInfo> {
           hintText: hint,
           labelStyle: const TextStyle(color: Colors.black87),
           hintStyle: const TextStyle(color: Colors.grey),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
           filled: true,
           fillColor: Colors.white,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),

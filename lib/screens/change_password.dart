@@ -25,7 +25,11 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
     }
   }
 
-  InputDecoration _buildInputDecoration(String label, bool visible, VoidCallback toggle) {
+  InputDecoration _buildInputDecoration(
+    String label,
+    bool visible,
+    VoidCallback toggle,
+  ) {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Color(0xFF28588B)),
@@ -50,8 +54,14 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
       backgroundColor: Colors.white,
       body: Column(
         children: [
+          // Header with back button and title
           Container(
-            padding: const EdgeInsets.only(top: 50, bottom: 30),
+            padding: const EdgeInsets.only(
+              top: 50,
+              bottom: 30,
+              left: 20,
+              right: 20,
+            ),
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -71,17 +81,28 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                 ),
               ],
             ),
-            child: const Center(
-              child: Text(
-                'Change Password',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () {
+                    Navigator.pop(context); // Go back to settings screen
+                  },
                 ),
-              ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Change Password',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
           ),
+
+          // Form content
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -109,8 +130,11 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                           _showCurrentPassword = !_showCurrentPassword;
                         }),
                       ),
-                      validator: (value) =>
-                          value!.isEmpty ? 'Enter your current password' : null,
+                      validator:
+                          (value) =>
+                              value!.isEmpty
+                                  ? 'Enter your current password'
+                                  : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -123,9 +147,11 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                           _showNewPassword = !_showNewPassword;
                         }),
                       ),
-                      validator: (value) => value!.length < 6
-                          ? 'Password must be at least 6 characters'
-                          : null,
+                      validator:
+                          (value) =>
+                              value!.length < 6
+                                  ? 'Password must be at least 6 characters'
+                                  : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(

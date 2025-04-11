@@ -13,11 +13,9 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Project RADAR',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
+      theme: ThemeData(primarySwatch: Colors.blue),
       home: LoginScreen(
-      onTap: () {}, // or provide actual logic here
+        onTap: () {}, // or provide actual logic here
       ),
     );
   }

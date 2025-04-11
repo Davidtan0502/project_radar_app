@@ -33,15 +33,24 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ],
             ),
-            child: const Center(
-              child: Text(
-                'Settings',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () {
+                    Navigator.pop(context); // Go back to previous screen
+                  },
                 ),
-              ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Settings',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 20),
@@ -60,9 +69,9 @@ class SettingsScreen extends StatelessWidget {
                       icon: Icons.person,
                       title: 'Account',
                       onTap: () {
-                        Navigator.of(context).push(
-                          _createRoute(const AccountInfo()),
-                        );
+                        Navigator.of(
+                          context,
+                        ).push(_createRoute(const AccountInfo()));
                       },
                     ),
                     const Divider(height: 1),
@@ -71,9 +80,9 @@ class SettingsScreen extends StatelessWidget {
                       icon: Icons.lock,
                       title: 'Privacy & Security',
                       onTap: () {
-                        Navigator.of(context).push(
-                          _createRoute(const ChangePassword()),
-                        );
+                        Navigator.of(
+                          context,
+                        ).push(_createRoute(const ChangePassword()));
                       },
                     ),
                     const Divider(height: 1),
@@ -82,9 +91,9 @@ class SettingsScreen extends StatelessWidget {
                       icon: Icons.info_outline,
                       title: 'About Us',
                       onTap: () {
-                        Navigator.of(context).push(
-                          _createRoute(const AboutUs()),
-                        );
+                        Navigator.of(
+                          context,
+                        ).push(_createRoute(const AboutUs()));
                       },
                     ),
                   ],
@@ -115,10 +124,7 @@ class SettingsScreen extends StatelessWidget {
       ),
       title: Text(
         title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       ),
       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
       onTap: onTap,
@@ -133,8 +139,10 @@ class SettingsScreen extends StatelessWidget {
         const end = Offset.zero;
         const curve = Curves.ease;
 
-        final tween = Tween(begin: begin, end: end)
-            .chain(CurveTween(curve: curve));
+        final tween = Tween(
+          begin: begin,
+          end: end,
+        ).chain(CurveTween(curve: curve));
         final fadeTween = Tween<double>(begin: 0.0, end: 1.0);
 
         return SlideTransition(

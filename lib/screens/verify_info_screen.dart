@@ -27,11 +27,12 @@ class VerifyInfoScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Please verify your information below:', style: TextStyle(fontSize: 16)),
-            const SizedBox(height: 20),
-            _buildInfoTile('Name', '$lastName, $firstName ${middleInitial.isNotEmpty ? '${middleInitial[0]}.' : ''}'),
-            _buildInfoTile('Email', email),
-            _buildInfoTile('Phone', '+63 $phone'),
+            Text("Last Name: $lastName"),
+            Text("First Name: $firstName"),
+            Text("M.I.: $middleInitial"),
+            Text("Email: $email"),
+            Text("Phone: $phone"),
+            Text("Password: $password"),
             const Spacer(),
             SizedBox(
               width: double.infinity,
@@ -41,7 +42,10 @@ class VerifyInfoScreen extends StatelessWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Verified and Registered!')),
                   );
-                  Navigator.popUntil(context, (route) => route.isFirst); // or go to MainNavigation()
+                  Navigator.popUntil(
+                    context,
+                    (route) => route.isFirst,
+                  ); // or go to MainNavigation()
                 },
                 child: const Text('Confirm and Continue'),
               ),
@@ -49,7 +53,7 @@ class VerifyInfoScreen extends StatelessWidget {
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('Go Back to Edit'),
-            )
+            ),
           ],
         ),
       ),
