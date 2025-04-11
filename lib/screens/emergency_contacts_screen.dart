@@ -39,7 +39,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Add Emergency Contact'),
+        title: const Text('Add Emergency Contact', style: TextStyle(color: Color(0xFF1565C0))),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -57,7 +57,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF1565C0))),
           ),
           ElevatedButton(
             onPressed: () {
@@ -69,7 +69,14 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                 Navigator.pop(context);
               }
             },
-            child: const Text('Save'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1565C0),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text('Save', style: TextStyle(fontSize: 16, color: Colors.white)),
           ),
         ],
       ),
@@ -87,8 +94,8 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SOS Contacts'),
-        backgroundColor: const Color(0xFF3F73A3),
+        title: const Text('SOS Contacts', style: TextStyle(color: Colors.white)),
+        backgroundColor: const Color(0xFF1565C0),
       ),
       body: ListView.separated(
         padding: const EdgeInsets.all(16),
@@ -97,9 +104,9 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
         itemBuilder: (ctx, i) {
           final c = _contacts[i];
           return ListTile(
-            leading: const Icon(Icons.person),
-            title: Text(c['name']!),
-            subtitle: Text(c['phone']!),
+            leading: const Icon(Icons.person, color: Color(0xFF1565C0)),
+            title: Text(c['name']!, style: TextStyle(fontSize: 16, color: Colors.black87)),
+            subtitle: Text(c['phone']!, style: TextStyle(fontSize: 14, color: Colors.black54)),
             trailing: IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
               onPressed: () => _removeContact(i),
@@ -109,8 +116,8 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addContact,
-        backgroundColor: const Color(0xFF3F73A3),
-        child: const Icon(Icons.add),
+        backgroundColor: const Color(0xFF1565C0),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
