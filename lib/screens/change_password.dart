@@ -22,6 +22,18 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password changed successfully!')),
       );
+
+      // Clear the text fields after successful save
+      _currentPasswordController.clear();
+      _newPasswordController.clear();
+      _confirmPasswordController.clear();
+
+      // Optionally reset visibility flags
+      setState(() {
+        _showCurrentPassword = false;
+        _showNewPassword = false;
+        _showConfirmPassword = false;
+      });
     }
   }
 
@@ -54,7 +66,6 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          // Header with back button and title
           Container(
             padding: const EdgeInsets.only(
               top: 50,
@@ -86,7 +97,7 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                 IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
                   onPressed: () {
-                    Navigator.pop(context); // Go back to settings screen
+                    Navigator.pop(context);
                   },
                 ),
                 const SizedBox(width: 10),
@@ -102,7 +113,6 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
             ),
           ),
 
-          // Form content
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),

@@ -10,7 +10,8 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<Color?> _colorAnimation;
   final TextEditingController _emailController = TextEditingController();
@@ -21,6 +22,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   bool _showPasswordStep = false;
   String? _emailError;
   String? _passwordError;
+  bool _obscurePassword = true; // NEW: toggle password state
 
   @override
   void initState() {
@@ -57,7 +59,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       return;
     }
 
-    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_emailController.text)) {
+    if (!RegExp(
+      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+    ).hasMatch(_emailController.text)) {
       setState(() => _emailError = 'Please enter a valid email address');
       return;
     }
@@ -110,16 +114,17 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Error'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Error'),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -192,24 +197,26 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               backgroundColor: _colorAnimation.value,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30)),
+                borderRadius: BorderRadius.circular(30),
+              ),
             ),
-            child: _isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
+            child:
+                _isLoading
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                    : Text(
+                      'Continue',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 14 : 16,
+                        color: Colors.white,
+                      ),
                     ),
-                  )
-                : Text(
-                    'Continue',
-                    style: TextStyle(
-                      fontSize: isSmallScreen ? 14 : 16,
-                      color: Colors.white,
-                    ),
-                  ),
           ),
         ),
       ],
@@ -226,11 +233,12 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           children: [
             IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () => setState(() {
-                _showPasswordStep = false;
-                _passwordController.clear();
-                _passwordError = null;
-              }),
+              onPressed:
+                  () => setState(() {
+                    _showPasswordStep = false;
+                    _passwordController.clear();
+                    _passwordError = null;
+                  }),
             ),
             Text(
               'Welcome Back!',
@@ -266,11 +274,26 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     child: TextField(
                       controller: _passwordController,
                       focusNode: _passwordFocusNode,
-                      obscureText: true,
-                      decoration: const InputDecoration(
+                      obscureText: _obscurePassword,
+                      decoration: InputDecoration(
                         hintText: 'Enter password',
                         border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
                       ),
                       onChanged: (_) => setState(() => _passwordError = null),
                     ),
@@ -293,7 +316,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           alignment: Alignment.centerRight,
           child: TextButton(
             onPressed: () {
-              _showErrorDialog('Password reset instructions sent to your email');
+              _showErrorDialog(
+                'Password reset instructions sent to your email',
+              );
             },
             child: const Text('Forgot Password?'),
           ),
@@ -307,24 +332,26 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               backgroundColor: _colorAnimation.value,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30)),
+                borderRadius: BorderRadius.circular(30),
+              ),
             ),
-            child: _isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
+            child:
+                _isLoading
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                    : Text(
+                      'Login',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 14 : 16,
+                        color: Colors.white,
+                      ),
                     ),
-                  )
-                : Text(
-                    'Login',
-                    style: TextStyle(
-                      fontSize: isSmallScreen ? 14 : 16,
-                      color: Colors.white,
-                    ),
-                  ),
           ),
         ),
       ],
@@ -346,9 +373,13 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   return SingleChildScrollView(
-                    padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).viewInsets.bottom,
+                    ),
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
                       child: IntrinsicHeight(
                         child: Column(
                           children: [
@@ -356,7 +387,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               flex: isSmallScreen ? 4 : 6,
                               child: Center(
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                  ),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
@@ -378,7 +411,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                         const SizedBox(height: 4),
                                         const Text(
                                           '(Rapid Action for Disaster Aid Resource)',
-                                          style: TextStyle(fontSize: 12, color: Colors.white70),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.white70,
+                                          ),
                                         ),
                                       ],
                                     ],
@@ -396,34 +432,45 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                 ),
                                 decoration: const BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                                  borderRadius: BorderRadius.vertical(
+                                    top: Radius.circular(30),
+                                  ),
                                   boxShadow: [
-                                    BoxShadow(color: Colors.black26, offset: Offset(0, -3), blurRadius: 6),
+                                    BoxShadow(
+                                      color: Colors.black26,
+                                      offset: Offset(0, -3),
+                                      blurRadius: 6,
+                                    ),
                                   ],
                                 ),
                                 child: Column(
                                   children: [
                                     Expanded(
-                                      child: _showPasswordStep ? _buildPasswordStep() : _buildEmailStep(),
+                                      child:
+                                          _showPasswordStep
+                                              ? _buildPasswordStep()
+                                              : _buildEmailStep(),
                                     ),
                                     if (!_showPasswordStep) ...[
                                       const SizedBox(height: 12),
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           const Text("Don't have an account? "),
-                                     // In the Register TextButton
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => const RegisterScreen(),
-                                            ),
-                                          );
-                                        },
-                                        child: const Text("Register"),
-                                      ),
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder:
+                                                      (context) =>
+                                                          const RegisterScreen(),
+                                                ),
+                                              );
+                                            },
+                                            child: const Text("Register"),
+                                          ),
                                         ],
                                       ),
                                     ],
