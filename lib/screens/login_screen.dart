@@ -412,10 +412,18 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
                                           const Text("Don't have an account? "),
-                                          TextButton(
-                                            onPressed: widget.onTap,
-                                            child: const Text("Register"),
-                                          ),
+                                     // In the Register TextButton
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => const RegisterScreen(),
+                                            ),
+                                          );
+                                        },
+                                        child: const Text("Register"),
+                                      ),
                                         ],
                                       ),
                                     ],
