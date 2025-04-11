@@ -67,13 +67,16 @@ class _AlertScreenState extends State<AlertScreen> {
   }
 
   Future<void> _launchPhone(String phoneNumber) async {
-    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
-    if (await canLaunchUrl(phoneUri)) {
-      await launchUrl(phoneUri);
-    } else {
-      throw 'Could not launch phone dialer';
-    }
+  final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+  if (await canLaunchUrl(phoneUri)) {
+    await launchUrl(
+      phoneUri,
+      mode: LaunchMode.externalApplication,
+    );
+  } else {
+    throw 'Could not launch phone dialer';
   }
+}
 
   void _navigateToIncidentReport(BuildContext context) {
     Navigator.push(

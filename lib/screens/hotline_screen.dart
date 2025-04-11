@@ -185,11 +185,16 @@ class _HotlinesPageState extends State<HotlinesPage> {
                                         children: [
                                           ElevatedButton.icon(
                                             onPressed: () async {
-                                              final Uri url = Uri.parse(hotline['phoneUri']);
-                                              if (await canLaunchUrl(url)) {
-                                                await launchUrl(url);
-                                              }
-                                            },
+                                               final Uri url = Uri.parse(hotline['phoneUri']);
+                                               if (await canLaunchUrl(url)) {
+                                                 await launchUrl(
+                                                   url,
+                                                   mode: LaunchMode.externalApplication,
+                                                 );
+                                               } else {
+                                                 throw 'Could not launch ${hotline['phoneUri']}';
+                                               }
+                                             },
                                             icon: const Icon(Icons.call, color: Colors.white),
                                             label: const Text('Call',
                                                 style: TextStyle(color: Colors.white)),
@@ -210,6 +215,8 @@ class _HotlinesPageState extends State<HotlinesPage> {
                                                   url,
                                                   mode: LaunchMode.externalApplication,
                                                 );
+                                              } else {
+                                                throw 'Could not launch ${hotline['facebookUrl']}';
                                               }
                                             },
                                             icon: const Icon(Icons.facebook),
