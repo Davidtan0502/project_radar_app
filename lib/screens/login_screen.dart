@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:project_radar_app/screens/main_navigation.dart';
 import 'package:project_radar_app/screens/registration_screen.dart';
 
@@ -22,7 +23,8 @@ class _LoginScreenState extends State<LoginScreen>
   bool _showPasswordStep = false;
   String? _emailError;
   String? _passwordError;
-  bool _obscurePassword = true; // NEW: toggle password state
+  bool _obscurePassword = true;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   void initState() {
@@ -59,9 +61,7 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    if (!RegExp(
-      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-    ).hasMatch(_emailController.text)) {
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_emailController.text)) {
       setState(() => _emailError = 'Please enter a valid email address');
       return;
     }
@@ -69,62 +69,139 @@ class _LoginScreenState extends State<LoginScreen>
     FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
 
-    // Simulate email verification
-    await Future.delayed(const Duration(seconds: 1));
-
-    if (!mounted) return;
-    setState(() {
-      _isLoading = false;
-      _showPasswordStep = true;
-    });
+    try {
+      final methods = await _auth.fetchSignInMethodsForEmail(_emailController.text);
+      if (methods.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _emailError = 'No account found. Please register.';
+          _isLoading = false;
+        });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _showPasswordStep = true;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showErrorDialog('Error checking email. Please try again.');
+    }
   }
 
   Future<void> _handleLogin() async {
-    setState(() => _passwordError = null);
-
-    if (_passwordController.text.isEmpty) {
-      setState(() => _passwordError = 'Please enter your password');
-      return;
-    }
-
-    if (_passwordController.text.length < 6) {
-      setState(() => _passwordError = 'Password must be at least 6 characters');
-      return;
-    }
-
-    FocusScope.of(context).unfocus();
-    setState(() => _isLoading = true);
+    setState(() {
+      _passwordError = null;
+      _isLoading = true;
+    });
 
     try {
-      // Simulate login process
-      await Future.delayed(const Duration(seconds: 1));
+      final userCredential = await _auth.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      if (!userCredential.user!.emailVerified) {
+        await _auth.signOut();
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Email Not Verified'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Please verify your email address before logging in.'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () async {
+                    await userCredential.user?.sendEmailVerification();
+                    if (!mounted) return;
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Verification email resent!'),
+                        backgroundColor: _colorAnimation.value,
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _colorAnimation.value,
+                  ),
+                  child: const Text('Resend Verification Email'),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'OK',
+                  style: TextStyle(color: _colorAnimation.value),
+                ),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
 
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const MainNavigation()),
       );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      if (e.code == 'user-not-found') {
+        _showErrorDialog('No user found with this email address.');
+      } else if (e.code == 'wrong-password') {
+        _showErrorDialog('Incorrect password. Please try again.');
+      } else {
+        _showErrorDialog('Login failed: ${e.message}');
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _showErrorDialog('Login failed. Please try again.');
+      _showErrorDialog('An error occurred. Please try again.');
+    }
+  }
+
+  Future<void> _handlePasswordReset() async {
+    try {
+      await _auth.sendPasswordResetEmail(email: _emailController.text);
+      if (!mounted) return;
+      _showErrorDialog('Password reset instructions sent to your email');
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      _showErrorDialog('Error: ${e.message}');
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorDialog('Failed to send reset email');
     }
   }
 
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Error'),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('Error', style: TextStyle(color: Colors.red)),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'OK',
+              style: TextStyle(color: _colorAnimation.value),
+            ),
           ),
+        ],
+      ),
     );
   }
 
@@ -194,29 +271,28 @@ class _LoginScreenState extends State<LoginScreen>
           child: ElevatedButton(
             onPressed: _isLoading ? null : _verifyEmail,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _colorAnimation.value,
+              backgroundColor: _isLoading ? Colors.grey : _colorAnimation.value,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(30),
               ),
             ),
-            child:
-                _isLoading
-                    ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                    : Text(
-                      'Continue',
-                      style: TextStyle(
-                        fontSize: isSmallScreen ? 14 : 16,
-                        color: Colors.white,
-                      ),
+            child: _isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
                     ),
+                  )
+                : Text(
+                    'Continue',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 14 : 16,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
         ),
       ],
@@ -233,12 +309,11 @@ class _LoginScreenState extends State<LoginScreen>
           children: [
             IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed:
-                  () => setState(() {
-                    _showPasswordStep = false;
-                    _passwordController.clear();
-                    _passwordError = null;
-                  }),
+              onPressed: () => setState(() {
+                _showPasswordStep = false;
+                _passwordController.clear();
+                _passwordError = null;
+              }),
             ),
             Text(
               'Welcome Back!',
@@ -278,9 +353,7 @@ class _LoginScreenState extends State<LoginScreen>
                       decoration: InputDecoration(
                         hintText: 'Enter password',
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 14,
-                        ),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword
@@ -315,11 +388,10 @@ class _LoginScreenState extends State<LoginScreen>
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
-            onPressed: () {
-              _showErrorDialog(
-                'Password reset instructions sent to your email',
-              );
-            },
+            onPressed: _isLoading ? null : _handlePasswordReset,
+            style: TextButton.styleFrom(
+              foregroundColor: _colorAnimation.value,
+            ),
             child: const Text('Forgot Password?'),
           ),
         ),
@@ -335,23 +407,22 @@ class _LoginScreenState extends State<LoginScreen>
                 borderRadius: BorderRadius.circular(30),
               ),
             ),
-            child:
-                _isLoading
-                    ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                    : Text(
-                      'Login',
-                      style: TextStyle(
-                        fontSize: isSmallScreen ? 14 : 16,
-                        color: Colors.white,
-                      ),
+            child: _isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
                     ),
+                  )
+                : Text(
+                    'Login',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 14 : 16,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
         ),
       ],
@@ -374,12 +445,10 @@ class _LoginScreenState extends State<LoginScreen>
                 builder: (context, constraints) {
                   return SingleChildScrollView(
                     padding: EdgeInsets.only(
-                      bottom: MediaQuery.of(context).viewInsets.bottom,
-                    ),
+                      bottom: MediaQuery.of(context).viewInsets.bottom),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
-                      ),
+                        minHeight: constraints.maxHeight),
                       child: IntrinsicHeight(
                         child: Column(
                           children: [
@@ -388,15 +457,13 @@ class _LoginScreenState extends State<LoginScreen>
                               child: Center(
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                  ),
+                                    horizontal: 20),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Image.asset(
                                         'assets/logo.png',
-                                        height: isSmallScreen ? 90 : 130,
-                                      ),
+                                        height: isSmallScreen ? 90 : 130),
                                       const SizedBox(height: 12),
                                       const Text(
                                         'R.A.D.A.R',
@@ -404,8 +471,7 @@ class _LoginScreenState extends State<LoginScreen>
                                           fontSize: 56,
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
-                                          letterSpacing: 1.5,
-                                        ),
+                                          letterSpacing: 1.5),
                                       ),
                                       if (!isSmallScreen) ...[
                                         const SizedBox(height: 4),
@@ -413,8 +479,7 @@ class _LoginScreenState extends State<LoginScreen>
                                           '(Rapid Action for Disaster Aid Resource)',
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: Colors.white70,
-                                          ),
+                                            color: Colors.white70),
                                         ),
                                       ],
                                     ],
@@ -428,34 +493,29 @@ class _LoginScreenState extends State<LoginScreen>
                                 width: double.infinity,
                                 padding: EdgeInsets.symmetric(
                                   horizontal: 24,
-                                  vertical: isSmallScreen ? 16 : 20,
-                                ),
+                                  vertical: isSmallScreen ? 16 : 20),
                                 decoration: const BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.vertical(
-                                    top: Radius.circular(30),
-                                  ),
+                                    top: Radius.circular(30)),
                                   boxShadow: [
                                     BoxShadow(
                                       color: Colors.black26,
                                       offset: Offset(0, -3),
-                                      blurRadius: 6,
-                                    ),
+                                      blurRadius: 6),
                                   ],
                                 ),
                                 child: Column(
                                   children: [
                                     Expanded(
-                                      child:
-                                          _showPasswordStep
-                                              ? _buildPasswordStep()
-                                              : _buildEmailStep(),
+                                      child: _showPasswordStep
+                                          ? _buildPasswordStep()
+                                          : _buildEmailStep(),
                                     ),
                                     if (!_showPasswordStep) ...[
                                       const SizedBox(height: 12),
                                       Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
+                                        mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
                                           const Text("Don't have an account? "),
                                           TextButton(
@@ -463,10 +523,8 @@ class _LoginScreenState extends State<LoginScreen>
                                               Navigator.push(
                                                 context,
                                                 MaterialPageRoute(
-                                                  builder:
-                                                      (context) =>
-                                                          const RegisterScreen(),
-                                                ),
+                                                  builder: (context) =>
+                                                      const RegisterScreen()),
                                               );
                                             },
                                             child: const Text("Register"),
@@ -482,8 +540,7 @@ class _LoginScreenState extends State<LoginScreen>
                                           style: TextStyle(
                                             fontStyle: FontStyle.italic,
                                             fontSize: 12,
-                                            color: Colors.black54,
-                                          ),
+                                            color: Colors.black54),
                                           textAlign: TextAlign.center,
                                         ),
                                       ),

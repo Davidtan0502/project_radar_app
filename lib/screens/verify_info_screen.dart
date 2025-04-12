@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:project_radar_app/screens/registration_screen.dart';
 
 class VerifyInfoScreen extends StatelessWidget {
   final String lastName;
@@ -7,6 +8,8 @@ class VerifyInfoScreen extends StatelessWidget {
   final String email;
   final String phone;
   final String password;
+  final VoidCallback onConfirm;
+  final VoidCallback onEdit;
 
   const VerifyInfoScreen({
     super.key,
@@ -16,6 +19,8 @@ class VerifyInfoScreen extends StatelessWidget {
     required this.email,
     required this.phone,
     required this.password,
+    required this.onConfirm,
+    required this.onEdit,
   });
 
   @override
@@ -24,6 +29,13 @@ class VerifyInfoScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Verify Information'),
         backgroundColor: const Color(0xFF336699),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: onEdit,
+            tooltip: 'Edit Information',
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
@@ -40,14 +52,23 @@ class VerifyInfoScreen extends StatelessWidget {
                 const Center(
                   child: Text(
                     'Please confirm your details',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Admin will review your information and contact you shortly.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
                 ),
                 const SizedBox(height: 20),
 
                 _buildInfoTile("Last Name", lastName),
                 _buildInfoTile("First Name", firstName),
-                _buildInfoTile("M.I ", middleInitial),
+                _buildInfoTile("Middle Initial", middleInitial),
                 _buildInfoTile("Email", email),
                 _buildInfoTile("Phone", "+63$phone"),
                 _buildInfoTile("Password", '*' * password.length),
@@ -56,13 +77,8 @@ class VerifyInfoScreen extends StatelessWidget {
 
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Registered!')),
-                      );
-                      Navigator.popUntil(context, (route) => route.isFirst);
-                    },
+                  child: ElevatedButton(
+                    onPressed: onConfirm,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF336699),
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -70,12 +86,11 @@ class VerifyInfoScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: const Text(
-                      'Confirm and Continue',
+                    child: const Text(
+                      'Submit for Approval',
                       style: TextStyle(
                         fontSize: 16,
-                        color: Color.fromARGB(221, 238, 236, 236),
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -95,7 +110,7 @@ class VerifyInfoScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 100,
+            width: 120,
             child: Text(
               '$label:',
               style: const TextStyle(fontWeight: FontWeight.bold),
