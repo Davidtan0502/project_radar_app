@@ -105,6 +105,7 @@ class _IncidentReportPageState extends State<IncidentReportPage> with SingleTick
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
                 ),
