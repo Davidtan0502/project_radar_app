@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'about_us.dart';
-import 'account_info.dart';
+import 'profile/about_us.dart';
+import 'profile/account_info.dart';
 import 'change_password.dart';
 
 class SettingsScreen extends StatelessWidget {

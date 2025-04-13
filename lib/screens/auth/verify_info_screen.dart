@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:project_radar_app/screens/registration_screen.dart';
 
 class VerifyInfoScreen extends StatelessWidget {
   final String lastName;

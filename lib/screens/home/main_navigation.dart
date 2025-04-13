@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:project_radar_app/screens/alert_screen.dart';
-import 'package:project_radar_app/screens/home_screen.dart';
-import 'package:project_radar_app/screens/hotline_screen.dart';
-import 'package:project_radar_app/screens/map_screen.dart';
-import 'package:project_radar_app/screens/profile_screen.dart';
+import 'package:project_radar_app/screens/alerts/alert_screen.dart';
+import 'package:project_radar_app/screens/home/home_screen.dart';
+import 'package:project_radar_app/screens/profile/hotline_screen.dart';
+import 'package:project_radar_app/screens/map/map_screen.dart';
+import 'package:project_radar_app/screens/profile/profile_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});

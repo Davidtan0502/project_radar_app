@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:project_radar_app/screens/main_navigation.dart';
-import 'package:project_radar_app/screens/registration_screen.dart';
+import 'package:project_radar_app/screens/home/main_navigation.dart';
+import 'package:project_radar_app/screens/auth/registration_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.onTap});
