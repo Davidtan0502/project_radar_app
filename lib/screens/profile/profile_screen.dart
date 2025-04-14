@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:project_radar_app/screens/profile/change_password.dart';
 import 'package:project_radar_app/screens/profile/edit_profile_screen.dart';
 import 'package:project_radar_app/screens/profile/emergency_contacts_screen.dart';
 import 'package:project_radar_app/screens/profile/help_and_support.dart';
-import 'package:project_radar_app/screens/settings_screen.dart';
+import 'package:project_radar_app/screens/profile/settings_screen.dart';
 import 'package:project_radar_app/screens/auth/login_screen.dart';
 import 'package:shimmer/shimmer.dart';
 
@@ -259,9 +260,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                       _buildOptionTile(
                         icon: Icons.lock_outline,
                         text: 'Change Password',
-                        onTap: () {
-                          // Navigate to change password screen
-                        },
+                        onTap: () => Navigator.push(
+                          context,
+                          _createRoute(const ChangePassword()),
+                        ),
                         textColor: textColor,
                       ),
                       const Divider(),

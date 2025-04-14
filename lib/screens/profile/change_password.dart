@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ChangePassword extends StatefulWidget {
   const ChangePassword({super.key});
@@ -16,26 +17,9 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
   bool _showCurrentPassword = false;
   bool _showNewPassword = false;
   bool _showConfirmPassword = false;
+  bool _isLoading = false;
 
-  void _savePassword() {
-    if (_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password changed successfully!')),
-      );
-
-      // Clear the text fields after successful save
-      _currentPasswordController.clear();
-      _newPasswordController.clear();
-      _confirmPasswordController.clear();
-
-      // Optionally reset visibility flags
-      setState(() {
-        _showCurrentPassword = false;
-        _showNewPassword = false;
-        _showConfirmPassword = false;
-      });
-    }
-  }
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   InputDecoration _buildInputDecoration(
     String label,
@@ -60,6 +44,78 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
     );
   }
 
+    Future<void> _savePassword() async {
+      if (!_formKey.currentState!.validate()) return;
+
+      final currentPassword = _currentPasswordController.text.trim();
+      final newPassword = _newPasswordController.text.trim();
+
+      setState(() => _isLoading = true);
+
+      try {
+        final user = _auth.currentUser;
+
+        if (user == null || user.email == null) {
+          throw FirebaseAuthException(
+              code: 'no-user', message: 'User not found or not logged in.');
+        }
+
+        // Re-authenticate the user
+        final credential = EmailAuthProvider.credential(
+          email: user.email!,
+          password: currentPassword,
+        );
+        await user.reauthenticateWithCredential(credential);
+
+        // Update the password
+        await user.updatePassword(newPassword);
+
+        // Send email verification (optional, only if not verified)
+        if (!user.emailVerified) {
+          await user.sendEmailVerification();
+        }
+
+        // Show success snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password changed successfully. Please log in again.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Sign out and navigate to login screen
+        await _auth.signOut();
+
+        if (context.mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+        }
+      } on FirebaseAuthException catch (e) {
+        String error = 'Failed to change password.';
+        if (e.code == 'wrong-password') {
+          error = 'Current password is incorrect.';
+        } else if (e.code == 'weak-password') {
+          error = 'New password is too weak.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('An unexpected error occurred.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } finally {
+        setState(() => _isLoading = false);
+      }
+    }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -67,12 +123,7 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
       body: Column(
         children: [
           Container(
-            padding: const EdgeInsets.only(
-              top: 50,
-              bottom: 30,
-              left: 20,
-              right: 20,
-            ),
+            padding: const EdgeInsets.only(top: 50, bottom: 30, left: 20, right: 20),
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -112,7 +163,6 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
               ],
             ),
           ),
-
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -136,15 +186,10 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                       decoration: _buildInputDecoration(
                         'Current Password',
                         _showCurrentPassword,
-                        () => setState(() {
-                          _showCurrentPassword = !_showCurrentPassword;
-                        }),
+                        () => setState(() => _showCurrentPassword = !_showCurrentPassword),
                       ),
-                      validator:
-                          (value) =>
-                              value!.isEmpty
-                                  ? 'Enter your current password'
-                                  : null,
+                      validator: (value) =>
+                          value!.isEmpty ? 'Enter your current password' : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -153,15 +198,10 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                       decoration: _buildInputDecoration(
                         'New Password',
                         _showNewPassword,
-                        () => setState(() {
-                          _showNewPassword = !_showNewPassword;
-                        }),
+                        () => setState(() => _showNewPassword = !_showNewPassword),
                       ),
-                      validator:
-                          (value) =>
-                              value!.length < 6
-                                  ? 'Password must be at least 6 characters'
-                                  : null,
+                      validator: (value) =>
+                          value!.length < 6 ? 'Password must be at least 6 characters' : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -170,9 +210,7 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                       decoration: _buildInputDecoration(
                         'Confirm New Password',
                         _showConfirmPassword,
-                        () => setState(() {
-                          _showConfirmPassword = !_showConfirmPassword;
-                        }),
+                        () => setState(() => _showConfirmPassword = !_showConfirmPassword),
                       ),
                       validator: (value) {
                         if (value != _newPasswordController.text) {
@@ -186,7 +224,7 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: _savePassword,
+                        onPressed: _isLoading ? null : _savePassword,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF28588B),
                           shape: RoundedRectangleBorder(
@@ -194,14 +232,16 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                           ),
                           elevation: 3,
                         ),
-                        child: const Text(
-                          'Save',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
+                        child: _isLoading
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : const Text(
+                                'Save',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ),
                   ],
