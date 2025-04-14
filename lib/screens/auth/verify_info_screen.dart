@@ -26,7 +26,7 @@ class VerifyInfoScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Verify Information'),
+        title: const Text('Verify Your Email'),
         backgroundColor: const Color(0xFF336699),
         actions: [
           IconButton(
@@ -51,29 +51,23 @@ class VerifyInfoScreen extends StatelessWidget {
                 const Center(
                   child: Text(
                     'Please confirm your details',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
                 const SizedBox(height: 20),
                 const Text(
-                  'Admin will review your information and contact you shortly.',
+                  'A verification email has been sent to your email address. Please check your inbox (and spam folder) and click the verification link. Once verified, tap the button below to continue.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey),
                 ),
                 const SizedBox(height: 20),
-
                 _buildInfoTile("Last Name", lastName),
                 _buildInfoTile("First Name", firstName),
                 _buildInfoTile("Middle Initial", middleInitial),
                 _buildInfoTile("Email", email),
                 _buildInfoTile("Phone", "+63$phone"),
                 _buildInfoTile("Password", '*' * password.length),
-
                 const Spacer(),
-
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -86,11 +80,8 @@ class VerifyInfoScreen extends StatelessWidget {
                       ),
                     ),
                     child: const Text(
-                      'Submit for Approval',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.white,
-                      ),
+                      'Verify Confirmation',
+                      style: TextStyle(fontSize: 16, color: Colors.white),
                     ),
                   ),
                 ),

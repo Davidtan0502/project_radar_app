@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:project_radar_app/screens/home/main_navigation.dart';
@@ -56,12 +57,15 @@ class _LoginScreenState extends State<LoginScreen>
       _passwordError = null;
     });
 
-    if (_emailController.text.isEmpty) {
+    // Use trimmed and lowercased email for consistency
+    final email = _emailController.text.trim().toLowerCase();
+
+    if (email.isEmpty) {
       setState(() => _emailError = 'Please enter your email');
       return;
     }
 
-    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_emailController.text)) {
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
       setState(() => _emailError = 'Please enter a valid email address');
       return;
     }
@@ -69,26 +73,11 @@ class _LoginScreenState extends State<LoginScreen>
     FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
 
-    try {
-      final methods = await _auth.fetchSignInMethodsForEmail(_emailController.text);
-      if (methods.isEmpty) {
-        if (!mounted) return;
-        setState(() {
-          _emailError = 'No account found. Please register.';
-          _isLoading = false;
-        });
-      } else {
-        if (!mounted) return;
-        setState(() {
-          _isLoading = false;
-          _showPasswordStep = true;
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      _showErrorDialog('Error checking email. Please try again.');
-    }
+    // Instead of checking with fetchSignInMethodsForEmail, proceed directly
+    setState(() {
+      _isLoading = false;
+      _showPasswordStep = true;
+    });
   }
 
   Future<void> _handleLogin() async {
@@ -98,57 +87,40 @@ class _LoginScreenState extends State<LoginScreen>
     });
 
     try {
+      // Use trimmed and lowercased email for consistency
+      final email = _emailController.text.trim().toLowerCase();
+      final password = _passwordController.text.trim();
+
       final userCredential = await _auth.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        email: email,
+        password: password,
       );
 
-      if (!userCredential.user!.emailVerified) {
-        await _auth.signOut();
-        if (!mounted) return;
-        setState(() => _isLoading = false);
-        
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Email Not Verified'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Please verify your email address before logging in.'),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () async {
-                    await userCredential.user?.sendEmailVerification();
-                    if (!mounted) return;
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Verification email resent!'),
-                        backgroundColor: _colorAnimation.value,
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _colorAnimation.value,
-                  ),
-                  child: const Text('Resend Verification Email'),
-                ),
-              ],
+      // Optional: Force a reload of the user
+      await userCredential.user!.reload();
+      final updatedUser = _auth.currentUser;
+
+      if (updatedUser == null || !updatedUser.emailVerified) {
+        // Resend the verification email if not verified
+        await updatedUser?.sendEmailVerification();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Email not verified. Verification email resent. Please verify your email before logging in.',
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'OK',
-                  style: TextStyle(color: _colorAnimation.value),
-                ),
-              ),
-            ],
+            duration: Duration(seconds: 4),
           ),
         );
+        await _auth.signOut();
+        setState(() => _isLoading = false);
         return;
       }
+
+      // Optionally update Firestore with emailVerified flag
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(updatedUser.uid)
+          .update({'emailVerified': true});
 
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -156,17 +128,17 @@ class _LoginScreenState extends State<LoginScreen>
         MaterialPageRoute(builder: (context) => const MainNavigation()),
       );
     } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
       setState(() => _isLoading = false);
       if (e.code == 'user-not-found') {
-        _showErrorDialog('No user found with this email address.');
+        _showErrorDialog(
+          'No user found with this email address. Please check your email or register.',
+        );
       } else if (e.code == 'wrong-password') {
         _showErrorDialog('Incorrect password. Please try again.');
       } else {
         _showErrorDialog('Login failed: ${e.message}');
       }
     } catch (e) {
-      if (!mounted) return;
       setState(() => _isLoading = false);
       _showErrorDialog('An error occurred. Please try again.');
     }
@@ -189,19 +161,20 @@ class _LoginScreenState extends State<LoginScreen>
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Error', style: TextStyle(color: Colors.red)),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'OK',
-              style: TextStyle(color: _colorAnimation.value),
-            ),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Error', style: TextStyle(color: Colors.red)),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'OK',
+                  style: TextStyle(color: _colorAnimation.value),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -277,22 +250,23 @@ class _LoginScreenState extends State<LoginScreen>
                 borderRadius: BorderRadius.circular(30),
               ),
             ),
-            child: _isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
+            child:
+                _isLoading
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                    : Text(
+                      'Continue',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 14 : 16,
+                        color: Colors.white,
+                      ),
                     ),
-                  )
-                : Text(
-                    'Continue',
-                    style: TextStyle(
-                      fontSize: isSmallScreen ? 14 : 16,
-                      color: Colors.white,
-                    ),
-                  ),
           ),
         ),
       ],
@@ -309,11 +283,12 @@ class _LoginScreenState extends State<LoginScreen>
           children: [
             IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () => setState(() {
-                _showPasswordStep = false;
-                _passwordController.clear();
-                _passwordError = null;
-              }),
+              onPressed:
+                  () => setState(() {
+                    _showPasswordStep = false;
+                    _passwordController.clear();
+                    _passwordError = null;
+                  }),
             ),
             Text(
               'Welcome Back!',
@@ -353,7 +328,9 @@ class _LoginScreenState extends State<LoginScreen>
                       decoration: InputDecoration(
                         hintText: 'Enter password',
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                        ),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword
@@ -389,9 +366,7 @@ class _LoginScreenState extends State<LoginScreen>
           alignment: Alignment.centerRight,
           child: TextButton(
             onPressed: _isLoading ? null : _handlePasswordReset,
-            style: TextButton.styleFrom(
-              foregroundColor: _colorAnimation.value,
-            ),
+            style: TextButton.styleFrom(foregroundColor: _colorAnimation.value),
             child: const Text('Forgot Password?'),
           ),
         ),
@@ -407,22 +382,23 @@ class _LoginScreenState extends State<LoginScreen>
                 borderRadius: BorderRadius.circular(30),
               ),
             ),
-            child: _isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
+            child:
+                _isLoading
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                    : Text(
+                      'Login',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 14 : 16,
+                        color: Colors.white,
+                      ),
                     ),
-                  )
-                : Text(
-                    'Login',
-                    style: TextStyle(
-                      fontSize: isSmallScreen ? 14 : 16,
-                      color: Colors.white,
-                    ),
-                  ),
           ),
         ),
       ],
@@ -445,10 +421,12 @@ class _LoginScreenState extends State<LoginScreen>
                 builder: (context, constraints) {
                   return SingleChildScrollView(
                     padding: EdgeInsets.only(
-                      bottom: MediaQuery.of(context).viewInsets.bottom),
+                      bottom: MediaQuery.of(context).viewInsets.bottom,
+                    ),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight),
+                        minHeight: constraints.maxHeight,
+                      ),
                       child: IntrinsicHeight(
                         child: Column(
                           children: [
@@ -457,13 +435,15 @@ class _LoginScreenState extends State<LoginScreen>
                               child: Center(
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 20),
+                                    horizontal: 20,
+                                  ),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Image.asset(
                                         'assets/logo.png',
-                                        height: isSmallScreen ? 90 : 130),
+                                        height: isSmallScreen ? 90 : 130,
+                                      ),
                                       const SizedBox(height: 12),
                                       const Text(
                                         'R.A.D.A.R',
@@ -471,7 +451,8 @@ class _LoginScreenState extends State<LoginScreen>
                                           fontSize: 56,
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
-                                          letterSpacing: 1.5),
+                                          letterSpacing: 1.5,
+                                        ),
                                       ),
                                       if (!isSmallScreen) ...[
                                         const SizedBox(height: 4),
@@ -479,7 +460,8 @@ class _LoginScreenState extends State<LoginScreen>
                                           '(Rapid Action for Disaster Aid Resource)',
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: Colors.white70),
+                                            color: Colors.white70,
+                                          ),
                                         ),
                                       ],
                                     ],
@@ -493,29 +475,34 @@ class _LoginScreenState extends State<LoginScreen>
                                 width: double.infinity,
                                 padding: EdgeInsets.symmetric(
                                   horizontal: 24,
-                                  vertical: isSmallScreen ? 16 : 20),
+                                  vertical: isSmallScreen ? 16 : 20,
+                                ),
                                 decoration: const BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.vertical(
-                                    top: Radius.circular(30)),
+                                    top: Radius.circular(30),
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
                                       color: Colors.black26,
                                       offset: Offset(0, -3),
-                                      blurRadius: 6),
+                                      blurRadius: 6,
+                                    ),
                                   ],
                                 ),
                                 child: Column(
                                   children: [
                                     Expanded(
-                                      child: _showPasswordStep
-                                          ? _buildPasswordStep()
-                                          : _buildEmailStep(),
+                                      child:
+                                          _showPasswordStep
+                                              ? _buildPasswordStep()
+                                              : _buildEmailStep(),
                                     ),
                                     if (!_showPasswordStep) ...[
                                       const SizedBox(height: 12),
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           const Text("Don't have an account? "),
                                           TextButton(
@@ -523,8 +510,10 @@ class _LoginScreenState extends State<LoginScreen>
                                               Navigator.push(
                                                 context,
                                                 MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      const RegisterScreen()),
+                                                  builder:
+                                                      (context) =>
+                                                          const RegisterScreen(),
+                                                ),
                                               );
                                             },
                                             child: const Text("Register"),
@@ -536,11 +525,12 @@ class _LoginScreenState extends State<LoginScreen>
                                       padding: EdgeInsets.only(top: 8),
                                       child: Center(
                                         child: Text(
-                                          'Road Safety: A Small Effort, Big Difference',
+                                          'project RADAR: A Small Effort, Big Difference',
                                           style: TextStyle(
                                             fontStyle: FontStyle.italic,
                                             fontSize: 12,
-                                            color: Colors.black54),
+                                            color: Colors.black54,
+                                          ),
                                           textAlign: TextAlign.center,
                                         ),
                                       ),

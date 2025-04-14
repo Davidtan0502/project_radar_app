@@ -20,11 +20,13 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _firstNameController = TextEditingController();
-  final TextEditingController _middleInitialController = TextEditingController();
+  final TextEditingController _middleInitialController =
+      TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
   bool _isLoading = false;
   bool _isPasswordVisible = false;
@@ -67,8 +69,10 @@ class _RegisterScreenState extends State<RegisterScreen>
     });
 
     try {
-      // First verify email doesn't exist
-      final methods = await _auth.fetchSignInMethodsForEmail(_emailController.text.trim());
+      // Check if email is already in use
+      final methods = await _auth.fetchSignInMethodsForEmail(
+        _emailController.text.trim(),
+      );
       if (methods.isNotEmpty) {
         throw FirebaseAuthException(
           code: 'email-already-in-use',
@@ -76,43 +80,61 @@ class _RegisterScreenState extends State<RegisterScreen>
         );
       }
 
-      // Create user data object
+      // Create the user in Firebase Authentication
+      UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          );
+
+      // Send verification email
+      await userCredential.user!.sendEmailVerification();
+
+      // Prepare user data for Firestore with status 'approved'
       final userData = {
         'firstName': _firstNameController.text.trim(),
         'lastName': _lastNameController.text.trim(),
         'middleInitial': _middleInitialController.text.trim(),
         'email': _emailController.text.trim(),
         'phone': '+63${_phoneController.text.trim()}',
-        'status': 'pending', // For admin approval
+        'password':
+            _passwordController.text
+                .trim(), // Note: Avoid storing plaintext passwords in production!
+        'status': 'approved', // Set account status as approved immediately
         'createdAt': FieldValue.serverTimestamp(),
-        'password': _passwordController.text.trim(), // Note: In production, don't store passwords in Firestore
       };
 
-      // Save to pending registrations collection
-      await _firestore.collection('pending_registrations').add(userData);
+      // Save to 'users' collection using the user's UID as the document ID
+      await _firestore
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .set(userData);
 
       if (!mounted) return;
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => VerifyInfoScreen(
-            lastName: _lastNameController.text,
-            firstName: _firstNameController.text,
-            middleInitial: _middleInitialController.text,
-            email: _emailController.text,
-            phone: _phoneController.text,
-            password: _passwordController.text,
-            onConfirm: () {
-              Navigator.popUntil(context, (route) => route.isFirst);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Registration submitted for admin approval'),
-                  duration: Duration(seconds: 3),
-                ),
-              );
-            },
-            onEdit: () => Navigator.pop(context),
-          ),
+          builder:
+              (_) => VerifyInfoScreen(
+                lastName: _lastNameController.text,
+                firstName: _firstNameController.text,
+                middleInitial: _middleInitialController.text,
+                email: _emailController.text,
+                phone: _phoneController.text,
+                password: _passwordController.text,
+                onConfirm: () {
+                  Navigator.popUntil(context, (route) => route.isFirst);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Verification email sent. Please check your inbox and verify your email to login.',
+                      ),
+                      duration: Duration(seconds: 4),
+                    ),
+                  );
+                },
+                onEdit: () => Navigator.pop(context),
+              ),
         ),
       );
     } on FirebaseAuthException catch (e) {
@@ -199,17 +221,21 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     BoxShadow(
                                       color: Colors.black26,
                                       offset: Offset(0, -3),
-                                      blurRadius: 6),
+                                      blurRadius: 6,
+                                    ),
                                   ],
                                 ),
                                 child: Form(
                                   key: _formKey,
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
                                     children: [
                                       if (_errorMessage != null)
                                         Padding(
-                                          padding: const EdgeInsets.only(bottom: 16),
+                                          padding: const EdgeInsets.only(
+                                            bottom: 16,
+                                          ),
                                           child: Text(
                                             _errorMessage!,
                                             style: const TextStyle(
@@ -219,60 +245,63 @@ class _RegisterScreenState extends State<RegisterScreen>
                                             textAlign: TextAlign.center,
                                           ),
                                         ),
-
                                       _buildTextField(
                                         _lastNameController,
                                         'Last Name',
                                         Icons.person,
                                         validator: (val) {
-                                          if (val == null || val.trim().isEmpty) {
+                                          if (val == null ||
+                                              val.trim().isEmpty) {
                                             return 'Enter last name';
                                           }
                                           return null;
                                         },
                                       ),
                                       const SizedBox(height: 12),
-
                                       _buildTextField(
                                         _firstNameController,
                                         'First Name',
                                         Icons.person_outline,
                                         validator: (val) {
-                                          if (val == null || val.trim().isEmpty) {
+                                          if (val == null ||
+                                              val.trim().isEmpty) {
                                             return 'Enter first name';
                                           }
                                           return null;
                                         },
                                       ),
                                       const SizedBox(height: 12),
-
                                       _buildTextField(
                                         _middleInitialController,
                                         'Middle Name',
                                         Icons.person_outline,
                                         validator: (val) {
-                                          if (val == null || val.trim().isEmpty) {
+                                          if (val == null ||
+                                              val.trim().isEmpty) {
                                             return 'Enter middle name';
                                           }
                                           return null;
                                         },
                                       ),
                                       const SizedBox(height: 12),
-
                                       _buildTextField(
                                         _emailController,
                                         'Email',
                                         Icons.email,
-                                        keyboardType: TextInputType.emailAddress,
+                                        keyboardType:
+                                            TextInputType.emailAddress,
                                         validator: (val) {
-                                          if (val == null || !val.contains('@')) {
+                                          if (val == null ||
+                                              val.isEmpty ||
+                                              !RegExp(
+                                                r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                                              ).hasMatch(val)) {
                                             return 'Enter valid email';
                                           }
                                           return null;
                                         },
                                       ),
                                       const SizedBox(height: 12),
-
                                       TextFormField(
                                         controller: _phoneController,
                                         keyboardType: TextInputType.phone,
@@ -285,12 +314,15 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         decoration: InputDecoration(
                                           labelText: 'Phone Number',
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
-                                          contentPadding: const EdgeInsets.symmetric(
-                                            vertical: 14,
-                                            horizontal: 16,
-                                          ),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                vertical: 14,
+                                                horizontal: 16,
+                                              ),
                                           prefixIcon: Container(
                                             padding: const EdgeInsets.symmetric(
                                               horizontal: 10,
@@ -313,7 +345,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         ),
                                       ),
                                       const SizedBox(height: 12),
-
                                       TextFormField(
                                         controller: _passwordController,
                                         obscureText: !_isPasswordVisible,
@@ -334,21 +365,24 @@ class _RegisterScreenState extends State<RegisterScreen>
                                             ),
                                             onPressed: () {
                                               setState(() {
-                                                _isPasswordVisible = !_isPasswordVisible;
+                                                _isPasswordVisible =
+                                                    !_isPasswordVisible;
                                               });
                                             },
                                           ),
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
-                                          contentPadding: const EdgeInsets.symmetric(
-                                            vertical: 14,
-                                            horizontal: 16,
-                                          ),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                vertical: 14,
+                                                horizontal: 16,
+                                              ),
                                         ),
                                       ),
                                       const SizedBox(height: 12),
-
                                       TextFormField(
                                         controller: _confirmPasswordController,
                                         obscureText: !_isConfirmPasswordVisible,
@@ -360,7 +394,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         },
                                         decoration: InputDecoration(
                                           labelText: 'Confirm Password',
-                                          prefixIcon: const Icon(Icons.lock_outline),
+                                          prefixIcon: const Icon(
+                                            Icons.lock_outline,
+                                          ),
                                           suffixIcon: IconButton(
                                             icon: Icon(
                                               _isConfirmPasswordVisible
@@ -369,43 +405,57 @@ class _RegisterScreenState extends State<RegisterScreen>
                                             ),
                                             onPressed: () {
                                               setState(() {
-                                                _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                                                _isConfirmPasswordVisible =
+                                                    !_isConfirmPasswordVisible;
                                               });
                                             },
                                           ),
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
-                                          contentPadding: const EdgeInsets.symmetric(
-                                            vertical: 14,
-                                            horizontal: 16,
-                                          ),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                vertical: 14,
+                                                horizontal: 16,
+                                              ),
                                         ),
                                       ),
                                       const SizedBox(height: 24),
-
                                       ElevatedButton(
-                                        onPressed: _isLoading ? null : _registerUser,
+                                        onPressed:
+                                            _isLoading ? null : _registerUser,
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: _colorAnimation.value,
-                                          padding: const EdgeInsets.symmetric(vertical: 16),
+                                          backgroundColor:
+                                              _colorAnimation.value,
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 16,
+                                          ),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
                                         ),
-                                        child: _isLoading
-                                            ? const SizedBox(
-                                                width: 24,
-                                                height: 24,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  color: Colors.white,
+                                        child:
+                                            _isLoading
+                                                ? const SizedBox(
+                                                  width: 24,
+                                                  height: 24,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        color: Colors.white,
+                                                      ),
+                                                )
+                                                : const Text(
+                                                  'Register',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    color: Colors.white,
+                                                  ),
                                                 ),
-                                              )
-                                            : const Text(
-                                                'Register',
-                                                style: TextStyle(fontSize: 16),
-                                              ),
                                       ),
                                     ],
                                   ),
