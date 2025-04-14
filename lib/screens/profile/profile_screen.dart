@@ -258,25 +258,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                       const Divider(),
                       _buildOptionTile(
-                        icon: Icons.lock_outline,
-                        text: 'Change Password',
-                        onTap: () => Navigator.push(
-                          context,
-                          _createRoute(const ChangePassword()),
-                        ),
-                        textColor: textColor,
-                      ),
-                      const Divider(),
-                      _buildOptionTile(
-                        icon: Icons.delete_forever,
-                        text: 'Delete Account',
-                        onTap: () {
-                          // Add deletion logic here
-                        },
-                        textColor: Colors.red,
-                      ),
-                      const Divider(),
-                      _buildOptionTile(
                         icon: Icons.logout,
                         text: 'Logout',
                         onTap: _logout,

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:project_radar_app/screens/profile/account_management_screen.dart';
+import 'package:project_radar_app/services/navigation.dart';
 
 class ChangePassword extends StatefulWidget {
   const ChangePassword({super.key});
@@ -20,6 +22,14 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
   bool _isLoading = false;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  @override
+  void dispose() {
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
 
   InputDecoration _buildInputDecoration(
     String label,
@@ -44,77 +54,69 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
     );
   }
 
-    Future<void> _savePassword() async {
-      if (!_formKey.currentState!.validate()) return;
+  Future<void> _savePassword() async {
+    if (!_formKey.currentState!.validate()) return;
 
-      final currentPassword = _currentPasswordController.text.trim();
-      final newPassword = _newPasswordController.text.trim();
+    final currentPassword = _currentPasswordController.text.trim();
+    final newPassword = _newPasswordController.text.trim();
 
-      setState(() => _isLoading = true);
+    setState(() => _isLoading = true);
 
-      try {
-        final user = _auth.currentUser;
+    try {
+      final user = _auth.currentUser;
 
-        if (user == null || user.email == null) {
-          throw FirebaseAuthException(
-              code: 'no-user', message: 'User not found or not logged in.');
-        }
-
-        // Re-authenticate the user
-        final credential = EmailAuthProvider.credential(
-          email: user.email!,
-          password: currentPassword,
-        );
-        await user.reauthenticateWithCredential(credential);
-
-        // Update the password
-        await user.updatePassword(newPassword);
-
-        // Send email verification (optional, only if not verified)
-        if (!user.emailVerified) {
-          await user.sendEmailVerification();
-        }
-
-        // Show success snackbar
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Password changed successfully. Please log in again.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Sign out and navigate to login screen
-        await _auth.signOut();
-
-        if (context.mounted) {
-          Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-        }
-      } on FirebaseAuthException catch (e) {
-        String error = 'Failed to change password.';
-        if (e.code == 'wrong-password') {
-          error = 'Current password is incorrect.';
-        } else if (e.code == 'weak-password') {
-          error = 'New password is too weak.';
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error),
-            backgroundColor: Colors.red,
-          ),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('An unexpected error occurred.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      } finally {
-        setState(() => _isLoading = false);
+      if (user == null || user.email == null) {
+        throw FirebaseAuthException(
+            code: 'no-user', message: 'User not found or not logged in.');
       }
-    }
 
+      // Re-authenticate the user
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+      await user.reauthenticateWithCredential(credential);
+
+      // Update the password
+      await user.updatePassword(newPassword);
+
+      // Show success snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password changed successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Navigate back to AccountManagementScreen
+      if (context.mounted) {
+        Navigation.pushReplacement(context, const AccountManagementScreen());
+      }
+    } on FirebaseAuthException catch (e) {
+      String error = 'Failed to change password.';
+      if (e.code == 'wrong-password') {
+        error = 'Current password is incorrect.';
+      } else if (e.code == 'weak-password') {
+        error = 'New password is too weak.';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('An unexpected error occurred.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -148,7 +150,7 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                 IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
                   onPressed: () {
-                    Navigator.pop(context);
+                    Navigation.pushReplacement(context, const AccountManagementScreen());
                   },
                 ),
                 const SizedBox(width: 10),

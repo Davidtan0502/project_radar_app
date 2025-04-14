@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:project_radar_app/screens/profile/account_management_screen.dart';
 import 'about_us.dart';
-import 'account_info.dart';
 import 'change_password.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -87,16 +87,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'Account',
                     onTap: () => Navigator.push(
                       context,
-                      _createRoute(const AccountInfo()),
+                      _createRoute(const AccountManagementScreen()),
                     ),
                   ),
                   _buildOptionTile(
                     icon: Icons.lock,
                     title: 'Privacy & Security',
-                    onTap: () => Navigator.push(
-                      context,
-                      _createRoute(const ChangePassword()),
-                    ),
+                    onTap: () => Navigator.push //(
+                      //context,
+                      //_createRoute(const name()),
+                  // ),
                   ),
                   _buildOptionTile(
                     icon: Icons.info_outline,
@@ -134,16 +134,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 20),
                   
-                  TextButton.icon(
-                    onPressed: () {
-                      // TODO: Add account deletion logic
-                    },
-                    icon: const Icon(Icons.delete_forever, color: Colors.red),
-                    label: const Text(
-                      'Delete Account',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                  ),
                 ],
               ),
             ),
