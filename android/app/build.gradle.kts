@@ -34,6 +34,12 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+    dependencies {
+        implementation(platform("com.google.firebase:firebase-bom:32.2.2"))
+        implementation("com.google.firebase:firebase-auth")
+        implementation("com.google.firebase:firebase-firestore")
+        // other dependencies...
+    }
 }
 
 flutter {
