@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:project_radar_app/screens/profile/account_management_screen.dart';
 import 'package:project_radar_app/services/navigation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class EditAccountinfo extends StatefulWidget {
   const EditAccountinfo({super.key});
@@ -14,6 +17,9 @@ class EditAccountinfo extends StatefulWidget {
 class _EditAccountinfoState extends State<EditAccountinfo> {
   File? _profileImage;
   File? _idImage;
+  bool _removeProfileImage = false;
+  double? _profileUploadProgress;
+  double? _idUploadProgress;
   final _formKey = GlobalKey<FormState>();
   bool _isFormDirty = false;
 
@@ -73,6 +79,42 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     _weightController.dispose();
   }
 
+  Future<String?> _uploadImageToStorage(File imageFile) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+
+    final ref = FirebaseStorage.instance.ref().child('profile_images/${user.uid}.jpg');
+    final uploadTask = ref.putFile(imageFile);
+
+    uploadTask.snapshotEvents.listen((event) {
+      double progress = (event.bytesTransferred / event.totalBytes) * 100;
+      setState(() {
+        _profileUploadProgress = progress;
+      });
+    });
+
+    final snapshot = await uploadTask;
+    return await snapshot.ref.getDownloadURL();
+  }
+
+  Future<String?> _uploadIDToStorage(File idFile) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+
+    final ref = FirebaseStorage.instance.ref().child('id_uploads/${user.uid}.jpg');
+    final uploadTask = ref.putFile(idFile);
+
+    uploadTask.snapshotEvents.listen((event) {
+      double progress = (event.bytesTransferred / event.totalBytes) * 100;
+      setState(() {
+        _idUploadProgress = progress;
+      });
+    });
+
+    final snapshot = await uploadTask;
+    return await snapshot.ref.getDownloadURL();
+  }
+
   Future<void> _pickImage(ImageSource source, bool isProfile) async {
     final picker = ImagePicker();
     final pickedImage = await picker.pickImage(source: source);
@@ -80,6 +122,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       setState(() {
         if (isProfile) {
           _profileImage = File(pickedImage.path);
+          _removeProfileImage = false;
         } else {
           _idImage = File(pickedImage.path);
         }
@@ -88,40 +131,84 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     }
   }
 
-  void _saveProfile() {
+  void _saveProfile() async {
     if (_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile saved successfully!'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      setState(() => _isFormDirty = false);
-      Navigation.pushReplacement(context, const AccountManagementScreen());
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        String? imageUrl;
+
+        if (_removeProfileImage) {
+          imageUrl = null;
+          final ref = FirebaseStorage.instance
+              .ref()
+              .child('profile_images/${user.uid}.jpg');
+          try {
+            await ref.delete();
+          } catch (e) {
+            debugPrint("No image to delete or already removed.");
+          }
+        } else if (_profileImage != null) {
+          imageUrl = await _uploadImageToStorage(_profileImage!);
+        }
+
+        String? idImageUrl;
+        if (_idImage != null) {
+          idImageUrl = await _uploadIDToStorage(_idImage!);
+        }
+
+        final userDoc =
+            FirebaseFirestore.instance.collection('users').doc(user.uid);
+
+        await userDoc.set({
+          'firstName': _firstNameController.text.trim(),
+          'middleName': _middleNameController.text.trim(),
+          'lastName': _lastNameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'phone': _phoneController.text.trim(),
+          'dob': _dobController.text.trim(),
+          'address': _addressController.text.trim(),
+          'bloodType': _bloodTypeController.text.trim(),
+          'height': _heightController.text.trim(),
+          'weight': _weightController.text.trim(),
+          'photoURL': imageUrl,
+          'idURL': idImageUrl,
+          'isVerified': true,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile saved successfully!')),
+        );
+
+        setState(() => _isFormDirty = false);
+        Navigation.pushReplacement(context, const AccountManagementScreen());
+      }
     }
   }
 
   Future<bool> _confirmUnsavedChanges() async {
     if (!_isFormDirty) return true;
-    
+
     return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Unsaved Changes'),
-        content: const Text('You have unsaved changes. Are you sure you want to leave?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Unsaved Changes'),
+            content:
+                const Text('You have unsaved changes. Are you sure you want to leave?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Discard', style: TextStyle(color: Colors.red)),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Discard', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   @override
@@ -176,28 +263,44 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
 
   Widget _buildProfileImageSection() {
     return Center(
-      child: Stack(
+      child: Column(
         children: [
-          GestureDetector(
-            onTap: () => _pickImage(ImageSource.gallery, true),
-            child: CircleAvatar(
-              radius: 50,
-              backgroundImage: _profileImage != null
-                  ? FileImage(_profileImage!)
-                  : const NetworkImage('https://via.placeholder.com/150') as ImageProvider,
-              child: _profileImage == null
-                  ? const Icon(Icons.camera_alt, size: 30, color: Colors.white70)
-                  : null,
-            ),
-          ),
-          if (_profileImage != null)
-            Positioned(
-              bottom: 0,
-              right: 0,
-              child: IconButton(
-                icon: const Icon(Icons.edit, color: Colors.white),
-                onPressed: () => _pickImage(ImageSource.gallery, true),
+          Stack(
+            children: [
+              GestureDetector(
+                onTap: () => _pickImage(ImageSource.gallery, true),
+                child: CircleAvatar(
+                  radius: 50,
+                  backgroundImage: _profileImage != null
+                      ? FileImage(_profileImage!)
+                      : const NetworkImage('https://via.placeholder.com/150') as ImageProvider,
+                  child: _profileImage == null
+                      ? const Icon(Icons.camera_alt, size: 30, color: Colors.white70)
+                      : null,
+                ),
               ),
+              if (_profileImage != null)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.white),
+                    onPressed: () => _pickImage(ImageSource.gallery, true),
+                  ),
+                ),
+            ],
+          ),
+          if (_profileImage != null || !_removeProfileImage)
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _removeProfileImage = true;
+                  _profileImage = null;
+                  _markFormDirty();
+                });
+              },
+              icon: const Icon(Icons.delete, color: Colors.red),
+              label: const Text("Remove Photo", style: TextStyle(color: Colors.red)),
             ),
         ],
       ),
@@ -212,28 +315,10 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
         _buildEditableField('First Name', _firstNameController, hint: 'John'),
         _buildEditableField('Middle Name', _middleNameController, hint: 'Felix'),
         _buildEditableField('Last Name', _lastNameController, hint: 'Doe'),
-        _buildEditableField(
-          'Email', 
-          _emailController, 
-          hint: 'yourname@example.com',
-          keyboardType: TextInputType.emailAddress,
-        ),
-        _buildEditableField(
-          'Phone Number', 
-          _phoneController, 
-          hint: '09123456789',
-          keyboardType: TextInputType.phone,
-        ),
-        _buildEditableField(
-          'Date of Birth', 
-          _dobController, 
-          hint: 'January 1, 1990',
-        ),
-        _buildEditableField(
-          'Address', 
-          _addressController, 
-          hint: '123 Main St, Manila City, Philippines',
-        ),
+        _buildEditableField('Email', _emailController, hint: 'yourname@example.com', keyboardType: TextInputType.emailAddress),
+        _buildEditableField('Phone Number', _phoneController, hint: '09123456789', keyboardType: TextInputType.phone),
+        _buildEditableField('Date of Birth', _dobController, hint: 'January 1, 1990'),
+        _buildEditableField('Address', _addressController, hint: '123 Main St, Manila City, Philippines'),
       ],
     );
   }
@@ -315,9 +400,9 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   }
 
   Widget _buildEditableField(
-    String label, 
+    String label,
     TextEditingController controller, {
-    String? hint, 
+    String? hint,
     TextInputType keyboardType = TextInputType.text,
   }) {
     return Padding(
@@ -336,8 +421,9 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
             borderSide: BorderSide.none,
           ),
         ),
-        validator: (value) => (value == null || value.isEmpty) ? 'Please enter $label' : null,
+        validator: (value) =>
+            (value == null || value.isEmpty) ? 'Please enter $label' : null,
       ),
     );
   }
-} 
+}

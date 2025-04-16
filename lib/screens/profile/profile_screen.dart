@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:project_radar_app/screens/profile/change_password.dart';
 import 'package:project_radar_app/screens/profile/edit_profile_screen.dart';
 import 'package:project_radar_app/screens/profile/emergency_contacts_screen.dart';
 import 'package:project_radar_app/screens/profile/help_and_support.dart';
