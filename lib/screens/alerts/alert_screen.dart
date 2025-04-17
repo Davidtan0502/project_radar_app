@@ -6,6 +6,7 @@ import '../../services/alert_service.dart';
 import '../../widgets/emergency_buttons.dart';
 import '../incidents/incident_report_screen.dart';
 import '../profile/emergency_contacts_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AlertScreen extends StatefulWidget {
   const AlertScreen({super.key});
@@ -95,10 +96,7 @@ class _AlertScreenState extends State<AlertScreen> {
                     ),
                     Text(
                       _currentTime,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
                     ),
                   ],
                 ),
@@ -107,14 +105,15 @@ class _AlertScreenState extends State<AlertScreen> {
               // Map
               SizedBox(
                 height: mapHeight,
-                child: _locationReady
-                    ? GoogleMap(
-                        onMapCreated: _onMapCreated,
-                        initialCameraPosition: _initialPosition,
-                        myLocationEnabled: true,
-                        zoomControlsEnabled: false,
-                      )
-                    : const Center(child: CircularProgressIndicator()),
+                child:
+                    _locationReady
+                        ? GoogleMap(
+                          onMapCreated: _onMapCreated,
+                          initialCameraPosition: _initialPosition,
+                          myLocationEnabled: true,
+                          zoomControlsEnabled: false,
+                        )
+                        : const Center(child: CircularProgressIndicator()),
               ),
 
               SizedBox(height: sectionSpacing),
@@ -128,17 +127,23 @@ class _AlertScreenState extends State<AlertScreen> {
                     buildSquareButton(
                       icon: 'assets/ambulance.png',
                       label: 'Ambulance',
-                      onTap: () => AlertService.launchPhone('09123456789'),
+                      onTap:
+                          () =>
+                              AlertService.launchPhone(context, '09123456789'),
                     ),
                     buildSquareButton(
                       icon: 'assets/firetruck.png',
                       label: 'Fire Truck',
-                      onTap: () => AlertService.launchPhone('09123456789'),
+                      onTap:
+                          () =>
+                              AlertService.launchPhone(context, '09123456789'),
                     ),
                     buildSquareButton(
                       icon: 'assets/police.png',
                       label: 'Police',
-                      onTap: () => AlertService.launchPhone('09123456789'),
+                      onTap:
+                          () =>
+                              AlertService.launchPhone(context, '09123456789'),
                     ),
                   ],
                 ),

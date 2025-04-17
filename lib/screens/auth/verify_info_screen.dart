@@ -1,40 +1,52 @@
 import 'package:flutter/material.dart';
 
-class VerifyInfoScreen extends StatelessWidget {
+/// A confirmation screen that displays the user's input
+class VerifyInfoScreen extends StatefulWidget {
   final String lastName;
   final String firstName;
-  final String middleInitial;
+  final String middleName;
   final String email;
   final String phone;
   final String password;
-  final VoidCallback onConfirm;
-  final VoidCallback onEdit;
 
   const VerifyInfoScreen({
     super.key,
     required this.lastName,
     required this.firstName,
-    required this.middleInitial,
+    required this.middleName,
     required this.email,
     required this.phone,
     required this.password,
-    required this.onConfirm,
-    required this.onEdit,
+    required Null Function() onConfirm,
+    required Null Function() onEdit,
   });
+
+  @override
+  State<VerifyInfoScreen> createState() => _VerifyInfoScreenState();
+}
+
+class _VerifyInfoScreenState extends State<VerifyInfoScreen> {
+  bool _isLoading = false;
+
+  /// Pops with `false` to signal "edit".
+  void _handleEdit() {
+    Navigator.pop(context, false);
+  }
+
+  /// Pops with `true` to signal "confirm".
+  Future<void> _handleConfirm() async {
+    setState(() => _isLoading = true);
+    await Future.delayed(const Duration(milliseconds: 300));
+    Navigator.pop(context, true);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Verify Your Email'),
+        title: const Text('Verify Your Details'),
         backgroundColor: const Color(0xFF336699),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: onEdit,
-            tooltip: 'Edit Information',
-          ),
-        ],
+        automaticallyImplyLeading: false,
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
@@ -54,36 +66,66 @@ class VerifyInfoScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
-                const SizedBox(height: 20),
-                const Text(
-                  'A verification email has been sent to your email address. Please check your inbox (and spam folder) and click the verification link. Once verified, tap the button below to continue.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey),
-                ),
-                const SizedBox(height: 20),
-                _buildInfoTile("Last Name", lastName),
-                _buildInfoTile("First Name", firstName),
-                _buildInfoTile("Middle Initial", middleInitial),
-                _buildInfoTile("Email", email),
-                _buildInfoTile("Phone", "+63$phone"),
-                _buildInfoTile("Password", '*' * password.length),
+                const SizedBox(height: 16),
+                _buildInfoTile('Last Name', widget.lastName),
+                _buildInfoTile('First Name', widget.firstName),
+                _buildInfoTile('Middle Name', widget.middleName),
+                _buildInfoTile('Email', widget.email),
+                _buildInfoTile('Phone', '+63${widget.phone}'),
+                _buildInfoTile('Password', '*' * widget.password.length),
                 const Spacer(),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: onConfirm,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF336699),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _handleEdit,
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: const BorderSide(color: Color(0xFF336699)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Edit',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF336699),
+                          ),
+                        ),
                       ),
                     ),
-                    child: const Text(
-                      'Verify Confirmation',
-                      style: TextStyle(fontSize: 16, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleConfirm,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF336699),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child:
+                            _isLoading
+                                ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                                : const Text(
+                                  'Confirm',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -107,7 +149,10 @@ class VerifyInfoScreen extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Text(value, style: const TextStyle(color: Colors.black87)),
+            child: Text(
+              value,
+              style: const TextStyle(color: Color.fromARGB(221, 11, 11, 11)),
+            ),
           ),
         ],
       ),

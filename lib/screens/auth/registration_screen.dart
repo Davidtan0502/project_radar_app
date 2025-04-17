@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'verify_info_screen.dart';
+import 'package:another_flushbar/flushbar.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -20,8 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _firstNameController = TextEditingController();
-  final TextEditingController _middleInitialController =
-      TextEditingController();
+  final TextEditingController _middleNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -52,7 +52,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     _controller.dispose();
     _lastNameController.dispose();
     _firstNameController.dispose();
-    _middleInitialController.dispose();
+    _middleNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
@@ -60,19 +60,41 @@ class _RegisterScreenState extends State<RegisterScreen>
     super.dispose();
   }
 
-  Future<void> _registerUser() async {
+  // Validate and defer registration until confirmation
+  void _submitRegistration() {
     if (!_formKey.currentState!.validate()) return;
 
+    Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder:
+            (_) => VerifyInfoScreen(
+              lastName: _lastNameController.text.trim(),
+              firstName: _firstNameController.text.trim(),
+              middleName: _middleNameController.text.trim(),
+              email: _emailController.text.trim().toLowerCase(),
+              phone: _phoneController.text.trim(),
+              password: _passwordController.text,
+              onConfirm: () {},
+              onEdit: () {},
+            ),
+      ),
+    ).then((confirmed) {
+      if (confirmed == true) {
+        _createAccount();
+      }
+    });
+  }
+
+  Future<void> _createAccount() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      // Check if email is already in use
-      final methods = await _auth.fetchSignInMethodsForEmail(
-        _emailController.text.trim(),
-      );
+      final email = _emailController.text.trim().toLowerCase();
+      final methods = await _auth.fetchSignInMethodsForEmail(email);
       if (methods.isNotEmpty) {
         throw FirebaseAuthException(
           code: 'email-already-in-use',
@@ -80,73 +102,51 @@ class _RegisterScreenState extends State<RegisterScreen>
         );
       }
 
-      // Create the user in Firebase Authentication
       UserCredential userCredential = await _auth
           .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
+            email: email,
             password: _passwordController.text.trim(),
           );
 
-      // Send verification email
       await userCredential.user!.sendEmailVerification();
 
-      // Prepare user data for Firestore with status 'approved'
       final userData = {
         'firstName': _firstNameController.text.trim(),
         'lastName': _lastNameController.text.trim(),
-        'middleInitial': _middleInitialController.text.trim(),
-        'email': _emailController.text.trim(),
+        'middleName': _middleNameController.text.trim(),
+        'email': email,
         'phone': '+63${_phoneController.text.trim()}',
-        'password':
-            _passwordController.text
-                .trim(), // Note: Avoid storing plaintext passwords in production!
-        'status': 'approved', // Set account status as approved immediately
+        'password': _passwordController.text.trim(),
+        'status': 'approved',
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // Save to 'users' collection using the user's UID as the document ID
       await _firestore
           .collection('users')
           .doc(userCredential.user!.uid)
           .set(userData);
 
       if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder:
-              (_) => VerifyInfoScreen(
-                lastName: _lastNameController.text,
-                firstName: _firstNameController.text,
-                middleInitial: _middleInitialController.text,
-                email: _emailController.text,
-                phone: _phoneController.text,
-                password: _passwordController.text,
-                onConfirm: () {
-                  Navigator.popUntil(context, (route) => route.isFirst);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Verification email sent. Please check your inbox and verify your email to login.',
-                      ),
-                      duration: Duration(seconds: 4),
-                    ),
-                  );
-                },
-                onEdit: () => Navigator.pop(context),
-              ),
-        ),
-      );
+      Navigator.popUntil(context, (route) => route.isFirst);
+      Flushbar(
+        message:
+            'Verification email sent. Please check your inbox and verify your email to login.',
+        duration: const Duration(seconds: 4),
+        margin: const EdgeInsets.all(8),
+        borderRadius: BorderRadius.circular(8),
+        backgroundColor: const Color.fromARGB(255, 25, 167, 0),
+        flushbarPosition: FlushbarPosition.TOP,
+      ).show(context);
     } on FirebaseAuthException catch (e) {
       setState(() {
-        _isLoading = false;
         _errorMessage = _getErrorMessage(e.code);
       });
     } catch (e) {
       setState(() {
-        _isLoading = false;
         _errorMessage = 'Registration failed. Please try again.';
       });
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -194,9 +194,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                   Icons.arrow_back,
                                   color: Colors.white,
                                 ),
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                },
+                                onPressed: () => Navigator.pop(context),
                               ),
                             ),
                             const Text(
@@ -272,13 +270,13 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       ),
                                       const SizedBox(height: 12),
                                       _buildTextField(
-                                        _middleInitialController,
-                                        'Middle Name',
+                                        _middleNameController,
+                                        'Middle Initial',
                                         Icons.person_outline,
                                         validator: (val) {
                                           if (val == null ||
                                               val.trim().isEmpty) {
-                                            return 'Enter middle name';
+                                            return 'Enter middle initial';
                                           }
                                           return null;
                                         },
@@ -348,28 +346,13 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       TextFormField(
                                         controller: _passwordController,
                                         obscureText: !_isPasswordVisible,
-                                        validator: (val) {
-                                          if (val == null || val.length < 6) {
-                                            return 'At least 6 characters';
-                                          }
-                                          return null;
-                                        },
+                                        validator:
+                                            (val) =>
+                                                val == null || val.length < 6
+                                                    ? 'At least 6 characters'
+                                                    : null,
                                         decoration: InputDecoration(
                                           labelText: 'Password',
-                                          prefixIcon: const Icon(Icons.lock),
-                                          suffixIcon: IconButton(
-                                            icon: Icon(
-                                              _isPasswordVisible
-                                                  ? Icons.visibility
-                                                  : Icons.visibility_off,
-                                            ),
-                                            onPressed: () {
-                                              setState(() {
-                                                _isPasswordVisible =
-                                                    !_isPasswordVisible;
-                                              });
-                                            },
-                                          ),
                                           border: OutlineInputBorder(
                                             borderRadius: BorderRadius.circular(
                                               12,
@@ -380,6 +363,19 @@ class _RegisterScreenState extends State<RegisterScreen>
                                                 vertical: 14,
                                                 horizontal: 16,
                                               ),
+                                          prefixIcon: const Icon(Icons.lock),
+                                          suffixIcon: IconButton(
+                                            icon: Icon(
+                                              _isPasswordVisible
+                                                  ? Icons.visibility
+                                                  : Icons.visibility_off,
+                                            ),
+                                            onPressed:
+                                                () => setState(() {
+                                                  _isPasswordVisible =
+                                                      !_isPasswordVisible;
+                                                }),
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(height: 12),
@@ -387,6 +383,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         controller: _confirmPasswordController,
                                         obscureText: !_isConfirmPasswordVisible,
                                         validator: (val) {
+                                          if (val == null || val.isEmpty) {
+                                            return 'Confirm Password is required';
+                                          }
                                           if (val != _passwordController.text) {
                                             return 'Passwords don\'t match';
                                           }
@@ -425,7 +424,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       const SizedBox(height: 24),
                                       ElevatedButton(
                                         onPressed:
-                                            _isLoading ? null : _registerUser,
+                                            _isLoading
+                                                ? null
+                                                : _submitRegistration,
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor:
                                               _colorAnimation.value,

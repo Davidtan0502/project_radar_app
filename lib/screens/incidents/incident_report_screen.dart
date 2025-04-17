@@ -7,7 +7,8 @@ class IncidentReportPage extends StatefulWidget {
   State<IncidentReportPage> createState() => _IncidentReportPageState();
 }
 
-class _IncidentReportPageState extends State<IncidentReportPage> with SingleTickerProviderStateMixin {
+class _IncidentReportPageState extends State<IncidentReportPage>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
@@ -30,21 +31,21 @@ class _IncidentReportPageState extends State<IncidentReportPage> with SingleTick
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: const Interval(0, 0.5, curve: Curves.easeInOut),
       ),
     );
-    
+
     _slideAnimation = Tween<double>(begin: 20, end: 0).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: const Interval(0.3, 1, curve: Curves.easeOut),
       ),
     );
-    
+
     _animationController.forward();
   }
 
@@ -142,17 +143,18 @@ class _IncidentReportPageState extends State<IncidentReportPage> with SingleTick
                             children: [
                               Text(
                                 'Report an Incident',
-                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: _primaryColor,
-                                    ),
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: _primaryColor,
+                                ),
                               ),
                               const SizedBox(height: 8),
                               Text(
                                 'Please fill out all fields to submit your report',
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: Colors.grey.shade600,
-                                    ),
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(color: Colors.grey.shade600),
                               ),
                               const SizedBox(height: 24),
                               _buildTextField(
@@ -227,7 +229,10 @@ class _IncidentReportPageState extends State<IncidentReportPage> with SingleTick
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: _primaryColor, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 16,
+          horizontal: 16,
+        ),
       ),
       validator: (value) => value == null || value.isEmpty ? validator : null,
     );
@@ -249,18 +254,19 @@ class _IncidentReportPageState extends State<IncidentReportPage> with SingleTick
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
       ),
-      items: _incidentTypes.map((type) {
-        return DropdownMenuItem(
-          value: type,
-          child: Text(
-            type,
-            style: const TextStyle(fontSize: 16),
-          ),
-        );
-      }).toList(),
+      items:
+          _incidentTypes.map((type) {
+            return DropdownMenuItem(
+              value: type,
+              child: Text(type, style: const TextStyle(fontSize: 16)),
+            );
+          }).toList(),
       onChanged: (value) => setState(() => _incidentType = value),
-      validator: (value) =>
-          value == null || value.isEmpty ? 'Please select an incident type' : null,
+      validator:
+          (value) =>
+              value == null || value.isEmpty
+                  ? 'Please select an incident type'
+                  : null,
       borderRadius: BorderRadius.circular(10),
       icon: Icon(Icons.arrow_drop_down, color: _primaryColor),
       dropdownColor: Colors.white,
@@ -283,11 +289,17 @@ class _IncidentReportPageState extends State<IncidentReportPage> with SingleTick
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: _primaryColor, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 16,
+          horizontal: 16,
+        ),
       ),
       maxLines: 5,
-      validator: (value) =>
-          value == null || value.isEmpty ? 'Please describe the incident in detail' : null,
+      validator:
+          (value) =>
+              value == null || value.isEmpty
+                  ? 'Please describe the incident in detail'
+                  : null,
     );
   }
 

@@ -53,12 +53,12 @@ class _HotlinesPageState extends State<HotlinesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredHotlines = _hotlines.where((hotline) {
-      return hotline['name']
-          .toString()
-          .toLowerCase()
-          .contains(_searchText.toLowerCase());
-    }).toList();
+    final filteredHotlines =
+        _hotlines.where((hotline) {
+          return hotline['name'].toString().toLowerCase().contains(
+            _searchText.toLowerCase(),
+          );
+        }).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F8FC),
@@ -79,7 +79,12 @@ class _HotlinesPageState extends State<HotlinesPage> {
               ),
             ],
           ),
-          padding: const EdgeInsets.only(top: 36, left: 16, right: 16, bottom: 12),
+          padding: const EdgeInsets.only(
+            top: 36,
+            left: 16,
+            right: 16,
+            bottom: 12,
+          ),
           alignment: Alignment.centerLeft,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -124,123 +129,163 @@ class _HotlinesPageState extends State<HotlinesPage> {
 
             // Hotline Cards
             Expanded(
-              child: filteredHotlines.isEmpty
-                  ? const Center(
-                      child: Text(
-                        "No results found.",
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    )
-                  : ListView.builder(
-                      controller: _scrollController,
-                      itemCount: filteredHotlines.length,
-                      itemBuilder: (context, index) {
-                        final hotline = filteredHotlines[index];
-                        return Padding(
-                          padding: EdgeInsets.only(
-                            bottom: index == filteredHotlines.length - 1 ? 0 : 16,
-                          ),
-                          child: Card(
-                            margin: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
+              child:
+                  filteredHotlines.isEmpty
+                      ? const Center(
+                        child: Text(
+                          "No results found.",
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      )
+                      : ListView.builder(
+                        controller: _scrollController,
+                        itemCount: filteredHotlines.length,
+                        itemBuilder: (context, index) {
+                          final hotline = filteredHotlines[index];
+                          return Padding(
+                            padding: EdgeInsets.only(
+                              bottom:
+                                  index == filteredHotlines.length - 1 ? 0 : 16,
                             ),
-                            elevation: 4,
-                            shadowColor: hotline['color'].withOpacity(0.3),
-                            child: ExpansionTile(
-                              tilePadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
+                            child: Card(
+                              margin: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
                               ),
-                              title: Text(
-                                hotline['name'],
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                              elevation: 4,
+                              shadowColor: hotline['color'].withOpacity(0.3),
+                              child: ExpansionTile(
+                                tilePadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
                                 ),
-                              ),
-                              subtitle: Text(
-                                hotline['number'],
-                                style: TextStyle(color: hotline['color']),
-                              ),
-                              leading: CircleAvatar(
-                                backgroundColor: hotline['color'],
-                                child: const Icon(Icons.local_phone, color: Colors.white),
-                              ),
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16.0, vertical: 10),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        hotline['description'],
-                                        style: const TextStyle(color: Colors.black87),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          ElevatedButton.icon(
-                                            onPressed: () async {
-                                               final Uri url = Uri.parse(hotline['phoneUri']);
-                                               if (await canLaunchUrl(url)) {
-                                                 await launchUrl(
-                                                   url,
-                                                   mode: LaunchMode.externalApplication,
-                                                 );
-                                               } else {
-                                                 throw 'Could not launch ${hotline['phoneUri']}';
-                                               }
-                                             },
-                                            icon: const Icon(Icons.call, color: Colors.white),
-                                            label: const Text('Call',
-                                                style: TextStyle(color: Colors.white)),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: hotline['color'],
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(30),
-                                              ),
-                                            ),
-                                          ),
-                                          OutlinedButton.icon(
-                                            onPressed: () async {
-                                              final Uri url = Uri.parse(hotline['facebookUrl']);
-                                              if (await canLaunchUrl(url)) {
-                                                await launchUrl(
-                                                  url,
-                                                  mode: LaunchMode.externalApplication,
-                                                );
-                                              } else {
-                                                throw 'Could not launch ${hotline['facebookUrl']}';
-                                              }
-                                            },
-                                            icon: const Icon(Icons.facebook),
-                                            label: const Text('Facebook'),
-                                            style: OutlinedButton.styleFrom(
-                                              foregroundColor: hotline['color'],
-                                              side: BorderSide(color: hotline['color']),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(30),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
+                                title: Text(
+                                  hotline['name'],
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
                                   ),
                                 ),
-                              ],
+                                subtitle: Text(
+                                  hotline['number'],
+                                  style: TextStyle(color: hotline['color']),
+                                ),
+                                leading: CircleAvatar(
+                                  backgroundColor: hotline['color'],
+                                  child: const Icon(
+                                    Icons.local_phone,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16.0,
+                                      vertical: 10,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          hotline['description'],
+                                          style: const TextStyle(
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            ElevatedButton.icon(
+                                              onPressed: () async {
+                                                final uri = Uri.parse(
+                                                  hotline['phoneUri'],
+                                                );
+                                                if (!await launchUrl(
+                                                  uri,
+                                                  mode:
+                                                      LaunchMode
+                                                          .externalApplication,
+                                                )) {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        'Could not open Phone App.',
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                              },
+                                              icon: const Icon(
+                                                Icons.call,
+                                                color: Colors.white,
+                                              ),
+                                              label: const Text(
+                                                'Call',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    hotline['color'],
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(30),
+                                                ),
+                                              ),
+                                            ),
+                                            OutlinedButton.icon(
+                                              onPressed: () async {
+                                                final uri = Uri.parse(
+                                                  hotline['facebookUrl'],
+                                                );
+                                                if (!await launchUrl(
+                                                  uri,
+                                                  mode:
+                                                      LaunchMode
+                                                          .externalApplication,
+                                                )) {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        'Could not open Facebook.',
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                              },
+                                              icon: const Icon(Icons.facebook),
+                                              label: const Text('Facebook'),
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor:
+                                                    hotline['color'],
+                                                side: BorderSide(
+                                                  color: hotline['color'],
+                                                ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(30),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
+                          );
+                        },
+                      ),
             ),
           ],
         ),

@@ -57,90 +57,134 @@ class _LoginScreenState extends State<LoginScreen>
       _passwordError = null;
     });
 
-    // Use trimmed and lowercased email for consistency
     final email = _emailController.text.trim().toLowerCase();
-
     if (email.isEmpty) {
       setState(() => _emailError = 'Please enter your email');
       return;
     }
-
     if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
       setState(() => _emailError = 'Please enter a valid email address');
       return;
     }
 
-    FocusScope.of(context).unfocus();
-    setState(() => _isLoading = true);
+    // Check if the email is registered in Firestore
+    try {
+      final userSnapshot =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where('email', isEqualTo: email)
+              .get();
 
-    // Instead of checking with fetchSignInMethodsForEmail, proceed directly
-    setState(() {
-      _isLoading = false;
-      _showPasswordStep = true;
-    });
+      if (userSnapshot.docs.isEmpty) {
+        // If the email is not found, show an error message and don't move to the password step
+        setState(() {
+          _emailError = 'No account found. Please register first.';
+          _showPasswordStep = false; // Keep user in the email step
+        });
+        return;
+      }
+
+      // Email is found, proceed to the password step
+      setState(() {
+        _isLoading = false;
+        _showPasswordStep = true;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _emailError =
+            'An error occurred while checking the email. Please try again.';
+      });
+    }
   }
+
+  // The error messages
+  final String notFoundMsg = 'No account found. Please register first.';
+  final String invalidEmailMsg = 'This email address is invalid.';
+  final String notVerifiedMsg =
+      'Your email isn’t verified yet. Please check your inbox.';
+  final String wrongPassMsg = 'Incorrect password. Please try again.';
+  final String userDisabledMsg = 'This account has been disabled.';
+  final String tooManyReqMsg = 'Too many attempts. Please try again later.';
 
   Future<void> _handleLogin() async {
     setState(() {
+      _emailError = null;
       _passwordError = null;
       _isLoading = true;
     });
 
+    final email = _emailController.text.trim().toLowerCase();
+    final password = _passwordController.text.trim();
+
     try {
-      // Use trimmed and lowercased email for consistency
-      final email = _emailController.text.trim().toLowerCase();
-      final password = _passwordController.text.trim();
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
 
-      final userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      await _auth.currentUser!.reload();
+      final user = _auth.currentUser;
 
-      // Optional: Force a reload of the user
-      await userCredential.user!.reload();
-      final updatedUser = _auth.currentUser;
-
-      if (updatedUser == null || !updatedUser.emailVerified) {
-        // Resend the verification email if not verified
-        await updatedUser?.sendEmailVerification();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Email not verified. Verification email resent. Please verify your email before logging in.',
-            ),
-            duration: Duration(seconds: 4),
-          ),
-        );
+      if (user == null || !user.emailVerified) {
+        await user?.sendEmailVerification();
         await _auth.signOut();
-        setState(() => _isLoading = false);
+
+        setState(() {
+          _isLoading = false;
+          _showPasswordStep = false;
+          _passwordController.clear();
+          _emailError = notVerifiedMsg;
+        });
+        _emailFocusNode.requestFocus();
         return;
       }
 
-      // Optionally update Firestore with emailVerified flag
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(updatedUser.uid)
-          .update({'emailVerified': true});
+      // 4) (Optional) mark verified in Firestore
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update(
+        {'emailVerified': true},
+      );
 
+      // 5) Go into the app
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const MainNavigation()),
+        MaterialPageRoute(builder: (e) => const MainNavigation()),
       );
     } on FirebaseAuthException catch (e) {
       setState(() => _isLoading = false);
-      if (e.code == 'user-not-found') {
-        _showErrorDialog(
-          'No user found with this email address. Please check your email or register.',
-        );
-      } else if (e.code == 'wrong-password') {
-        _showErrorDialog('Incorrect password. Please try again.');
-      } else {
-        _showErrorDialog('Login failed: ${e.message}');
+
+      switch (e.code) {
+        case 'invalid-email':
+        case 'user-not-found':
+        case 'user-disabled':
+        case 'too-many-requests':
+          // existing email‐field cases…
+          setState(() {
+            _showPasswordStep = false;
+            _passwordController.clear();
+            _emailError =
+                {
+                  'invalid-email': invalidEmailMsg,
+                  'user-not-found': notFoundMsg,
+                  'user-disabled': userDisabledMsg,
+                  'too-many-requests': tooManyReqMsg,
+                }[e.code];
+          });
+          _emailFocusNode.requestFocus();
+          break;
+
+        case 'wrong-password':
+        case 'invalid-credential':
+          setState(() {
+            _passwordError = wrongPassMsg;
+          });
+          _passwordFocusNode.requestFocus();
+          break;
+
+        default:
+          _showErrorDialog('Login error: ${e.message}');
       }
     } catch (e) {
       setState(() => _isLoading = false);
-      _showErrorDialog('An error occurred. Please try again.');
+      _showErrorDialog('An unexpected error occurred. Please try again.');
     }
   }
 
@@ -148,14 +192,37 @@ class _LoginScreenState extends State<LoginScreen>
     try {
       await _auth.sendPasswordResetEmail(email: _emailController.text);
       if (!mounted) return;
-      _showErrorDialog('Password reset instructions sent to your email');
+      _showDialog('Password reset instructions sent to your email');
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      _showErrorDialog('Error: ${e.message}');
+      _showErrorDialog('RADAR: ${e.message}');
     } catch (e) {
       if (!mounted) return;
       _showErrorDialog('Failed to send reset email');
     }
+  }
+
+  void _showDialog(String message) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text(
+              'RADAR',
+              style: TextStyle(color: Color.fromARGB(255, 28, 217, 255)),
+            ),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'OK',
+                  style: TextStyle(color: _colorAnimation.value),
+                ),
+              ),
+            ],
+          ),
+    );
   }
 
   void _showErrorDialog(String message) {
