@@ -131,60 +131,95 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     }
   }
 
-  void _saveProfile() async {
-    if (_formKey.currentState!.validate()) {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        String? imageUrl;
-
-        if (_removeProfileImage) {
-          imageUrl = null;
-          final ref = FirebaseStorage.instance
-              .ref()
-              .child('profile_images/${user.uid}.jpg');
-          try {
-            await ref.delete();
-          } catch (e) {
-            debugPrint("No image to delete or already removed.");
-          }
-        } else if (_profileImage != null) {
-          imageUrl = await _uploadImageToStorage(_profileImage!);
-        }
-
-        String? idImageUrl;
-        if (_idImage != null) {
-          idImageUrl = await _uploadIDToStorage(_idImage!);
-        }
-
-        final userDoc =
-            FirebaseFirestore.instance.collection('users').doc(user.uid);
-
-        await userDoc.set({
-          'firstName': _firstNameController.text.trim(),
-          'middleName': _middleNameController.text.trim(),
-          'lastName': _lastNameController.text.trim(),
-          'email': _emailController.text.trim(),
-          'phone': _phoneController.text.trim(),
-          'dob': _dobController.text.trim(),
-          'address': _addressController.text.trim(),
-          'bloodType': _bloodTypeController.text.trim(),
-          'height': _heightController.text.trim(),
-          'weight': _weightController.text.trim(),
-          'photoURL': imageUrl,
-          'idURL': idImageUrl,
-          'isVerified': true,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile saved successfully!')),
-        );
-
-        setState(() => _isFormDirty = false);
-        Navigation.pushReplacement(context, const AccountManagementScreen());
-      }
-    }
+void _saveProfile() async {
+  if (!_formKey.currentState!.validate()) {
+    // Show error if validation fails
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please fill all required fields correctly')),
+    );
+    return;
   }
+
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('You must be logged in to save changes')),
+    );
+    return;
+  }
+
+  try {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    // Prepare update data
+    Map<String, dynamic> updateData = {
+      'firstName': _firstNameController.text.trim(),
+      'middleName': _middleNameController.text.trim(),
+      'lastName': _lastNameController.text.trim(),
+      'email': _emailController.text.trim(),
+      'phone': _phoneController.text.trim(),
+      'dob': _dobController.text.trim(),
+      'address': _addressController.text.trim(),
+      'bloodType': _bloodTypeController.text.trim(),
+      'height': _heightController.text.trim(),
+      'weight': _weightController.text.trim(),
+      'isVerified': true,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    // Handle profile image
+    if (_removeProfileImage) {
+      updateData['photoURL'] = null;
+      try {
+        await FirebaseStorage.instance
+            .ref()
+            .child('profile_images/${user.uid}.jpg')
+            .delete();
+      } catch (e) {
+        debugPrint("No image to delete or already removed: $e");
+      }
+    } else if (_profileImage != null) {
+      final imageUrl = await _uploadImageToStorage(_profileImage!);
+      updateData['photoURL'] = imageUrl;
+    }
+
+    // Handle ID image
+    if (_idImage != null) {
+      final idImageUrl = await _uploadIDToStorage(_idImage!);
+      updateData['idURL'] = idImageUrl;
+    }
+
+    // Update Firestore
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .update(updateData); // Using update() instead of set()
+
+    // Close loading dialog
+    Navigator.of(context).pop();
+
+    // Show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Profile saved successfully!')),
+    );
+
+    setState(() => _isFormDirty = false);
+    Navigation.pushReplacement(context, const AccountManagementScreen());
+  } catch (e) {
+    // Close loading dialog if still open
+    Navigator.of(context).pop();
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to save profile: ${e.toString()}')),
+    );
+    debugPrint('Error saving profile: $e');
+  }
+}
 
   Future<bool> _confirmUnsavedChanges() async {
     if (!_isFormDirty) return true;
