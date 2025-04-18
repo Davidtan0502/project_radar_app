@@ -39,34 +39,56 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   void initState() {
     super.initState();
     _initializeFormListeners();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final doc =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+    if (!doc.exists) return;
+    final data = doc.data()!;
+    setState(() {
+      _firstNameController.text = data['firstName'] ?? '';
+      _middleNameController.text = data['middleName'] ?? '';
+      _lastNameController.text = data['lastName'] ?? '';
+      _emailController.text = data['email'] ?? '';
+      _phoneController.text = data['phone'] ?? '';
+      _dobController.text = data['dob'] ?? '';
+      _addressController.text = data['address'] ?? '';
+      _bloodTypeController.text = data['bloodType'] ?? '';
+      _heightController.text = data['height'] ?? '';
+      _weightController.text = data['weight'] ?? '';
+    });
   }
 
   void _initializeFormListeners() {
-    _firstNameController.addListener(_markFormDirty);
-    _middleNameController.addListener(_markFormDirty);
-    _lastNameController.addListener(_markFormDirty);
-    _emailController.addListener(_markFormDirty);
-    _phoneController.addListener(_markFormDirty);
-    _dobController.addListener(_markFormDirty);
-    _addressController.addListener(_markFormDirty);
-    _bloodTypeController.addListener(_markFormDirty);
-    _heightController.addListener(_markFormDirty);
-    _weightController.addListener(_markFormDirty);
+    for (final ctrl in [
+      _firstNameController,
+      _middleNameController,
+      _lastNameController,
+      _emailController,
+      _phoneController,
+      _dobController,
+      _addressController,
+      _bloodTypeController,
+      _heightController,
+      _weightController,
+    ]) {
+      ctrl.addListener(_markFormDirty);
+    }
   }
 
   void _markFormDirty() {
-    if (!_isFormDirty) {
-      setState(() => _isFormDirty = true);
-    }
+    if (!_isFormDirty) setState(() => _isFormDirty = true);
   }
 
   @override
   void dispose() {
-    _disposeControllers();
-    super.dispose();
-  }
-
-  void _disposeControllers() {
     _firstNameController.dispose();
     _middleNameController.dispose();
     _lastNameController.dispose();
@@ -77,138 +99,122 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     _bloodTypeController.dispose();
     _heightController.dispose();
     _weightController.dispose();
+    super.dispose();
   }
 
-  Future<String?> _uploadImageToStorage(File imageFile) async {
+  Future<String?> _uploadImageToStorage(File imageFile, String path) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return null;
-
-    final ref = FirebaseStorage.instance.ref().child('profile_images/${user.uid}.jpg');
+    final ref = FirebaseStorage.instance
+        .ref()
+        .child(path)
+        .child('${user.uid}.jpg');
     final uploadTask = ref.putFile(imageFile);
-
     uploadTask.snapshotEvents.listen((event) {
-      double progress = (event.bytesTransferred / event.totalBytes) * 100;
+      double progress = event.bytesTransferred / event.totalBytes;
       setState(() {
-        _profileUploadProgress = progress;
+        if (path.contains('profile_images'))
+          _profileUploadProgress = progress;
+        else
+          _idUploadProgress = progress;
       });
     });
-
     final snapshot = await uploadTask;
-    return await snapshot.ref.getDownloadURL();
-  }
-
-  Future<String?> _uploadIDToStorage(File idFile) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return null;
-
-    final ref = FirebaseStorage.instance.ref().child('id_uploads/${user.uid}.jpg');
-    final uploadTask = ref.putFile(idFile);
-
-    uploadTask.snapshotEvents.listen((event) {
-      double progress = (event.bytesTransferred / event.totalBytes) * 100;
-      setState(() {
-        _idUploadProgress = progress;
-      });
-    });
-
-    final snapshot = await uploadTask;
-    return await snapshot.ref.getDownloadURL();
+    return snapshot.ref.getDownloadURL();
   }
 
   Future<void> _pickImage(ImageSource source, bool isProfile) async {
     final picker = ImagePicker();
-    final pickedImage = await picker.pickImage(source: source);
-    if (pickedImage != null) {
-      setState(() {
-        if (isProfile) {
-          _profileImage = File(pickedImage.path);
-          _removeProfileImage = false;
-        } else {
-          _idImage = File(pickedImage.path);
-        }
-        _markFormDirty();
-      });
-    }
+    final picked = await picker.pickImage(source: source);
+    if (picked == null) return;
+    setState(() {
+      if (isProfile) {
+        _profileImage = File(picked.path);
+        _removeProfileImage = false;
+      } else {
+        _idImage = File(picked.path);
+      }
+      _markFormDirty();
+    });
   }
 
-  void _saveProfile() async {
-    if (_formKey.currentState!.validate()) {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        String? imageUrl;
-
-        if (_removeProfileImage) {
-          imageUrl = null;
-          final ref = FirebaseStorage.instance
-              .ref()
-              .child('profile_images/${user.uid}.jpg');
-          try {
-            await ref.delete();
-          } catch (e) {
-            debugPrint("No image to delete or already removed.");
-          }
-        } else if (_profileImage != null) {
-          imageUrl = await _uploadImageToStorage(_profileImage!);
-        }
-
-        String? idImageUrl;
-        if (_idImage != null) {
-          idImageUrl = await _uploadIDToStorage(_idImage!);
-        }
-
-        final userDoc =
-            FirebaseFirestore.instance.collection('users').doc(user.uid);
-
-        await userDoc.set({
-          'firstName': _firstNameController.text.trim(),
-          'middleName': _middleNameController.text.trim(),
-          'lastName': _lastNameController.text.trim(),
-          'email': _emailController.text.trim(),
-          'phone': _phoneController.text.trim(),
-          'dob': _dobController.text.trim(),
-          'address': _addressController.text.trim(),
-          'bloodType': _bloodTypeController.text.trim(),
-          'height': _heightController.text.trim(),
-          'weight': _weightController.text.trim(),
-          'photoURL': imageUrl,
-          'idURL': idImageUrl,
-          'isVerified': true,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile saved successfully!')),
-        );
-
-        setState(() => _isFormDirty = false);
-        Navigation.pushReplacement(context, const AccountManagementScreen());
-      }
+  Future<void> _saveProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    String? profileUrl;
+    if (_removeProfileImage) {
+      try {
+        await FirebaseStorage.instance
+            .ref('profile_images/${user.uid}.jpg')
+            .delete();
+      } catch (_) {}
+    } else if (_profileImage != null) {
+      profileUrl = await _uploadImageToStorage(
+        _profileImage!,
+        'profile_images',
+      );
     }
+    String? idUrl;
+    if (_idImage != null) {
+      idUrl = await _uploadImageToStorage(_idImage!, 'id_uploads');
+    }
+    final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+    await docRef.set({
+      'firstName': _firstNameController.text.trim(),
+      'middleName': _middleNameController.text.trim(),
+      'lastName': _lastNameController.text.trim(),
+      'email': _emailController.text.trim(),
+      'phone': _phoneController.text.trim(),
+      'dob': _dobController.text.trim(),
+      'address': _addressController.text.trim(),
+      'bloodType': _bloodTypeController.text.trim(),
+      'height': _heightController.text.trim(),
+      'weight': _weightController.text.trim(),
+      if (profileUrl != null) 'photoURL': profileUrl,
+      if (idUrl != null) 'idURL': idUrl,
+      'isVerified': true,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Profile saved successfully!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+    setState(() => _isFormDirty = false);
+    Navigation.pushReplacement(context, const AccountManagementScreen());
   }
 
   Future<bool> _confirmUnsavedChanges() async {
     if (!_isFormDirty) return true;
-
-    return await showDialog<bool>(
+    final discard =
+        await showDialog<bool>(
           context: context,
           barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('Unsaved Changes'),
-            content:
-                const Text('You have unsaved changes. Are you sure you want to leave?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+          builder:
+              (_) => AlertDialog(
+                title: const Text('Unsaved Changes'),
+                content: const Text(
+                  'You have unsaved changes. Do you want to discard them?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text(
+                      'Discard',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+                ],
               ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Discard', style: TextStyle(color: Colors.red)),
-              ),
-            ],
-          ),
         ) ??
         false;
+    return discard;
   }
 
   @override
@@ -216,46 +222,47 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final radarBlue = const Color(0xFF1565C0);
-
     return WillPopScope(
       onWillPop: _confirmUnsavedChanges,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Edit Profile', style: TextStyle(color: Colors.white)),
+          title: const Text(
+            'Edit Profile',
+            style: TextStyle(color: Colors.white),
+          ),
           backgroundColor: radarBlue,
           iconTheme: const IconThemeData(color: Colors.white),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () async {
               if (await _confirmUnsavedChanges()) {
-                Navigation.pushReplacement(context, const AccountManagementScreen());
+                Navigation.pushReplacement(
+                  context,
+                  const AccountManagementScreen(),
+                );
               }
             },
           ),
         ),
         backgroundColor: isDark ? Colors.black : Colors.grey[100],
-        body: _buildFormContent(context, radarBlue),
-      ),
-    );
-  }
-
-  Widget _buildFormContent(BuildContext context, Color primaryColor) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Form(
-        key: _formKey,
-        child: ListView(
-          children: [
-            _buildProfileImageSection(),
-            const SizedBox(height: 20),
-            _buildPersonalInfoSection(),
-            const SizedBox(height: 20),
-            _buildIdUploadSection(),
-            const SizedBox(height: 20),
-            _buildHealthInfoSection(),
-            const SizedBox(height: 30),
-            _buildSaveButton(primaryColor),
-          ],
+        body: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              children: [
+                _buildProfileImageSection(),
+                const SizedBox(height: 20),
+                _buildPersonalInfoSection(),
+                const SizedBox(height: 20),
+                _buildIdUploadSection(),
+                const SizedBox(height: 20),
+                _buildHealthInfoSection(),
+                const SizedBox(height: 30),
+                _buildSaveButton(radarBlue),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -271,12 +278,21 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
                 onTap: () => _pickImage(ImageSource.gallery, true),
                 child: CircleAvatar(
                   radius: 50,
-                  backgroundImage: _profileImage != null
-                      ? FileImage(_profileImage!)
-                      : const NetworkImage('https://via.placeholder.com/150') as ImageProvider,
-                  child: _profileImage == null
-                      ? const Icon(Icons.camera_alt, size: 30, color: Colors.white70)
-                      : null,
+                  backgroundImage:
+                      _profileImage != null
+                          ? FileImage(_profileImage!)
+                          : const NetworkImage(
+                                'https://via.placeholder.com/150',
+                              )
+                              as ImageProvider,
+                  child:
+                      _profileImage == null
+                          ? const Icon(
+                            Icons.camera_alt,
+                            size: 30,
+                            color: Colors.white70,
+                          )
+                          : null,
                 ),
               ),
               if (_profileImage != null)
@@ -300,7 +316,10 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
                 });
               },
               icon: const Icon(Icons.delete, color: Colors.red),
-              label: const Text("Remove Photo", style: TextStyle(color: Colors.red)),
+              label: const Text(
+                'Remove Photo',
+                style: TextStyle(color: Colors.red),
+              ),
             ),
         ],
       ),
@@ -313,12 +332,34 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       children: [
         _buildSectionTitle('Personal Information'),
         _buildEditableField('First Name', _firstNameController, hint: 'John'),
-        _buildEditableField('Middle Name', _middleNameController, hint: 'Felix'),
+        _buildEditableField(
+          'Middle Name',
+          _middleNameController,
+          hint: 'Felix',
+        ),
         _buildEditableField('Last Name', _lastNameController, hint: 'Doe'),
-        _buildEditableField('Email', _emailController, hint: 'yourname@example.com', keyboardType: TextInputType.emailAddress),
-        _buildEditableField('Phone Number', _phoneController, hint: '09123456789', keyboardType: TextInputType.phone),
-        _buildEditableField('Date of Birth', _dobController, hint: 'January 1, 1990'),
-        _buildEditableField('Address', _addressController, hint: '123 Main St, Manila City, Philippines'),
+        _buildEditableField(
+          'Email',
+          _emailController,
+          hint: 'you@example.com',
+          keyboardType: TextInputType.emailAddress,
+        ),
+        _buildEditableField(
+          'Phone Number',
+          _phoneController,
+          hint: '09123456789',
+          keyboardType: TextInputType.phone,
+        ),
+        _buildEditableField(
+          'Date of Birth',
+          _dobController,
+          hint: 'January 1, 1990',
+        ),
+        _buildEditableField(
+          'Address',
+          _addressController,
+          hint: '123 Main St, Manila City',
+        ),
       ],
     );
   }
@@ -337,20 +378,21 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: Colors.grey),
             ),
-            child: _idImage != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.file(_idImage!, fit: BoxFit.cover),
-                  )
-                : const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.upload_file, size: 40),
-                        Text('Tap to upload ID'),
-                      ],
+            child:
+                _idImage != null
+                    ? ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.file(_idImage!, fit: BoxFit.cover),
+                    )
+                    : const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.upload_file, size: 40),
+                          Text('Tap to upload ID'),
+                        ],
+                      ),
                     ),
-                  ),
           ),
         ),
       ],
@@ -413,7 +455,10 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
           filled: true,
           fillColor: Colors.white,
           border: OutlineInputBorder(
@@ -421,8 +466,9 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
             borderSide: BorderSide.none,
           ),
         ),
-        validator: (value) =>
-            (value == null || value.isEmpty) ? 'Please enter $label' : null,
+        validator:
+            (value) =>
+                (value == null || value.isEmpty) ? 'Please enter $label' : null,
       ),
     );
   }

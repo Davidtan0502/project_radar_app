@@ -21,7 +21,42 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
   bool _showConfirmPassword = false;
   bool _isLoading = false;
 
+  String? _currentPasswordError;
+  String? _newPasswordError;
+  String? _confirmPasswordError;
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _currentPasswordController.addListener(() {
+      if (_currentPasswordError != null &&
+          _currentPasswordController.text.isEmpty) {
+        setState(() {
+          _currentPasswordError = null;
+        });
+      }
+    });
+
+    _newPasswordController.addListener(() {
+      if (_newPasswordError != null && _newPasswordController.text.isEmpty) {
+        setState(() {
+          _newPasswordError = null;
+        });
+      }
+    });
+
+    _confirmPasswordController.addListener(() {
+      if (_confirmPasswordError != null &&
+          _confirmPasswordController.text.isEmpty) {
+        setState(() {
+          _confirmPasswordError = null;
+        });
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -34,8 +69,9 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
   InputDecoration _buildInputDecoration(
     String label,
     bool visible,
-    VoidCallback toggle,
-  ) {
+    VoidCallback toggle, {
+    String? errorText,
+  }) {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Color(0xFF28588B)),
@@ -51,6 +87,7 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
         ),
         onPressed: toggle,
       ),
+      errorText: errorText,
     );
   }
 
@@ -60,61 +97,85 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
     final currentPassword = _currentPasswordController.text.trim();
     final newPassword = _newPasswordController.text.trim();
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _currentPasswordError = null;
+      _newPasswordError = null;
+      _confirmPasswordError = null;
+    });
 
     try {
       final user = _auth.currentUser;
-
       if (user == null || user.email == null) {
         throw FirebaseAuthException(
-            code: 'no-user', message: 'User not found or not logged in.');
+          code: 'no-user',
+          message: 'User not found or not logged in.',
+        );
       }
 
-      // Re-authenticate the user
-      final credential = EmailAuthProvider.credential(
+      final cred = EmailAuthProvider.credential(
         email: user.email!,
         password: currentPassword,
       );
-      await user.reauthenticateWithCredential(credential);
 
-      // Update the password
+      await user.reauthenticateWithCredential(cred);
+      print("Reauthentication successful!");
+
       await user.updatePassword(newPassword);
+      print("Password updated successfully!");
 
-      // Show success snackbar
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password changed successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      _currentPasswordController.clear();
+      _newPasswordController.clear();
+      _confirmPasswordController.clear();
 
-      // Navigate back to AccountManagementScreen
-      if (context.mounted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password changed successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
         Navigation.pushReplacement(context, const AccountManagementScreen());
       }
     } on FirebaseAuthException catch (e) {
-      String error = 'Failed to change password.';
-      if (e.code == 'wrong-password') {
-        error = 'Current password is incorrect.';
-      } else if (e.code == 'weak-password') {
-        error = 'New password is too weak.';
-      }
+      setState(() {
+        if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+          _currentPasswordError =
+              'The current password you entered is incorrect.';
+        } else if (e.code == 'weak-password') {
+          _newPasswordError =
+              'The new password is too weak. Use at least 6 characters with letters and numbers.';
+        } else if (e.code == 'requires-recent-login') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Please log out and log in again before changing your password.',
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${e.message}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _formKey.currentState!.validate();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('An unexpected error occurred.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      setState(() {
+        _currentPasswordError =
+            'An unexpected error occurred. Please try again.';
+      });
+      _formKey.currentState!.validate();
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -125,7 +186,12 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
       body: Column(
         children: [
           Container(
-            padding: const EdgeInsets.only(top: 50, bottom: 30, left: 20, right: 20),
+            padding: const EdgeInsets.only(
+              top: 50,
+              bottom: 30,
+              left: 20,
+              right: 20,
+            ),
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -150,7 +216,10 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                 IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
                   onPressed: () {
-                    Navigation.pushReplacement(context, const AccountManagementScreen());
+                    Navigation.pushReplacement(
+                      context,
+                      const AccountManagementScreen(),
+                    );
                   },
                 ),
                 const SizedBox(width: 10),
@@ -188,10 +257,18 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                       decoration: _buildInputDecoration(
                         'Current Password',
                         _showCurrentPassword,
-                        () => setState(() => _showCurrentPassword = !_showCurrentPassword),
+                        () => setState(
+                          () => _showCurrentPassword = !_showCurrentPassword,
+                        ),
+                        errorText: _currentPasswordError,
                       ),
-                      validator: (value) =>
-                          value!.isEmpty ? 'Enter your current password' : null,
+                      validator: (value) {
+                        if (value!.isEmpty)
+                          return 'Enter your current password';
+                        if (_currentPasswordError != null)
+                          return _currentPasswordError;
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -200,10 +277,22 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                       decoration: _buildInputDecoration(
                         'New Password',
                         _showNewPassword,
-                        () => setState(() => _showNewPassword = !_showNewPassword),
+                        () => setState(
+                          () => _showNewPassword = !_showNewPassword,
+                        ),
+                        errorText: _newPasswordError,
                       ),
-                      validator: (value) =>
-                          value!.length < 6 ? 'Password must be at least 6 characters' : null,
+                      validator: (value) {
+                        final val = value?.trim() ?? '';
+                        if (val.isEmpty) return 'Enter a new password';
+                        if (val.length < 6)
+                          return 'Password must be at least 6 characters';
+                        final regex = RegExp(r'^(?=.*[A-Za-z])(?=.*\d).{6,}$');
+                        if (!regex.hasMatch(val))
+                          return 'Password must contain letters and numbers';
+                        if (_newPasswordError != null) return _newPasswordError;
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -212,12 +301,19 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                       decoration: _buildInputDecoration(
                         'Confirm New Password',
                         _showConfirmPassword,
-                        () => setState(() => _showConfirmPassword = !_showConfirmPassword),
+                        () => setState(
+                          () => _showConfirmPassword = !_showConfirmPassword,
+                        ),
+                        errorText: _confirmPasswordError,
                       ),
                       validator: (value) {
-                        if (value != _newPasswordController.text) {
+                        final val = value?.trim() ?? '';
+                        if (val.isEmpty)
+                          return 'Please confirm your new password';
+                        if (val != _newPasswordController.text.trim())
                           return 'Passwords do not match';
-                        }
+                        if (_confirmPasswordError != null)
+                          return _confirmPasswordError;
                         return null;
                       },
                     ),
@@ -234,16 +330,19 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                           ),
                           elevation: 3,
                         ),
-                        child: _isLoading
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text(
-                                'Save',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
+                        child:
+                            _isLoading
+                                ? const CircularProgressIndicator(
                                   color: Colors.white,
+                                )
+                                : const Text(
+                                  'Save',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
                                 ),
-                              ),
                       ),
                     ),
                   ],
