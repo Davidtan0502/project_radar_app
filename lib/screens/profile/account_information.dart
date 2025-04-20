@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart'; // format date
-import 'package:project_radar_app/screens/profile/account_management_screen.dart';
-import 'package:project_radar_app/services/navigation.dart';
 
 class AccountInformationScreen extends StatefulWidget {
   const AccountInformationScreen({Key? key}) : super(key: key);
@@ -26,8 +24,9 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
+      // intercept Android back button
       onWillPop: () async {
-        Navigation.pushReplacement(context, const AccountManagementScreen());
+        Navigator.pop(context);
         return false;
       },
       child: FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -44,11 +43,7 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
                 title: const Text('Account Information'),
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  onPressed:
-                      () => Navigation.pushReplacement(
-                        context,
-                        const AccountManagementScreen(),
-                      ),
+                  onPressed: () => Navigator.pop(context),
                 ),
               ),
               body: const Center(child: Text('No user data found')),
@@ -76,21 +71,16 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
               centerTitle: true,
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back),
-                onPressed:
-                    () => Navigation.pushReplacement(
-                      context,
-                      const AccountManagementScreen(),
-                    ),
+                onPressed: () => Navigator.pop(context),
               ),
             ),
             body: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  _buildProfileHeader(context, fullName),
+                  _buildProfileHeader(fullName),
                   const SizedBox(height: 32),
                   _buildAccountInfoCard(
-                    context,
                     fullName,
                     email,
                     phone,
@@ -111,7 +101,7 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
     );
   }
 
-  Widget _buildProfileHeader(BuildContext context, String fullName) {
+  Widget _buildProfileHeader(String fullName) {
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
 
@@ -148,7 +138,6 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
   }
 
   Widget _buildAccountInfoCard(
-    BuildContext context,
     String fullName,
     String email,
     String phone,
@@ -175,63 +164,50 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
         child: Column(
           children: [
             _buildInfoTile(
-              context,
               icon: Icons.person_outline,
               label: 'Full Name',
               value: fullName,
             ),
-            _buildDivider(context),
+            _buildDivider(),
             _buildInfoTile(
-              context,
               icon: Icons.email_outlined,
               label: 'Email',
               value: email,
             ),
-            _buildDivider(context),
+            _buildDivider(),
             _buildInfoTile(
-              context,
               icon: Icons.phone_outlined,
               label: 'Phone',
               value: phone,
             ),
-            _buildDivider(context),
+            _buildDivider(),
             _buildInfoTile(
-              context,
               icon: Icons.cake_outlined,
               label: 'Date of Birth',
               value: dob,
             ),
-            _buildDivider(context),
+            _buildDivider(),
             _buildInfoTile(
-              context,
               icon: Icons.home_outlined,
               label: 'Address',
               value: address,
             ),
-            _buildDivider(context),
+            _buildDivider(),
             _buildInfoTile(
-              context,
               icon: Icons.water_drop_outlined,
               label: 'Blood Type',
               value: bloodType,
             ),
-            _buildDivider(context),
+            _buildDivider(),
+            _buildInfoTile(icon: Icons.height, label: 'Height', value: height),
+            _buildDivider(),
             _buildInfoTile(
-              context,
-              icon: Icons.height,
-              label: 'Height',
-              value: height,
-            ),
-            _buildDivider(context),
-            _buildInfoTile(
-              context,
               icon: Icons.monitor_weight_outlined,
               label: 'Weight',
               value: weight,
             ),
-            _buildDivider(context),
+            _buildDivider(),
             _buildInfoTile(
-              context,
               icon: Icons.calendar_today_outlined,
               label: 'Joined Date',
               value: joinedDate,
@@ -242,8 +218,7 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
     );
   }
 
-  Widget _buildInfoTile(
-    BuildContext context, {
+  Widget _buildInfoTile({
     required IconData icon,
     required String label,
     required String value,
@@ -273,7 +248,7 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
     );
   }
 
-  Widget _buildDivider(BuildContext context) {
+  Widget _buildDivider() {
     return Divider(
       height: 1,
       indent: 72,

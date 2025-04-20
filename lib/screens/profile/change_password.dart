@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:project_radar_app/screens/profile/account_management_screen.dart';
-import 'package:project_radar_app/services/navigation.dart';
 
 class ChangePassword extends StatefulWidget {
   const ChangePassword({super.key});
@@ -34,26 +32,20 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
     _currentPasswordController.addListener(() {
       if (_currentPasswordError != null &&
           _currentPasswordController.text.isEmpty) {
-        setState(() {
-          _currentPasswordError = null;
-        });
+        setState(() => _currentPasswordError = null);
       }
     });
 
     _newPasswordController.addListener(() {
       if (_newPasswordError != null && _newPasswordController.text.isEmpty) {
-        setState(() {
-          _newPasswordError = null;
-        });
+        setState(() => _newPasswordError = null);
       }
     });
 
     _confirmPasswordController.addListener(() {
       if (_confirmPasswordError != null &&
           _confirmPasswordController.text.isEmpty) {
-        setState(() {
-          _confirmPasswordError = null;
-        });
+        setState(() => _confirmPasswordError = null);
       }
     });
   }
@@ -113,17 +105,17 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
         );
       }
 
+      // Re-authenticate
       final cred = EmailAuthProvider.credential(
         email: user.email!,
         password: currentPassword,
       );
-
       await user.reauthenticateWithCredential(cred);
-      print("Reauthentication successful!");
 
+      // Update password
       await user.updatePassword(newPassword);
-      print("Password updated successfully!");
 
+      // Clear fields
       _currentPasswordController.clear();
       _newPasswordController.clear();
       _confirmPasswordController.clear();
@@ -135,8 +127,7 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
             backgroundColor: Colors.green,
           ),
         );
-
-        Navigation.pushReplacement(context, const AccountManagementScreen());
+        Navigator.pop(context);
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -164,18 +155,16 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
           );
         }
       });
-
+      // Re-validate to show field error
       _formKey.currentState!.validate();
-    } catch (e) {
+    } catch (_) {
       setState(() {
         _currentPasswordError =
             'An unexpected error occurred. Please try again.';
       });
       _formKey.currentState!.validate();
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -215,12 +204,7 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () {
-                    Navigation.pushReplacement(
-                      context,
-                      const AccountManagementScreen(),
-                    );
-                  },
+                  onPressed: () => Navigator.pop(context),
                 ),
                 const SizedBox(width: 10),
                 const Text(

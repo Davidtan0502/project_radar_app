@@ -142,6 +142,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     if (!_formKey.currentState!.validate()) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+
     String? profileUrl;
     if (_removeProfileImage) {
       try {
@@ -155,10 +156,12 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
         'profile_images',
       );
     }
+
     String? idUrl;
     if (_idImage != null) {
       idUrl = await _uploadImageToStorage(_idImage!, 'id_uploads');
     }
+
     final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
     await docRef.set({
       'firstName': _firstNameController.text.trim(),
@@ -176,14 +179,16 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       'isVerified': true,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Profile saved successfully!'),
+      const SnackBar(
+        content: Text('Profile saved successfully!'),
         backgroundColor: Colors.green,
       ),
     );
+
     setState(() => _isFormDirty = false);
-    Navigation.pushReplacement(context, const AccountManagementScreen());
+    Navigator.pop(context);
   }
 
   Future<bool> _confirmUnsavedChanges() async {
@@ -196,7 +201,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
               (_) => AlertDialog(
                 title: const Text('Unsaved Changes'),
                 content: const Text(
-                  'You have unsaved changes. Do you want to discard them?',
+                  'You have unsaved changes. Discard them and go back?',
                 ),
                 actions: [
                   TextButton(
@@ -222,6 +227,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final radarBlue = const Color(0xFF1565C0);
+
     return WillPopScope(
       onWillPop: _confirmUnsavedChanges,
       child: Scaffold(
@@ -236,10 +242,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () async {
               if (await _confirmUnsavedChanges()) {
-                Navigation.pushReplacement(
-                  context,
-                  const AccountManagementScreen(),
-                );
+                Navigator.pop(context);
               }
             },
           ),
@@ -355,11 +358,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
           _dobController,
           hint: 'January 1, 1990',
         ),
-        _buildEditableField(
-          'Address',
-          _addressController,
-          hint: '123 Main St, Manila City',
-        ),
+        _buildEditableField('Address', _addressController, hint: '123 Main St'),
       ],
     );
   }

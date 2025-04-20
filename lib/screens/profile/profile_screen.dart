@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:project_radar_app/screens/profile/edit_profile_screen.dart';
 import 'package:project_radar_app/screens/profile/emergency_contacts_screen.dart';
 import 'package:project_radar_app/screens/profile/help_and_support.dart';
 import 'package:project_radar_app/screens/profile/settings_screen.dart';
@@ -36,16 +35,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.3),
       end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _fadeAnimation = Tween<double>(
       begin: 0,
       end: 1,
-    ).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
 
     _controller.forward();
     _loadUserData();
@@ -56,8 +51,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (user != null) {
       setState(() {
         _displayName = user.displayName ?? 'John Doe';
-        _photoURL = user.photoURL ??
-            'https://www.gravatar.com/avatar/placeholder';
+        _photoURL =
+            user.photoURL ?? 'https://www.gravatar.com/avatar/placeholder';
         _isVerified = user.emailVerified;
         _isLoading = false;
       });
@@ -77,15 +72,16 @@ class _ProfileScreenState extends State<ProfileScreen>
               onPressed: () => Navigator.of(context).pop(),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text(
+                "Logout",
+                style: TextStyle(color: Colors.white),
               ),
-              child: const Text("Logout", style: TextStyle(color: Colors.white)),
               onPressed: () {
                 FirebaseAuth.instance.signOut();
-                Navigator.of(context).pushReplacement(
-                  _createRoute(LoginScreen(onTap: () {})),
-                );
+                Navigator.of(
+                  context,
+                ).pushReplacement(_createRoute(LoginScreen(onTap: () {})));
               },
             ),
           ],
@@ -119,9 +115,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                 height: screenHeight * 0.3,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: isDark
-                        ? [Colors.blueGrey.shade800, Colors.blueGrey.shade900]
-                        : [Color(0xFF3F73A3), Color(0xFF28588B)],
+                    colors:
+                        isDark
+                            ? [
+                              Colors.blueGrey.shade800,
+                              Colors.blueGrey.shade900,
+                            ]
+                            : [Color(0xFF3F73A3), Color(0xFF28588B)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -141,19 +141,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                     opacity: _fadeAnimation,
                     child: Column(
                       children: [
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              _createRoute(const EditProfileScreen()),
-                            );
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 4),
-                            ),
-                            child: _isLoading
-                                ? Shimmer.fromColors(
+                        Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 4),
+                          ),
+                          child:
+                              _isLoading
+                                  ? Shimmer.fromColors(
                                     baseColor: Colors.grey[300]!,
                                     highlightColor: Colors.grey[100]!,
                                     child: const CircleAvatar(
@@ -161,31 +156,30 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       backgroundColor: Colors.white,
                                     ),
                                   )
-                                : CircleAvatar(
+                                  : CircleAvatar(
                                     radius: 60,
                                     backgroundImage: NetworkImage(_photoURL),
                                   ),
-                          ),
                         ),
                         const SizedBox(height: 10),
                         _isLoading
                             ? Shimmer.fromColors(
-                                baseColor: Colors.grey[300]!,
-                                highlightColor: Colors.grey[100]!,
-                                child: Container(
-                                  width: 120,
-                                  height: 20,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                _displayName,
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
+                              baseColor: Colors.grey[300]!,
+                              highlightColor: Colors.grey[100]!,
+                              child: Container(
+                                width: 120,
+                                height: 20,
+                                color: Colors.white,
                               ),
+                            )
+                            : Text(
+                              _displayName,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
                         const SizedBox(height: 6),
                         if (!_isLoading)
                           Container(
@@ -229,30 +223,33 @@ class _ProfileScreenState extends State<ProfileScreen>
                       _buildOptionTile(
                         icon: Icons.settings,
                         text: 'Settings',
-                        onTap: () => Navigator.push(
-                          context,
-                          _createRoute(const SettingsScreen()),
-                        ),
+                        onTap:
+                            () => Navigator.push(
+                              context,
+                              _createRoute(const SettingsScreen()),
+                            ),
                         textColor: textColor,
                       ),
                       const Divider(),
                       _buildOptionTile(
                         icon: Icons.help_outline,
                         text: 'Help & Support',
-                        onTap: () => Navigator.push(
-                          context,
-                          _createRoute(const HelpSupportScreen()),
-                        ),
+                        onTap:
+                            () => Navigator.push(
+                              context,
+                              _createRoute(const HelpSupportScreen()),
+                            ),
                         textColor: textColor,
                       ),
                       const Divider(),
                       _buildOptionTile(
                         icon: Icons.contact_phone,
                         text: 'SOS Contacts',
-                        onTap: () => Navigator.push(
-                          context,
-                          _createRoute(const EmergencyContactsScreen()),
-                        ),
+                        onTap:
+                            () => Navigator.push(
+                              context,
+                              _createRoute(const EmergencyContactsScreen()),
+                            ),
                         textColor: textColor,
                       ),
                       const Divider(),
@@ -282,11 +279,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     Color? textColor,
   }) {
     return ListTile(
-      leading: Icon(
-        icon,
-        color: isLogout ? Colors.red : textColor,
-        size: 26,
-      ),
+      leading: Icon(icon, color: isLogout ? Colors.red : textColor, size: 26),
       title: Text(
         text,
         style: TextStyle(
@@ -307,7 +300,10 @@ class _ProfileScreenState extends State<ProfileScreen>
         const end = Offset.zero;
         const curve = Curves.ease;
 
-        final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+        final tween = Tween(
+          begin: begin,
+          end: end,
+        ).chain(CurveTween(curve: curve));
         final fadeTween = Tween<double>(begin: 0.0, end: 1.0);
 
         return SlideTransition(
