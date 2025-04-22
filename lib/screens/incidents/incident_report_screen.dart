@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 
 class IncidentReportPage extends StatefulWidget {
   const IncidentReportPage({super.key});
@@ -12,6 +14,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
+  final _landmarkController = TextEditingController();
   final _cellphoneController = TextEditingController();
   final _concernController = TextEditingController();
   final _otherIncidentTypeController = TextEditingController();
@@ -47,6 +50,29 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     );
 
     _animationController.forward();
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      final placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+      final placemark = placemarks.first;
+
+      final address =
+          '${placemark.street}, ${placemark.subLocality}, ${placemark.locality}, ${placemark.administrativeArea}, ${placemark.postalCode}';
+
+      setState(() {
+        _addressController.text = address;
+      });
+    } catch (e) {
+      print('Error getting location: $e');
+    }
   }
 
   @override
@@ -54,6 +80,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     _animationController.dispose();
     _nameController.dispose();
     _addressController.dispose();
+    _landmarkController.dispose();
     _cellphoneController.dispose();
     _concernController.dispose();
     _otherIncidentTypeController.dispose();
@@ -64,6 +91,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     _formKey.currentState?.reset();
     _nameController.clear();
     _addressController.clear();
+    _landmarkController.clear();
     _cellphoneController.clear();
     _concernController.clear();
     _otherIncidentTypeController.clear();
@@ -92,7 +120,6 @@ class _IncidentReportPageState extends State<IncidentReportPage>
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-            // Improved header with animation
             SliverAppBar(
               backgroundColor: _primaryColor,
               expandedHeight: 120,
@@ -169,6 +196,13 @@ class _IncidentReportPageState extends State<IncidentReportPage>
                                 label: 'Address',
                                 icon: Icons.location_on_outlined,
                                 validator: 'Please enter your address',
+                              ),
+                              const SizedBox(height: 16),
+                              _buildTextField(
+                                controller: _landmarkController,
+                                label: 'Landmark',
+                                icon: Icons.place_outlined,
+                                validator: 'Please enter a nearby landmark',
                               ),
                               const SizedBox(height: 16),
                               _buildTextField(
