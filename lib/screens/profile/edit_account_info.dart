@@ -260,7 +260,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
                 const SizedBox(height: 20),
                 _buildIdUploadSection(),
                 const SizedBox(height: 20),
-                _buildHealthInfoSection(),
+                _buildHealthInfoSection(), // <--- optional fields
                 const SizedBox(height: 30),
                 _buildSaveButton(radarBlue),
               ],
@@ -285,9 +285,8 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
                       _profileImage != null
                           ? FileImage(_profileImage!)
                           : const NetworkImage(
-                                'https://via.placeholder.com/150',
-                              )
-                              as ImageProvider,
+                            'https://via.placeholder.com/150',
+                          ),
                   child:
                       _profileImage == null
                           ? const Icon(
@@ -403,9 +402,55 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle('Health Information'),
-        _buildEditableField('Blood Type', _bloodTypeController, hint: 'O+'),
-        _buildEditableField('Height', _heightController, hint: '170 cm'),
-        _buildEditableField('Weight', _weightController, hint: '65 kg'),
+        // Now **optional**: no validator here
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: TextFormField(
+            controller: _bloodTypeController,
+            decoration: InputDecoration(
+              labelText: 'Blood Type',
+              hintText: 'O+',
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: TextFormField(
+            controller: _heightController,
+            decoration: InputDecoration(
+              labelText: 'Height',
+              hintText: '170 cm',
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: TextFormField(
+            controller: _weightController,
+            decoration: InputDecoration(
+              labelText: 'Weight',
+              hintText: '65 kg',
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
