@@ -35,10 +35,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        final doc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
+        final doc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
 
         if (doc.exists) {
           setState(() {
@@ -52,12 +53,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         } else {
           setState(() {
             final displayName = user.displayName ?? '';
-            _firstName = displayName.split(' ').isNotEmpty
-                ? capitalize(displayName.split(' ').first)
-                : 'User';
-            _lastName = displayName.split(' ').length > 1
-                ? capitalize(displayName.split(' ').last)
-                : '';
+            _firstName =
+                displayName.split(' ').isNotEmpty
+                    ? capitalize(displayName.split(' ').first)
+                    : 'User';
+            _lastName =
+                displayName.split(' ').length > 1
+                    ? capitalize(displayName.split(' ').last)
+                    : '';
             _isVerified = user.emailVerified;
             _photoURL = user.photoURL ?? '';
             _email = user.email ?? '';
@@ -90,14 +93,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onPressed: () => Navigator.of(context).pop(),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text(
+                "Logout",
+                style: TextStyle(color: Colors.white),
               ),
-              child: const Text("Logout", style: TextStyle(color: Colors.white)),
               onPressed: () {
                 FirebaseAuth.instance.signOut();
                 Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => LoginScreen(onTap: () {})),
+                  MaterialPageRoute(
+                    builder: (context) => LoginScreen(onTap: () {}),
+                  ),
                 );
               },
             ),
@@ -156,33 +162,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   height: 120,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.grey[300]!,
-                      width: 2,
-                    ),
+                    border: Border.all(color: Colors.grey[300]!, width: 2),
                   ),
-                  child: _isLoading
-                      ? Shimmer.fromColors(
-                          baseColor: Colors.grey[300]!,
-                          highlightColor: Colors.grey[100]!,
-                          child: const Icon(Icons.account_circle, size: 120),
-                        )
-                      : _photoURL.isNotEmpty
+                  child:
+                      _isLoading
+                          ? Shimmer.fromColors(
+                            baseColor: Colors.grey[300]!,
+                            highlightColor: Colors.grey[100]!,
+                            child: const Icon(Icons.account_circle, size: 120),
+                          )
+                          : _photoURL.isNotEmpty
                           ? ClipRRect(
-                              borderRadius: BorderRadius.circular(60),
-                              child: Image.network(
-                                _photoURL,
-                                width: 120,
-                                height: 120,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.account_circle,
-                                  size: 120,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            )
-                          : const Icon(Icons.account_circle, size: 120, color: Colors.grey),
+                            borderRadius: BorderRadius.circular(60),
+                            child: Image.network(
+                              _photoURL,
+                              width: 120,
+                              height: 120,
+                              fit: BoxFit.cover,
+                              errorBuilder:
+                                  (_, __, ___) => const Icon(
+                                    Icons.account_circle,
+                                    size: 120,
+                                    color: Colors.grey,
+                                  ),
+                            ),
+                          )
+                          : const Icon(
+                            Icons.account_circle,
+                            size: 120,
+                            color: Colors.grey,
+                          ),
                 ),
 
                 const SizedBox(height: 16),
@@ -240,10 +249,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 else
                   Text(
                     _email,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                   ),
 
                 const SizedBox(height: 24),
@@ -262,26 +268,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildOptionTile(
                     icon: Icons.settings,
                     title: 'Settings',
-                    onTap: () => _navigateWithAnimation(
-                      context,
-                      const SettingsScreen(),
-                    ),
+                    onTap:
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SettingsScreen(),
+                          ),
+                        ),
                   ),
                   _buildOptionTile(
                     icon: Icons.help_outline,
                     title: 'Help & Support',
-                    onTap: () => _navigateWithAnimation(
-                      context,
-                      const HelpSupportScreen(),
-                    ),
+                    onTap:
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const HelpSupportScreen(),
+                          ),
+                        ),
                   ),
                   _buildOptionTile(
                     icon: Icons.contact_phone,
                     title: 'Emergency Contacts',
-                    onTap: () => _navigateWithAnimation(
-                      context,
-                      const EmergencyContactsScreen(),
-                    ),
+                    onTap:
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => const EmergencyContactsScreen(),
+                          ),
+                        ),
                   ),
                   _buildOptionTile(
                     icon: Icons.logout,
@@ -304,43 +320,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required VoidCallback onTap,
     bool isLogout = false,
   }) {
-    return AnimatedScale(
-      duration: const Duration(milliseconds: 200),
-      scale: 1.0,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: const BoxDecoration(
-            color: Color(0xFFE8F0FA),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            color: isLogout ? Colors.red : const Color(0xFF28588B),
-            size: 24,
-          ),
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      leading: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: const BoxDecoration(
+          color: Color(0xFFE8F0FA),
+          shape: BoxShape.circle,
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: onTap,
+        child: Icon(
+          icon,
+          color: isLogout ? Colors.red : const Color(0xFF28588B),
+          size: 24,
+        ),
       ),
-    );
-  }
-
-  void _navigateWithAnimation(BuildContext context, Widget screen) {
-  Navigator.push(
-    context,
-    PageRouteBuilder(
-      pageBuilder: (context, animation, secondaryAnimation) => screen,
-      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        return FadeTransition(
-          opacity: animation, // Uses the default fade-in effect
-          child: child,
-        );
-      },
-      transitionDuration: const Duration(milliseconds: 300),
-      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+      onTap: onTap,
     );
   }
 }

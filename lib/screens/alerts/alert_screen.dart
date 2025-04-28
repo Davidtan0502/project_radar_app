@@ -3,9 +3,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import '../../services/alert_service.dart';
+import '../../services/emergency_contact_service.dart'; // ← added
 import '../../widgets/emergency_buttons.dart';
 import '../incidents/incident_report_screen.dart';
-import '../profile/emergency_contacts_screen.dart';
+import '../profile/emergency_contacts_screen.dart'; // can remain if you still navigate elsewhere
 
 class AlertScreen extends StatefulWidget {
   const AlertScreen({super.key});
@@ -150,18 +151,35 @@ class _AlertScreenState extends State<AlertScreen> {
 
               SizedBox(height: sectionSpacing),
 
-              // SOS Button
+              // SOS Button (now calls first saved contact)
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: sidePadding),
                 child: buildFullWidthButton(
                   icon: 'assets/sos.png',
                   label: 'SOS',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const EmergencyContactsScreen(),
-                      ),
-                    );
+                  onTap: () async {
+                    final contacts =
+                        await EmergencyContactService().loadContacts();
+                    if (contacts.isNotEmpty) {
+                      final firstPhone = contacts.first['phone'];
+                      if (firstPhone != null && firstPhone.isNotEmpty) {
+                        AlertService.launchPhone(context, firstPhone);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'No phone number available for SOS call.',
+                            ),
+                          ),
+                        );
+                      }
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('No emergency contacts available.'),
+                        ),
+                      );
+                    }
                   },
                 ),
               ),

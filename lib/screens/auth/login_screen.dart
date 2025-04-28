@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:project_radar_app/screens/home/main_navigation.dart';
-import 'package:project_radar_app/screens/auth/registration_screen.dart';
+import 'package:project_radar_app/terms_condition/terms_and_condition.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.onTap});
@@ -574,13 +574,8 @@ class _LoginScreenState extends State<LoginScreen>
                                           const Text("Don't have an account? "),
                                           TextButton(
                                             onPressed: () {
-                                              Navigator.push(
+                                              TermsConditionScreen.show(
                                                 context,
-                                                MaterialPageRoute(
-                                                  builder:
-                                                      (context) =>
-                                                          const RegisterScreen(),
-                                                ),
                                               );
                                             },
                                             child: const Text("Register"),

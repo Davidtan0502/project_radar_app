@@ -11,7 +11,8 @@ class AccountInformationScreen extends StatefulWidget {
   const AccountInformationScreen({super.key});
 
   @override
-  State<AccountInformationScreen> createState() => _AccountInformationScreenState();
+  State<AccountInformationScreen> createState() =>
+      _AccountInformationScreenState();
 }
 
 class _AccountInformationScreenState extends State<AccountInformationScreen> {
@@ -31,7 +32,8 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
       return {};
     }
 
-    final DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final DocumentSnapshot userDoc =
+        await _firestore.collection('users').doc(user.uid).get();
     if (!userDoc.exists) {
       return {};
     }
@@ -57,7 +59,7 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        Navigation.pushReplacement(context, const AccountManagementScreen());
+        Navigator.pop(context);
         return false;
       },
       child: Scaffold(
@@ -65,20 +67,14 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
         appBar: AppBar(
           title: const Text(
             'Account Information',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
           centerTitle: true,
           elevation: 0,
           backgroundColor: const Color(0xFF28588B),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigation.pushReplacement(
-              context,
-              const AccountManagementScreen(),
-            ),
+            onPressed: () => Navigator.pop(context),
           ),
         ),
         body: FutureBuilder<Map<String, dynamic>>(
@@ -104,11 +100,13 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
               userData['middleName'],
               userData['lastName'],
             ];
-            final fullName = parts.where((part) => part != null && part.trim().isNotEmpty).join(' ');
+            final fullName = parts
+                .where((part) => part != null && part.trim().isNotEmpty)
+                .join(' ');
 
-            final joinedDate = DateFormat('MMMM d, y').format(
-              (userData['createdAt'] as Timestamp).toDate(),
-            );
+            final joinedDate = DateFormat(
+              'MMMM d, y',
+            ).format((userData['createdAt'] as Timestamp).toDate());
 
             return SingleChildScrollView(
               padding: const EdgeInsets.all(20),
@@ -138,7 +136,10 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
     );
   }
 
-  Widget _buildProfileHeader(BuildContext context, Map<String, dynamic> userData) {
+  Widget _buildProfileHeader(
+    BuildContext context,
+    Map<String, dynamic> userData,
+  ) {
     const primaryColor = Color(0xFF28588B);
 
     return Center(
@@ -159,32 +160,39 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
               children: [
                 CircleAvatar(
                   radius: 55,
-                  backgroundImage: userData['photoURL'] != null && userData['photoURL'].isNotEmpty
-                      ? NetworkImage(userData['photoURL']) as ImageProvider
-                      : const AssetImage('assets/images/profile_placeholder.png'),
+                  backgroundImage:
+                      userData['photoURL'] != null &&
+                              userData['photoURL'].isNotEmpty
+                          ? NetworkImage(userData['photoURL']) as ImageProvider
+                          : const AssetImage(
+                            'assets/images/profile_placeholder.png',
+                          ),
                 ),
                 Positioned(
                   bottom: 0,
                   right: 0,
                   child: GestureDetector(
                     onTap: () {
-                      Navigation.pushReplacement(context, const EditAccountinfo());
+                      Navigation.pushReplacement(
+                        context,
+                        const EditAccountinfo(),
+                      );
                     },
                     child: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: primaryColor,
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 2,
-                        ),
+                        border: Border.all(color: Colors.white, width: 2),
                       ),
-                      child: const Icon(Icons.edit, size: 18, color: Colors.white),
+                      child: const Icon(
+                        Icons.edit,
+                        size: 18,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
-
               ],
             ),
           ),
@@ -214,34 +222,76 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
     String weight,
     String joinedDate,
   ) {
-
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
           children: [
-            _buildInfoTile(context, icon: Icons.person_outline, label: 'Full Name', value: fullName),
+            _buildInfoTile(
+              context,
+              icon: Icons.person_outline,
+              label: 'Full Name',
+              value: fullName,
+            ),
             const Divider(height: 1, indent: 16, endIndent: 16),
-            _buildInfoTile(context, icon: Icons.email_outlined, label: 'Email', value: email),
+            _buildInfoTile(
+              context,
+              icon: Icons.email_outlined,
+              label: 'Email',
+              value: email,
+            ),
             const Divider(height: 1, indent: 16, endIndent: 16),
-            _buildInfoTile(context, icon: Icons.phone_outlined, label: 'Phone', value: phone),
+            _buildInfoTile(
+              context,
+              icon: Icons.phone_outlined,
+              label: 'Phone',
+              value: phone,
+            ),
             const Divider(height: 1, indent: 16, endIndent: 16),
-            _buildInfoTile(context, icon: Icons.cake_outlined, label: 'Date of Birth', value: dob.isNotEmpty ? dob : 'Not provided'),
+            _buildInfoTile(
+              context,
+              icon: Icons.cake_outlined,
+              label: 'Date of Birth',
+              value: dob.isNotEmpty ? dob : 'Not provided',
+            ),
             const Divider(height: 1, indent: 16, endIndent: 16),
-            _buildInfoTile(context, icon: Icons.home_outlined, label: 'Address', value: address.isNotEmpty ? address : 'Not provided'),
+            _buildInfoTile(
+              context,
+              icon: Icons.home_outlined,
+              label: 'Address',
+              value: address.isNotEmpty ? address : 'Not provided',
+            ),
             const Divider(height: 1, indent: 16, endIndent: 16),
-            _buildInfoTile(context, icon: Icons.water_drop_outlined, label: 'Blood Type', value: bloodType.isNotEmpty ? bloodType : 'Not provided'),
+            _buildInfoTile(
+              context,
+              icon: Icons.water_drop_outlined,
+              label: 'Blood Type',
+              value: bloodType.isNotEmpty ? bloodType : 'Not provided',
+            ),
             const Divider(height: 1, indent: 16, endIndent: 16),
-            _buildInfoTile(context, icon: Icons.height, label: 'Height', value: height.isNotEmpty ? height : 'Not provided'),
+            _buildInfoTile(
+              context,
+              icon: Icons.height,
+              label: 'Height',
+              value: height.isNotEmpty ? height : 'Not provided',
+            ),
             const Divider(height: 1, indent: 16, endIndent: 16),
-            _buildInfoTile(context, icon: Icons.monitor_weight, label: 'Weight', value: weight.isNotEmpty ? weight : 'Not provided'),
+            _buildInfoTile(
+              context,
+              icon: Icons.monitor_weight,
+              label: 'Weight',
+              value: weight.isNotEmpty ? weight : 'Not provided',
+            ),
             const Divider(height: 1, indent: 16, endIndent: 16),
-            _buildInfoTile(context, icon: Icons.calendar_today, label: 'Joined Date', value: joinedDate),
+            _buildInfoTile(
+              context,
+              icon: Icons.calendar_today,
+              label: 'Joined Date',
+              value: joinedDate,
+            ),
           ],
         ),
       ),
@@ -264,11 +314,7 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
           color: Color(0xFFE8F0FA),
           shape: BoxShape.circle,
         ),
-        child: Icon(
-          icon,
-          color: primaryColor,
-          size: 24,
-        ),
+        child: Icon(icon, color: primaryColor, size: 24),
       ),
       title: Text(
         label,
@@ -279,12 +325,13 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
       ),
       subtitle: Text(
         value,
-        style: const TextStyle(
-          fontSize: 16,
-          color: Colors.black87,
-        ),
+        style: const TextStyle(fontSize: 16, color: Colors.black87),
       ),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+      trailing: const Icon(
+        Icons.arrow_forward_ios,
+        size: 16,
+        color: Colors.grey,
+      ),
     );
   }
 }

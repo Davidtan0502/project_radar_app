@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/screens/profile/account_management_screen.dart';
+import 'package:project_radar_app/services/navigation.dart';
 import 'about_us.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -34,6 +35,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       backgroundColor: Colors.white,
       body: Column(
         children: [
+          // HEADER
           Container(
             padding: const EdgeInsets.only(top: 50, bottom: 30),
             width: double.infinity,
@@ -60,7 +62,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
                   onPressed: () {
-                    Navigator.pop(context);
+                    // <— single-pop back to ProfileScreen
+                    Navigator.of(context).pop();
                   },
                 ),
                 const SizedBox(width: 10),
@@ -75,7 +78,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
+
           const SizedBox(height: 20),
+
+          // CONTENT
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -84,26 +90,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildOptionTile(
                     icon: Icons.person,
                     title: 'Account',
-                    onTap: () => Navigator.push(
-                      context,
-                      _createRoute(const AccountManagementScreen()),
-                    ),
+                    onTap:
+                        () => Navigator.push(
+                          context,
+                          _createRoute(const AccountManagementScreen()),
+                        ),
                   ),
                   _buildOptionTile(
                     icon: Icons.lock,
                     title: 'Privacy & Security',
-                    onTap: () => Navigator.push //(
-                      //context,
-                      //_createRoute(const name()),
-                  // ),
+                    onTap: () {}, // stub
                   ),
                   _buildOptionTile(
                     icon: Icons.info_outline,
                     title: 'About Us',
-                    onTap: () => Navigator.push(
-                      context,
-                      _createRoute(const AboutUs()),
-                    ),
+                    onTap:
+                        () => Navigator.push(
+                          context,
+                          _createRoute(const AboutUs()),
+                        ),
                   ),
                   SwitchListTile(
                     title: const Text('Notifications'),
@@ -123,7 +128,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       setState(() {
                         _isDarkMode = value;
                       });
-                      // Here you would trigger theme change
+                      // trigger theme change here if needed
                     },
                   ),
                   ListTile(
@@ -132,7 +137,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     leading: const Icon(Icons.system_update_alt_outlined),
                   ),
                   const SizedBox(height: 20),
-                  
                 ],
               ),
             ),
@@ -155,7 +159,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           color: Color(0xFFE8F0FA),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: Color(0xFF28588B), size: 24),
+        child: Icon(icon, color: const Color(0xFF28588B), size: 24),
       ),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
@@ -170,10 +174,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const begin = Offset(0.0, 1.0);
         const end = Offset.zero;
         const curve = Curves.ease;
-        final tween =
-            Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+        final tween = Tween(
+          begin: begin,
+          end: end,
+        ).chain(CurveTween(curve: curve));
         final fadeTween = Tween<double>(begin: 0.0, end: 1.0);
-
         return SlideTransition(
           position: animation.drive(tween),
           child: FadeTransition(

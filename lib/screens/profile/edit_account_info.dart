@@ -46,7 +46,11 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    final doc =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
     if (!doc.exists) return;
     final data = doc.data()!;
     setState(() {
@@ -60,6 +64,8 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       _bloodTypeController.text = data['bloodType'] ?? '';
       _heightController.text = data['height'] ?? '';
       _weightController.text = data['weight'] ?? '';
+      // Prevent the initial load from marking the form dirty:
+      _isFormDirty = false;
     });
   }
 
@@ -108,7 +114,10 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   Future<String?> _uploadImageToStorage(File imageFile, String path) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return null;
-    final ref = FirebaseStorage.instance.ref().child(path).child('${user.uid}.jpg');
+    final ref = FirebaseStorage.instance
+        .ref()
+        .child(path)
+        .child('${user.uid}.jpg');
     final uploadTask = ref.putFile(imageFile);
     uploadTask.snapshotEvents.listen((event) {
       double progress = event.bytesTransferred / event.totalBytes;
@@ -128,7 +137,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: source);
     if (picked == null) return;
-    
+
     final file = File(picked.path);
     if (!_isFileSizeValid(file)) {
       if (!mounted) return;
@@ -178,10 +187,15 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       String? profileUrl;
       if (_removeProfileImage) {
         try {
-          await FirebaseStorage.instance.ref('profile_images/${user.uid}.jpg').delete();
+          await FirebaseStorage.instance
+              .ref('profile_images/${user.uid}.jpg')
+              .delete();
         } catch (_) {}
       } else if (_profileImage != null) {
-        profileUrl = await _uploadImageToStorage(_profileImage!, 'profile_images');
+        profileUrl = await _uploadImageToStorage(
+          _profileImage!,
+          'profile_images',
+        );
       }
 
       String? idUrl;
@@ -189,7 +203,9 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
         idUrl = await _uploadImageToStorage(_idImage!, 'id_uploads');
       }
 
-      final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      final docRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid);
       await docRef.set({
         'firstName': _firstNameController.text.trim(),
         'middleName': _middleNameController.text.trim(),
@@ -218,36 +234,36 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       setState(() => _isFormDirty = false);
       Navigator.pop(context);
     } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   Future<bool> _confirmUnsavedChanges() async {
     if (!_isFormDirty) return true;
-    final discard = await showDialog<bool>(
+    final discard =
+        await showDialog<bool>(
           context: context,
           barrierDismissible: false,
-          builder: (_) => AlertDialog(
-            title: const Text('Unsaved Changes'),
-            content: const Text(
-              'You have unsaved changes. Discard them and go back?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text(
-                  'Discard',
-                  style: TextStyle(color: Colors.red),
+          builder:
+              (_) => AlertDialog(
+                title: const Text('Unsaved Changes'),
+                content: const Text(
+                  'You have unsaved changes. Discard them and go back?',
                 ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text(
+                      'Discard',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
         ) ??
         false;
     return discard;
@@ -272,9 +288,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () async {
-              if (await _confirmUnsavedChanges()) {
-                Navigator.pop(context);
-              }
+              if (await _confirmUnsavedChanges()) Navigator.pop(context);
             },
           ),
         ),
@@ -312,16 +326,21 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
                 onTap: () => _pickImage(ImageSource.gallery, true),
                 child: CircleAvatar(
                   radius: 50,
-                  backgroundImage: _profileImage != null
-                      ? FileImage(_profileImage!)
-                      : const NetworkImage('https://via.placeholder.com/150') as ImageProvider,
-                  child: _profileImage == null
-                      ? const Icon(
-                          Icons.camera_alt,
-                          size: 30,
-                          color: Colors.white70,
-                        )
-                      : null,
+                  backgroundImage:
+                      _profileImage != null
+                          ? FileImage(_profileImage!)
+                          : const NetworkImage(
+                                'https://via.placeholder.com/150',
+                              )
+                              as ImageProvider,
+                  child:
+                      _profileImage == null
+                          ? const Icon(
+                            Icons.camera_alt,
+                            size: 30,
+                            color: Colors.white70,
+                          )
+                          : null,
                 ),
               ),
               if (_profileImage != null)
@@ -361,7 +380,11 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       children: [
         _buildSectionTitle('Personal Information'),
         _buildEditableField('First Name', _firstNameController, hint: 'John'),
-        _buildEditableField('Middle Name', _middleNameController, hint: 'Felix'),
+        _buildEditableField(
+          'Middle Name',
+          _middleNameController,
+          hint: 'Felix',
+        ),
         _buildEditableField('Last Name', _lastNameController, hint: 'Doe'),
         _buildEditableField(
           'Email',
@@ -400,20 +423,21 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: Colors.grey),
             ),
-            child: _idImage != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.file(_idImage!, fit: BoxFit.cover),
-                  )
-                : const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.upload_file, size: 40),
-                        Text('Tap to upload ID'),
-                      ],
+            child:
+                _idImage != null
+                    ? ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.file(_idImage!, fit: BoxFit.cover),
+                    )
+                    : const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.upload_file, size: 40),
+                          Text('Tap to upload ID'),
+                        ],
+                      ),
                     ),
-                  ),
           ),
         ),
       ],
@@ -489,12 +513,13 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
             borderRadius: BorderRadius.circular(10),
           ),
         ),
-        child: _isSaving
-            ? const CircularProgressIndicator(color: Colors.white)
-            : const Text(
-                'Save Changes',
-                style: TextStyle(fontSize: 16, color: Colors.white),
-              ),
+        child:
+            _isSaving
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text(
+                  'Save Changes',
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
       ),
     );
   }
@@ -522,12 +547,13 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
         controller: controller,
         keyboardType: keyboardType,
         readOnly: isDateField,
-        onTap: isDateField
-            ? () async {
-                FocusScope.of(context).requestFocus(FocusNode());
-                await _selectDate(context);
-              }
-            : null,
+        onTap:
+            isDateField
+                ? () async {
+                  FocusScope.of(context).requestFocus(FocusNode());
+                  await _selectDate(context);
+                }
+                : null,
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
@@ -541,9 +567,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide.none,
           ),
-          suffixIcon: isDateField
-              ? const Icon(Icons.calendar_today)
-              : null,
+          suffixIcon: isDateField ? const Icon(Icons.calendar_today) : null,
         ),
         validator: (value) {
           if (value == null || value.isEmpty) {

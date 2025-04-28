@@ -30,8 +30,8 @@ class _IncidentReportPageState extends State<IncidentReportPage>
   late Animation<double> _slideAnimation;
 
   // Reference to the Firestore collection
-  final CollectionReference _incidentsCollection = 
-      FirebaseFirestore.instance.collection('incidents');
+  final CollectionReference _incidentsCollection = FirebaseFirestore.instance
+      .collection('incidents');
 
   @override
   void initState() {
@@ -111,7 +111,8 @@ class _IncidentReportPageState extends State<IncidentReportPage>
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => const Center(child: CircularProgressIndicator()),
+          builder:
+              (context) => const Center(child: CircularProgressIndicator()),
         );
 
         // Prepare the data to be saved
@@ -120,9 +121,10 @@ class _IncidentReportPageState extends State<IncidentReportPage>
           'address': _addressController.text,
           'landmark': _landmarkController.text,
           'contactNumber': _cellphoneController.text,
-          'incidentType': _incidentType == 'Other' 
-              ? _otherIncidentTypeController.text 
-              : _incidentType,
+          'incidentType':
+              _incidentType == 'Other'
+                  ? _otherIncidentTypeController.text
+                  : _incidentType,
           'description': _concernController.text,
           'timestamp': FieldValue.serverTimestamp(),
           'status': 'Pending', // You can add status tracking
@@ -342,16 +344,19 @@ class _IncidentReportPageState extends State<IncidentReportPage>
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
       ),
-      items: _incidentTypes.map((type) {
-        return DropdownMenuItem(
-          value: type,
-          child: Text(type, style: const TextStyle(fontSize: 16)),
-        );
-      }).toList(),
+      items:
+          _incidentTypes.map((type) {
+            return DropdownMenuItem(
+              value: type,
+              child: Text(type, style: const TextStyle(fontSize: 16)),
+            );
+          }).toList(),
       onChanged: (value) => setState(() => _incidentType = value),
-      validator: (value) => value == null || value.isEmpty
-          ? 'Please select an incident type'
-          : null,
+      validator:
+          (value) =>
+              value == null || value.isEmpty
+                  ? 'Please select an incident type'
+                  : null,
       borderRadius: BorderRadius.circular(10),
       icon: Icon(Icons.arrow_drop_down, color: _primaryColor),
       dropdownColor: Colors.white,
@@ -380,9 +385,11 @@ class _IncidentReportPageState extends State<IncidentReportPage>
         ),
       ),
       maxLines: 5,
-      validator: (value) => value == null || value.isEmpty
-          ? 'Please describe the incident in detail'
-          : null,
+      validator:
+          (value) =>
+              value == null || value.isEmpty
+                  ? 'Please describe the incident in detail'
+                  : null,
     );
   }
 

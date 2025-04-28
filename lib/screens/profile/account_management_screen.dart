@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:project_radar_app/screens/profile/edit_account_info.dart';
 import 'package:project_radar_app/screens/profile/change_password.dart';
 import 'package:project_radar_app/screens/profile/account_information.dart';
+import 'package:project_radar_app/screens/profile/settings_screen.dart'; // ← import SettingsScreen
 import 'package:project_radar_app/services/navigation.dart';
 
 class AccountManagementScreen extends StatelessWidget {
@@ -10,34 +11,43 @@ class AccountManagementScreen extends StatelessWidget {
   void _confirmDeleteAccount(BuildContext context) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Delete Account"),
-        content: const Text(
-            "Are you sure you want to delete your account? This action cannot be undone."),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel",
-                style: TextStyle(color: Colors.grey)),
+      builder:
+          (_) => AlertDialog(
+            title: const Text("Delete Account"),
+            content: const Text(
+              "Are you sure you want to delete your account? This action cannot be undone.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  "Cancel",
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Account deletion initiated."),
+                    ),
+                  );
+                  // TODO: Add delete logic
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  "Delete",
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text("Account deletion initiated.")),
-              );
-              // TODO: Add delete logic
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10))),
-            child: const Text("Delete",
-                style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
     );
   }
 
@@ -47,7 +57,7 @@ class AccountManagementScreen extends StatelessWidget {
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          // Header with gradient background (matches profile screen)
+          // Header with gradient background
           Container(
             padding: const EdgeInsets.only(top: 50, bottom: 20),
             width: double.infinity,
@@ -66,7 +76,9 @@ class AccountManagementScreen extends StatelessWidget {
               children: [
                 IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigation.back(context),
+                  // ← replace pop with a straight replacement to SettingsScreen
+                  onPressed:
+                      () => Navigator.pop(context, const SettingsScreen()),
                 ),
                 const SizedBox(width: 10),
                 const Text(
@@ -80,7 +92,7 @@ class AccountManagementScreen extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Main content
           Expanded(
             child: Padding(
@@ -99,31 +111,40 @@ class AccountManagementScreen extends StatelessWidget {
                           context,
                           icon: Icons.person_outline,
                           title: 'Account Information',
-                          onTap: () => Navigation.push(
-                              context, const AccountInformationScreen()),
+                          onTap:
+                              () => Navigation.push(
+                                context,
+                                const AccountInformationScreen(),
+                              ),
                         ),
                         const Divider(height: 1, indent: 16, endIndent: 16),
                         _buildAccountOptionTile(
                           context,
                           icon: Icons.edit_outlined,
                           title: 'Edit Account Details',
-                          onTap: () => Navigation.push(
-                              context, const EditAccountinfo()),
+                          onTap:
+                              () => Navigation.push(
+                                context,
+                                const EditAccountinfo(),
+                              ),
                         ),
                         const Divider(height: 1, indent: 16, endIndent: 16),
                         _buildAccountOptionTile(
                           context,
                           icon: Icons.lock_outline,
                           title: 'Change Password',
-                          onTap: () => Navigation.push(
-                              context, const ChangePassword()),
+                          onTap:
+                              () => Navigation.push(
+                                context,
+                                const ChangePassword(),
+                              ),
                         ),
                       ],
                     ),
                   ),
-                  
+
                   const SizedBox(height: 20),
-                  
+
                   // Delete Account Card
                   Card(
                     elevation: 2,
@@ -159,16 +180,13 @@ class AccountManagementScreen extends StatelessWidget {
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: isDestructive 
-              ? const Color(0xFFFAE8E8) 
-              : const Color(0xFFE8F0FA),
+          color:
+              isDestructive ? const Color(0xFFFAE8E8) : const Color(0xFFE8F0FA),
           shape: BoxShape.circle,
         ),
         child: Icon(
           icon,
-          color: isDestructive 
-              ? Colors.red 
-              : const Color(0xFF28588B),
+          color: isDestructive ? Colors.red : const Color(0xFF28588B),
           size: 24,
         ),
       ),

@@ -271,12 +271,12 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       const SizedBox(height: 12),
                                       _buildTextField(
                                         _middleNameController,
-                                        'Middle Initial',
+                                        'Middle Name',
                                         Icons.person_outline,
                                         validator: (val) {
                                           if (val == null ||
                                               val.trim().isEmpty) {
-                                            return 'Enter middle initial';
+                                            return 'Enter middle name';
                                           }
                                           return null;
                                         },
