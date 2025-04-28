@@ -31,51 +31,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadUserData();
   }
 
-Future<void> _loadUserData() async {
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
+  Future<void> _loadUserData() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
 
-      if (doc.exists) {
-        setState(() {
-          _firstName = capitalizeName(doc.data()?['firstName'] ?? '');
-          _lastName = capitalizeName(doc.data()?['lastName'] ?? '');
-          _isVerified = doc.data()?['isVerified'] ?? false;
-          _photoURL = user.photoURL ?? '';
-          _email = user.email ?? '';
-          _isLoading = false;
-        });
+        if (doc.exists) {
+          setState(() {
+            _firstName = capitalizeName(doc.data()?['firstName'] ?? '');
+            _lastName = capitalizeName(doc.data()?['lastName'] ?? '');
+            _isVerified = doc.data()?['isVerified'] ?? false;
+            _photoURL = user.photoURL ?? '';
+            _email = user.email ?? '';
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            final displayName = user.displayName ?? '';
+            _firstName = displayName.split(' ').isNotEmpty
+                ? capitalize(displayName.split(' ').first)
+                : 'User';
+            _lastName = displayName.split(' ').length > 1
+                ? capitalize(displayName.split(' ').last)
+                : '';
+            _isVerified = user.emailVerified;
+            _photoURL = user.photoURL ?? '';
+            _email = user.email ?? '';
+            _isLoading = false;
+          });
+        }
       } else {
         setState(() {
-          final displayName = user.displayName ?? '';
-          _firstName = displayName.split(' ').isNotEmpty 
-              ? capitalize(displayName.split(' ').first)
-              : 'User';
-          _lastName = displayName.split(' ').length > 1 
-              ? capitalize(displayName.split(' ').last)
-              : '';
-          _isVerified = user.emailVerified;
-          _photoURL = user.photoURL ?? '';
-          _email = user.email ?? '';
           _isLoading = false;
         });
       }
-    } else {
+    } catch (e) {
       setState(() {
         _isLoading = false;
       });
+      debugPrint('Error loading user data: $e');
     }
-  } catch (e) {
-    setState(() {
-      _isLoading = false;
-    });
-    debugPrint('Error loading user data: $e');
   }
-}
 
   void _logout() {
     showDialog(
@@ -144,7 +144,7 @@ Future<void> _loadUserData() async {
               ],
             ),
           ),
-          
+
           // Profile Section (Messenger-style)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -184,9 +184,9 @@ Future<void> _loadUserData() async {
                             )
                           : const Icon(Icons.account_circle, size: 120, color: Colors.grey),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Name with verification badge
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -210,7 +210,7 @@ Future<void> _loadUserData() async {
                           color: Colors.black87,
                         ),
                       ),
-                    
+
                     if (!_isLoading && _isVerified)
                       const Padding(
                         padding: EdgeInsets.only(left: 8.0),
@@ -222,9 +222,9 @@ Future<void> _loadUserData() async {
                       ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 8),
-                
+
                 // Email
                 if (_isLoading)
                   Shimmer.fromColors(
@@ -245,14 +245,14 @@ Future<void> _loadUserData() async {
                       color: Colors.grey[600],
                     ),
                   ),
-                
+
                 const SizedBox(height: 24),
               ],
             ),
           ),
-          
+
           const Divider(height: 1, thickness: 1),
-          
+
           // Options List
           Expanded(
             child: Padding(
@@ -262,25 +262,25 @@ Future<void> _loadUserData() async {
                   _buildOptionTile(
                     icon: Icons.settings,
                     title: 'Settings',
-                    onTap: () => Navigator.push(
+                    onTap: () => _navigateWithAnimation(
                       context,
-                      MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                      const SettingsScreen(),
                     ),
                   ),
                   _buildOptionTile(
                     icon: Icons.help_outline,
                     title: 'Help & Support',
-                    onTap: () => Navigator.push(
+                    onTap: () => _navigateWithAnimation(
                       context,
-                      MaterialPageRoute(builder: (context) => const HelpSupportScreen()),
+                      const HelpSupportScreen(),
                     ),
                   ),
                   _buildOptionTile(
                     icon: Icons.contact_phone,
                     title: 'Emergency Contacts',
-                    onTap: () => Navigator.push(
+                    onTap: () => _navigateWithAnimation(
                       context,
-                      MaterialPageRoute(builder: (context) => const EmergencyContactsScreen()),
+                      const EmergencyContactsScreen(),
                     ),
                   ),
                   _buildOptionTile(
@@ -304,26 +304,43 @@ Future<void> _loadUserData() async {
     required VoidCallback onTap,
     bool isLogout = false,
   }) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      leading: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: const BoxDecoration(
-          color: Color(0xFFE8F0FA),
-          shape: BoxShape.circle,
+    return AnimatedScale(
+      duration: const Duration(milliseconds: 200),
+      scale: 1.0,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: const BoxDecoration(
+            color: Color(0xFFE8F0FA),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            color: isLogout ? Colors.red : const Color(0xFF28588B),
+            size: 24,
+          ),
         ),
-        child: Icon(
-          icon, 
-          color: isLogout ? Colors.red : const Color(0xFF28588B), 
-          size: 24
-        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: onTap,
       ),
-      title: Text(
-        title, 
-        style: const TextStyle(fontWeight: FontWeight.w600)
+    );
+  }
+
+  void _navigateWithAnimation(BuildContext context, Widget screen) {
+  Navigator.push(
+    context,
+    PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => screen,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation, // Uses the default fade-in effect
+          child: child,
+        );
+      },
+      transitionDuration: const Duration(milliseconds: 300),
       ),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: onTap,
     );
   }
 }

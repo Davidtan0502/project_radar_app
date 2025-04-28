@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class IncidentReportPage extends StatefulWidget {
   const IncidentReportPage({super.key});
@@ -26,6 +28,10 @@ class _IncidentReportPageState extends State<IncidentReportPage>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
+
+  // Reference to the Firestore collection
+  final CollectionReference _incidentsCollection = 
+      FirebaseFirestore.instance.collection('incidents');
 
   @override
   void initState() {
@@ -98,22 +104,69 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     setState(() => _incidentType = null);
   }
 
-  void _submitForm() {
+  Future<void> _submitForm() async {
     if (_formKey.currentState?.validate() ?? false) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Report Submitted Successfully'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.green.shade600,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+      try {
+        // Show loading indicator
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(child: CircularProgressIndicator()),
+        );
+
+        // Prepare the data to be saved
+        final incidentData = {
+          'name': _nameController.text,
+          'address': _addressController.text,
+          'landmark': _landmarkController.text,
+          'contactNumber': _cellphoneController.text,
+          'incidentType': _incidentType == 'Other' 
+              ? _otherIncidentTypeController.text 
+              : _incidentType,
+          'description': _concernController.text,
+          'timestamp': FieldValue.serverTimestamp(),
+          'status': 'Pending', // You can add status tracking
+        };
+
+        // Add to Firestore
+        await _incidentsCollection.add(incidentData);
+
+        // Close loading indicator
+        Navigator.of(context).pop();
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Report Submitted Successfully'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green.shade600,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
-        ),
-      );
-      _resetForm();
+        );
+
+        _resetForm();
+      } catch (e) {
+        // Close loading indicator if still open
+        Navigator.of(context).pop();
+
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error submitting report: ${e.toString()}'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red.shade600,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
     }
   }
 
+  // The rest of your existing build methods remain the same...
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -242,6 +295,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     );
   }
 
+  // The rest of your helper widget methods remain the same...
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -288,19 +342,16 @@ class _IncidentReportPageState extends State<IncidentReportPage>
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
       ),
-      items:
-          _incidentTypes.map((type) {
-            return DropdownMenuItem(
-              value: type,
-              child: Text(type, style: const TextStyle(fontSize: 16)),
-            );
-          }).toList(),
+      items: _incidentTypes.map((type) {
+        return DropdownMenuItem(
+          value: type,
+          child: Text(type, style: const TextStyle(fontSize: 16)),
+        );
+      }).toList(),
       onChanged: (value) => setState(() => _incidentType = value),
-      validator:
-          (value) =>
-              value == null || value.isEmpty
-                  ? 'Please select an incident type'
-                  : null,
+      validator: (value) => value == null || value.isEmpty
+          ? 'Please select an incident type'
+          : null,
       borderRadius: BorderRadius.circular(10),
       icon: Icon(Icons.arrow_drop_down, color: _primaryColor),
       dropdownColor: Colors.white,
@@ -329,11 +380,9 @@ class _IncidentReportPageState extends State<IncidentReportPage>
         ),
       ),
       maxLines: 5,
-      validator:
-          (value) =>
-              value == null || value.isEmpty
-                  ? 'Please describe the incident in detail'
-                  : null,
+      validator: (value) => value == null || value.isEmpty
+          ? 'Please describe the incident in detail'
+          : null,
     );
   }
 
