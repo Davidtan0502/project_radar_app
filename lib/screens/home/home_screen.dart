@@ -9,6 +9,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:project_radar_app/widgets/capitalize_names.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Config {
@@ -137,10 +138,8 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     _cacheLocationData(address);
-    if (_mapController != null) {
-      _mapController.animateCamera(CameraUpdate.newLatLng(_initialPosition!));
-    }
-
+    _mapController.animateCamera(CameraUpdate.newLatLng(_initialPosition!));
+  
     await _fetchWeather(position.latitude, position.longitude);
   }
 
@@ -272,7 +271,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _weatherIcon.isNotEmpty
               ? Image.network(
-                  "https://openweathermap.org/img/wn/${_weatherIcon}@2x.png",
+                  "https://openweathermap.org/img/wn/$_weatherIcon@2x.png",
                   width: 50,
                   height: 50,
                   errorBuilder: (_, __, ___) => const Icon(Icons.cloud, size: 50),
@@ -355,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
             alignment: Alignment.centerRight,
             child: TextButton.icon(
               onPressed: () {
-                if (_currentPosition != null && _mapController != null) {
+                if (_currentPosition != null) {
                   _mapController.animateCamera(CameraUpdate.newLatLng(LatLng(_currentPosition!.latitude, _currentPosition!.longitude)));
                 }
               },
@@ -387,8 +386,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
                 final data = snapshot.data;
                 if (data == null) return const Text("No user data found", style: TextStyle(fontSize: 14));
-                final name = [data['firstName'], data['middleName'], data['lastName']]
+                final name = [data['firstName'], data['lastName']]
                     .where((e) => (e ?? '').toString().trim().isNotEmpty)
+                    .map((e) => capitalizeName(e.toString()))
                     .join(' ');
                 final address = data['address'] ?? "No address set";
                 final isVerified = data['isVerified'] ?? false;

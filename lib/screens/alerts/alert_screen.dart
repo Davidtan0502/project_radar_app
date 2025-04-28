@@ -6,7 +6,6 @@ import '../../services/alert_service.dart';
 import '../../widgets/emergency_buttons.dart';
 import '../incidents/incident_report_screen.dart';
 import '../profile/emergency_contacts_screen.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class AlertScreen extends StatefulWidget {
   const AlertScreen({super.key});

@@ -1,109 +1,145 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; // format date
+import 'package:project_radar_app/screens/profile/account_management_screen.dart';
+import 'package:project_radar_app/screens/profile/edit_account_info.dart';
+import 'package:project_radar_app/services/navigation.dart';
+import 'package:intl/intl.dart';
+import 'package:project_radar_app/widgets/capitalize_names.dart';
 
 class AccountInformationScreen extends StatefulWidget {
-  const AccountInformationScreen({Key? key}) : super(key: key);
+  const AccountInformationScreen({super.key});
 
   @override
-  State<AccountInformationScreen> createState() =>
-      _AccountInformationScreenState();
+  State<AccountInformationScreen> createState() => _AccountInformationScreenState();
 }
 
 class _AccountInformationScreenState extends State<AccountInformationScreen> {
-  late final Future<DocumentSnapshot<Map<String, dynamic>>> _userDoc;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  late Future<Map<String, dynamic>> _userData;
 
   @override
   void initState() {
     super.initState();
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    _userDoc = FirebaseFirestore.instance.collection('users').doc(uid).get();
+    _userData = _fetchUserData();
+  }
+
+  Future<Map<String, dynamic>> _fetchUserData() async {
+    final User? user = _auth.currentUser;
+    if (user == null) {
+      return {};
+    }
+
+    final DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
+    if (!userDoc.exists) {
+      return {};
+    }
+
+    final data = userDoc.data() as Map<String, dynamic>;
+    return {
+      'firstName': data['firstName'] ?? '',
+      'middleName': data['middleName'] ?? '',
+      'lastName': data['lastName'] ?? '',
+      'email': user.email ?? '',
+      'phone': data['phone'] ?? 'Not provided',
+      'createdAt': data['createdAt'] ?? Timestamp.now(),
+      'photoURL': user.photoURL ?? '',
+      'dob': data['dob'] ?? '',
+      'address': data['address'] ?? '',
+      'bloodType': data['bloodType'] ?? '',
+      'height': data['height'] ?? '',
+      'weight': data['weight'] ?? '',
+    };
   }
 
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
-      // intercept Android back button
       onWillPop: () async {
-        Navigator.pop(context);
+        Navigation.pushReplacement(context, const AccountManagementScreen());
         return false;
       },
-      child: FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        future: _userDoc,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-          if (!snap.hasData || !snap.data!.exists) {
-            return Scaffold(
-              appBar: AppBar(
-                title: const Text('Account Information'),
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ),
-              body: const Center(child: Text('No user data found')),
-            );
-          }
-          final data = snap.data!.data()!;
-          final fullName =
-              "${data['firstName']} ${data['middleName']} ${data['lastName']}";
-          final email = data['email'] as String? ?? '';
-          final phone = data['phone'] as String? ?? '';
-          final dob = data['dob'] as String? ?? '';
-          final address = data['address'] as String? ?? '';
-          final bloodType = data['bloodType'] as String? ?? '';
-          final height = data['height'] as String? ?? '';
-          final weight = data['weight'] as String? ?? '';
-          final Timestamp ts = data['createdAt'] as Timestamp;
-          final joinedDate = DateFormat('MMMM d, y').format(ts.toDate());
-
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text(
-                'Account Information',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              centerTitle: true,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => Navigator.pop(context),
-              ),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: const Text(
+            'Account Information',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
-            body: SingleChildScrollView(
+          ),
+          centerTitle: true,
+          elevation: 0,
+          backgroundColor: const Color(0xFF28588B),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigation.pushReplacement(
+              context,
+              const AccountManagementScreen(),
+            ),
+          ),
+        ),
+        body: FutureBuilder<Map<String, dynamic>>(
+          future: _userData,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28588B)),
+                ),
+              );
+            }
+
+            if (snapshot.hasError || !snapshot.hasData) {
+              return Center(
+                child: Text('Error loading data: ${snapshot.error}'),
+              );
+            }
+
+            final userData = snapshot.data!;
+            final parts = [
+              userData['firstName'],
+              userData['middleName'],
+              userData['lastName'],
+            ];
+            final fullName = parts.where((part) => part != null && part.trim().isNotEmpty).join(' ');
+
+            final joinedDate = DateFormat('MMMM d, y').format(
+              (userData['createdAt'] as Timestamp).toDate(),
+            );
+
+            return SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  _buildProfileHeader(fullName),
+                  _buildProfileHeader(context, userData),
                   const SizedBox(height: 32),
                   _buildAccountInfoCard(
-                    fullName,
-                    email,
-                    phone,
-                    dob,
-                    address,
-                    bloodType,
-                    height,
-                    weight,
+                    context,
+                    capitalizeName(fullName),
+                    userData['email'],
+                    userData['phone'],
+                    userData['dob'],
+                    userData['address'],
+                    userData['bloodType'],
+                    userData['height'],
+                    userData['weight'],
                     joinedDate,
                   ),
                   const SizedBox(height: 24),
                 ],
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildProfileHeader(String fullName) {
-    final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
+  Widget _buildProfileHeader(BuildContext context, Map<String, dynamic> userData) {
+    const primaryColor = Color(0xFF28588B);
 
     return Center(
       child: Column(
@@ -118,18 +154,47 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
                 width: 3,
               ),
             ),
-            child: const CircleAvatar(
-              radius: 55,
-              backgroundImage: AssetImage(
-                'assets/images/profile_placeholder.png',
-              ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 55,
+                  backgroundImage: userData['photoURL'] != null && userData['photoURL'].isNotEmpty
+                      ? NetworkImage(userData['photoURL']) as ImageProvider
+                      : const AssetImage('assets/images/profile_placeholder.png'),
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigation.pushReplacement(context, const EditAccountinfo());
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: primaryColor,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white,
+                          width: 2,
+                        ),
+                      ),
+                      child: const Icon(Icons.edit, size: 18, color: Colors.white),
+                    ),
+                  ),
+                ),
+
+              ],
             ),
           ),
           const SizedBox(height: 16),
           Text(
-            fullName,
-            style: theme.textTheme.headlineSmall?.copyWith(
+            capitalizeName('${userData['firstName']} ${userData['lastName']}'),
+            style: const TextStyle(
+              fontSize: 24,
               fontWeight: FontWeight.bold,
+              color: Colors.black87,
             ),
           ),
         ],
@@ -138,6 +203,7 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
   }
 
   Widget _buildAccountInfoCard(
+    BuildContext context,
     String fullName,
     String email,
     String phone,
@@ -148,112 +214,77 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
     String weight,
     String joinedDate,
   ) {
-    final theme = Theme.of(context);
-    final cardColor =
-        theme.brightness == Brightness.dark ? Colors.grey[900] : Colors.white;
 
     return Card(
-      elevation: 0,
-      color: cardColor,
+      elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.dividerColor.withOpacity(0.1), width: 1),
+        borderRadius: BorderRadius.circular(12),
       ),
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
           children: [
-            _buildInfoTile(
-              icon: Icons.person_outline,
-              label: 'Full Name',
-              value: fullName,
-            ),
-            _buildDivider(),
-            _buildInfoTile(
-              icon: Icons.email_outlined,
-              label: 'Email',
-              value: email,
-            ),
-            _buildDivider(),
-            _buildInfoTile(
-              icon: Icons.phone_outlined,
-              label: 'Phone',
-              value: phone,
-            ),
-            _buildDivider(),
-            _buildInfoTile(
-              icon: Icons.cake_outlined,
-              label: 'Date of Birth',
-              value: dob,
-            ),
-            _buildDivider(),
-            _buildInfoTile(
-              icon: Icons.home_outlined,
-              label: 'Address',
-              value: address,
-            ),
-            _buildDivider(),
-            _buildInfoTile(
-              icon: Icons.water_drop_outlined,
-              label: 'Blood Type',
-              value: bloodType,
-            ),
-            _buildDivider(),
-            _buildInfoTile(icon: Icons.height, label: 'Height', value: height),
-            _buildDivider(),
-            _buildInfoTile(
-              icon: Icons.monitor_weight_outlined,
-              label: 'Weight',
-              value: weight,
-            ),
-            _buildDivider(),
-            _buildInfoTile(
-              icon: Icons.calendar_today_outlined,
-              label: 'Joined Date',
-              value: joinedDate,
-            ),
+            _buildInfoTile(context, icon: Icons.person_outline, label: 'Full Name', value: fullName),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            _buildInfoTile(context, icon: Icons.email_outlined, label: 'Email', value: email),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            _buildInfoTile(context, icon: Icons.phone_outlined, label: 'Phone', value: phone),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            _buildInfoTile(context, icon: Icons.cake_outlined, label: 'Date of Birth', value: dob.isNotEmpty ? dob : 'Not provided'),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            _buildInfoTile(context, icon: Icons.home_outlined, label: 'Address', value: address.isNotEmpty ? address : 'Not provided'),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            _buildInfoTile(context, icon: Icons.water_drop_outlined, label: 'Blood Type', value: bloodType.isNotEmpty ? bloodType : 'Not provided'),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            _buildInfoTile(context, icon: Icons.height, label: 'Height', value: height.isNotEmpty ? height : 'Not provided'),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            _buildInfoTile(context, icon: Icons.monitor_weight, label: 'Weight', value: weight.isNotEmpty ? weight : 'Not provided'),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            _buildInfoTile(context, icon: Icons.calendar_today, label: 'Joined Date', value: joinedDate),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoTile({
+  Widget _buildInfoTile(
+    BuildContext context, {
     required IconData icon,
     required String label,
     required String value,
   }) {
-    final theme = Theme.of(context);
+    const primaryColor = Color(0xFF28588B);
+
     return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: theme.colorScheme.primary.withOpacity(0.1),
+        padding: const EdgeInsets.all(10),
+        decoration: const BoxDecoration(
+          color: Color(0xFFE8F0FA),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: theme.colorScheme.primary),
+        child: Icon(
+          icon,
+          color: primaryColor,
+          size: 24,
+        ),
       ),
       title: Text(
         label,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurface.withOpacity(0.6),
+        style: const TextStyle(
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
         ),
       ),
       subtitle: Text(
         value,
-        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+        style: const TextStyle(
+          fontSize: 16,
+          color: Colors.black87,
+        ),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Divider(
-      height: 1,
-      indent: 72,
-      endIndent: 16,
-      color: Theme.of(context).dividerColor.withOpacity(0.1),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
     );
   }
 }

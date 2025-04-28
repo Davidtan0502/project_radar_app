@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/screens/profile/account_management_screen.dart';
 import 'about_us.dart';
-import 'change_password.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsScreen extends StatefulWidget {

@@ -247,10 +247,12 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                         errorText: _currentPasswordError,
                       ),
                       validator: (value) {
-                        if (value!.isEmpty)
+                        if (value!.isEmpty) {
                           return 'Enter your current password';
-                        if (_currentPasswordError != null)
+                        }
+                        if (_currentPasswordError != null) {
                           return _currentPasswordError;
+                        }
                         return null;
                       },
                     ),
@@ -269,11 +271,13 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                       validator: (value) {
                         final val = value?.trim() ?? '';
                         if (val.isEmpty) return 'Enter a new password';
-                        if (val.length < 6)
+                        if (val.length < 6) {
                           return 'Password must be at least 6 characters';
+                        }
                         final regex = RegExp(r'^(?=.*[A-Za-z])(?=.*\d).{6,}$');
-                        if (!regex.hasMatch(val))
+                        if (!regex.hasMatch(val)) {
                           return 'Password must contain letters and numbers';
+                        }
                         if (_newPasswordError != null) return _newPasswordError;
                         return null;
                       },
@@ -292,12 +296,15 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                       ),
                       validator: (value) {
                         final val = value?.trim() ?? '';
-                        if (val.isEmpty)
+                        if (val.isEmpty) {
                           return 'Please confirm your new password';
-                        if (val != _newPasswordController.text.trim())
+                        }
+                        if (val != _newPasswordController.text.trim()) {
                           return 'Passwords do not match';
-                        if (_confirmPasswordError != null)
+                        }
+                        if (_confirmPasswordError != null) {
                           return _confirmPasswordError;
+                        }
                         return null;
                       },
                     ),
