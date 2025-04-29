@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:project_radar_app/screens/profile/account_management_screen.dart';
 import 'package:project_radar_app/screens/profile/edit_account_info.dart';
 import 'package:project_radar_app/services/navigation.dart';
 import 'package:intl/intl.dart';

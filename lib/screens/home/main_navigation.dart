@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/screens/alerts/alert_screen.dart';
 import 'package:project_radar_app/screens/home/home_screen.dart';
-import 'package:project_radar_app/screens/profile/hotline_screen.dart';
+import 'package:project_radar_app/screens/hotlines/hotline_screen.dart';
 import 'package:project_radar_app/screens/map/map_screen.dart';
 import 'package:project_radar_app/screens/profile/profile_screen.dart';
 
