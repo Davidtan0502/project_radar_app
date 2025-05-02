@@ -3,10 +3,9 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import '../../services/alert_service.dart';
-import '../../services/emergency_contact_service.dart'; // ← added
+import '../../services/emergency_contact_service.dart';
 import '../../widgets/emergency_buttons.dart';
 import '../incidents/incident_report_screen.dart';
-// can remain if you still navigate elsewhere
 
 class AlertScreen extends StatefulWidget {
   const AlertScreen({super.key});

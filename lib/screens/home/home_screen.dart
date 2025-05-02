@@ -73,13 +73,20 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.setString('cached_weather_desc', desc);
     await prefs.setString('cached_temperature', temp);
     await prefs.setString('cached_weather_icon', icon);
-    await prefs.setString('weather_timestamp', DateTime.now().toIso8601String());
+    await prefs.setString(
+      'weather_timestamp',
+      DateTime.now().toIso8601String(),
+    );
   }
 
   Future<Map<String, dynamic>?> _getUserProfile() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final doc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
       return doc.data();
     }
     return null;
@@ -94,7 +101,8 @@ class _HomeScreenState extends State<HomeScreen> {
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission != LocationPermission.whileInUse && permission != LocationPermission.always) {
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) {
         return _setDefaultLocation();
       }
     }
@@ -119,15 +127,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _updatePosition(Position position) async {
-    final placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
+    final placemarks = await placemarkFromCoordinates(
+      position.latitude,
+      position.longitude,
+    );
     if (!mounted) return;
 
     final place = placemarks.isNotEmpty ? placemarks.first : null;
-    final street = (place?.street?.isNotEmpty ?? false) ? place!.street : (place?.name ?? '');
+    final street =
+        (place?.street?.isNotEmpty ?? false)
+            ? place!.street
+            : (place?.name ?? '');
 
-    final address = place != null
-        ? "$street, ${place.locality}, ${place.administrativeArea}, ${place.country}"
-        : "Address not available";
+    final address =
+        place != null
+            ? "$street, ${place.locality}, ${place.administrativeArea}, ${place.country}"
+            : "Address not available";
 
     setState(() {
       _currentPosition = position;
@@ -138,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _cacheLocationData(address);
     _mapController.animateCamera(CameraUpdate.newLatLng(_initialPosition!));
-  
+
     await _fetchWeather(position.latitude, position.longitude);
   }
 
@@ -159,7 +174,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (lastFetchStr != null) {
       final lastFetch = DateTime.tryParse(lastFetchStr);
-      if (lastFetch != null && now.difference(lastFetch) < const Duration(minutes: 10)) {
+      if (lastFetch != null &&
+          now.difference(lastFetch) < const Duration(minutes: 10)) {
         return;
       }
     }
@@ -168,7 +184,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final url = Uri.parse(
-          "https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&units=metric&appid=${Config.weatherApiKey}");
+        "https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&units=metric&appid=${Config.weatherApiKey}",
+      );
       final response = await http.get(url).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -209,7 +226,13 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: child,
     );
@@ -228,27 +251,35 @@ class _HomeScreenState extends State<HomeScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text("Project RADAR", style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white)),
-                    IconButton(
-                      onPressed: () async {
-                        try {
-                          final position = await Geolocator.getCurrentPosition(
-                            desiredAccuracy: LocationAccuracy.high,
-                          );
-                          await _updatePosition(position);
-                          _startListeningToLocation();
-                          _startWeatherAutoUpdate();
-                        } catch (e) {
-                          debugPrint("Refresh failed: $e");
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Failed to refresh location")),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.refresh, color: Colors.white),
-                      tooltip: "Refresh Location & Weather",
+                  Text(
+                    "Project RADAR",
+                    style: GoogleFonts.poppins(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
                     ),
-
+                  ),
+                  IconButton(
+                    onPressed: () async {
+                      try {
+                        final position = await Geolocator.getCurrentPosition(
+                          desiredAccuracy: LocationAccuracy.high,
+                        );
+                        await _updatePosition(position);
+                        _startListeningToLocation();
+                        _startWeatherAutoUpdate();
+                      } catch (e) {
+                        debugPrint("Refresh failed: $e");
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Failed to refresh location"),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.refresh, color: Colors.white),
+                    tooltip: "Refresh Location & Weather",
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
@@ -270,28 +301,43 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _weatherIcon.isNotEmpty
               ? Image.network(
-                  "https://openweathermap.org/img/wn/$_weatherIcon@2x.png",
-                  width: 50,
-                  height: 50,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.cloud, size: 50),
-                )
+                "https://openweathermap.org/img/wn/$_weatherIcon@2x.png",
+                width: 50,
+                height: 50,
+                errorBuilder: (_, __, ___) => const Icon(Icons.cloud, size: 50),
+              )
               : const Icon(Icons.cloud, size: 50),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Weather Today", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text(
+                  "Weather Today",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 4),
                 _isLoadingWeather
                     ? const LinearProgressIndicator()
                     : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(_weatherDescription, style: const TextStyle(fontSize: 14, color: Colors.grey)),
-                          Text(_temperature, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                        ],
-                      ),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _weatherDescription,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        Text(
+                          _temperature,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
               ],
             ),
           ),
@@ -305,9 +351,15 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("My Location", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text(
+            "My Location",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 4),
-          const Text("Tell the operator your location", style: TextStyle(fontSize: 14, color: Colors.grey)),
+          const Text(
+            "Tell the operator your location",
+            style: TextStyle(fontSize: 14, color: Colors.grey),
+          ),
           const SizedBox(height: 12),
           Text(_currentAddress, style: const TextStyle(fontSize: 14)),
           const SizedBox(height: 12),
@@ -315,37 +367,68 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(12),
             child: SizedBox(
               height: 150,
-              child: _initialPosition == null
-                  ? const Center(child: CircularProgressIndicator())
-                  : GoogleMap(
-                      initialCameraPosition: CameraPosition(target: _initialPosition!, zoom: 16),
-                      onMapCreated: (controller) => _mapController = controller,
-                      myLocationEnabled: true,
-                      myLocationButtonEnabled: false,
-                      zoomControlsEnabled: false,
-                      markers: _currentPosition != null
-                          ? {
-                              Marker(
-                                markerId: const MarkerId("currentLoc"),
-                                position: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-                              ),
-                            }
-                          : {},
-                    ),
+              child:
+                  _initialPosition == null
+                      ? const Center(child: CircularProgressIndicator())
+                      : GoogleMap(
+                        initialCameraPosition: CameraPosition(
+                          target: _initialPosition!,
+                          zoom: 16,
+                        ),
+                        onMapCreated:
+                            (controller) => _mapController = controller,
+                        myLocationEnabled: true,
+                        myLocationButtonEnabled: false,
+                        zoomControlsEnabled: false,
+                        markers:
+                            _currentPosition != null
+                                ? {
+                                  Marker(
+                                    markerId: const MarkerId("currentLoc"),
+                                    position: LatLng(
+                                      _currentPosition!.latitude,
+                                      _currentPosition!.longitude,
+                                    ),
+                                  ),
+                                }
+                                : {},
+                      ),
             ),
           ),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(children: [
-                const Text("Latitude: ", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                Text(_currentPosition?.latitude.toStringAsFixed(5) ?? "N/A", style: const TextStyle(color: Colors.red)),
-              ]),
-              Row(children: [
-                const Text("Longitude: ", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-                Text(_currentPosition?.longitude.toStringAsFixed(5) ?? "N/A", style: const TextStyle(color: Colors.blue)),
-              ]),
+              Row(
+                children: [
+                  const Text(
+                    "Latitude: ",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
+                  Text(
+                    _currentPosition?.latitude.toStringAsFixed(5) ?? "N/A",
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  const Text(
+                    "Longitude: ",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                  Text(
+                    _currentPosition?.longitude.toStringAsFixed(5) ?? "N/A",
+                    style: const TextStyle(color: Colors.blue),
+                  ),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 6),
@@ -354,7 +437,14 @@ class _HomeScreenState extends State<HomeScreen> {
             child: TextButton.icon(
               onPressed: () {
                 if (_currentPosition != null) {
-                  _mapController.animateCamera(CameraUpdate.newLatLng(LatLng(_currentPosition!.latitude, _currentPosition!.longitude)));
+                  _mapController.animateCamera(
+                    CameraUpdate.newLatLng(
+                      LatLng(
+                        _currentPosition!.latitude,
+                        _currentPosition!.longitude,
+                      ),
+                    ),
+                  );
                 }
               },
               icon: const Icon(Icons.my_location, size: 18),
@@ -374,17 +464,29 @@ class _HomeScreenState extends State<HomeScreen> {
           Container(
             width: 60,
             height: 60,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.grey[200]),
-            child: const Icon(Icons.account_circle, size: 60, color: Colors.grey),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.grey[200],
+            ),
+            child: const Icon(
+              Icons.account_circle,
+              size: 60,
+              color: Colors.grey,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: FutureBuilder<Map<String, dynamic>?>(
               future: _getUserProfile(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  return const LinearProgressIndicator();
                 final data = snapshot.data;
-                if (data == null) return const Text("No user data found", style: TextStyle(fontSize: 14));
+                if (data == null)
+                  return const Text(
+                    "No user data found",
+                    style: TextStyle(fontSize: 14),
+                  );
                 final name = [data['firstName'], data['lastName']]
                     .where((e) => (e ?? '').toString().trim().isNotEmpty)
                     .map((e) => capitalizeName(e.toString()))
@@ -395,14 +497,29 @@ class _HomeScreenState extends State<HomeScreen> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     Text(address, style: const TextStyle(fontSize: 14)),
                     if (isVerified)
                       Container(
                         margin: const EdgeInsets.only(top: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(color: Colors.blue[900], borderRadius: BorderRadius.circular(20)),
-                        child: const Text("Verified", style: TextStyle(color: Colors.white, fontSize: 12)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[900],
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          "Verified",
+                          style: TextStyle(color: Colors.white, fontSize: 12),
+                        ),
                       ),
                   ],
                 );

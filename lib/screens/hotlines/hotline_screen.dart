@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:project_radar_app/screens/hotlines/fire_department.dart';
+import 'package:project_radar_app/screens/hotlines/health_department.dart';
+import 'package:project_radar_app/screens/hotlines/police_department.dart';
 
 class HotlinesPage extends StatefulWidget {
   const HotlinesPage({super.key});
@@ -19,7 +22,7 @@ class _HotlinesPageState extends State<HotlinesPage> {
       'description':
           'Handles disaster preparedness, response, and mitigation in Manila.',
       'facebookUrl': 'https://www.facebook.com/sagipmanila',
-      'phoneUri': 'tel:+639507003710',
+      'phoneUri': 'tel:0950 700 3710',
       'color': Colors.blue,
     },
     {
@@ -28,7 +31,7 @@ class _HotlinesPageState extends State<HotlinesPage> {
       'description':
           'Provides health services, responds to medical emergencies and outbreaks.',
       'facebookUrl': 'https://www.facebook.com/manilahealthdepartment',
-      'phoneUri': 'tel:+639369925513',
+      'phoneUri': 'tel:0936 992 5513',
       'color': Colors.green,
     },
     {
@@ -37,7 +40,7 @@ class _HotlinesPageState extends State<HotlinesPage> {
       'description':
           'Maintains peace and order, responds to emergencies and crime scenes.',
       'facebookUrl': 'https://www.facebook.com/manilapolicedistrict2017',
-      'phoneUri': 'tel:+639178992092',
+      'phoneUri': 'tel:0917 899 2092',
       'color': Colors.indigo,
     },
     {
@@ -46,151 +49,16 @@ class _HotlinesPageState extends State<HotlinesPage> {
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
       'facebookUrl': 'https://www.facebook.com/MDFRVI',
-      'phoneUri': 'tel:+6325276951',
+      'phoneUri': 'tel:0 252 769 51',
       'color': Colors.redAccent,
-    },
-    {
-      'name': 'Bureau of Fire - NCR Intramuros FS',
-      'number': '+63 956 958 6301',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/intramuros.firestation',
-      'phoneUri': 'tel:+639569586301',
-      'color': Colors.redAccent,
-    },
-    {
-      'name': 'Raxabago - Tondo Police Station',
-      'number': '+63 998 598 7894',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639985987894',
-      'color': Colors.indigo,
-    },
-    {
-      'name': 'Moriones - Tondo Police Station',
-      'number': '+63 998 598 7896',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/MorionesTondoPS2',
-      'phoneUri': 'tel:+639985987896',
-      'color': Colors.indigo,
-    },
-    {
-      'name': 'Sta Cruz Police Station',
-      'number': '+63 998 598 7898',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/mpd.psthree',
-      'phoneUri': 'tel:+639985987898',
-      'color': Colors.indigo,
-    },
-    {
-      'name': 'Sampaloc Police Station',
-      'number': '+63 998 598 7900',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/PS4mpd',
-      'phoneUri': 'tel:+639985987900',
-      'color': Colors.indigo,
-    },
-    {
-      'name': 'Ermita Police Station',
-      'number': '+63 998 598 7902',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/estacion.ermita',
-      'phoneUri': 'tel:+639985987902',
-      'color': Colors.indigo,
-    },
-    {
-      'name': 'Sta Ana Police Station',
-      'number': '+63 998 598 7904',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/profile.php?id=100080997518053',
-      'phoneUri': 'tel:+639985987904',
-      'color': Colors.indigo,
-    },
-    {
-      'name': 'Jose Abad Santos Police Station',
-      'number': '+63 998 598 7906',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/jas.siete',
-      'phoneUri': 'tel:+639985987906',
-      'color': Colors.indigo,
-    },
-    {
-      'name': 'Sta Mesa Police Station',
-      'number': '+63 998 598 7908',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/StaMesaPoliceStationPS8',
-      'phoneUri': 'tel:+639985987908',
-      'color': Colors.indigo,
-    },
-    {
-      'name': 'Malate Police Station',
-      'number': '+63 998 598 7909',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/profile.php?id=100063710633871',
-      'phoneUri': 'tel:+639985987909',
-      'color': Colors.indigo,
-    },
-    {
-      'name': 'Pandacan Police Station',
-      'number': '+63 998 598 7912',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/pandacan10',
-      'phoneUri': 'tel:+639985987912',
-      'color': Colors.indigo,
-    },
-    {
-      'name': 'Meisic Police Station',
-      'number': '+63 998 598 7914',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/binondops.mpdreact',
-      'phoneUri': 'tel:+639985987914',
-      'color': Colors.indigo,
-    },
-    {
-      'name': 'Delpan Police Station',
-      'number': '+63 963 500 1054',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/profile.php?id=100087532271461',
-      'phoneUri': 'tel:+639635001054',
-      'color': Colors.indigo,
-    },
-    {
-      'name': 'Baseco Police Station',
-      'number': '+63 939 618 1340',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/basecopolicestation',
-      'phoneUri': 'tel:+639396181340',
-      'color': Colors.indigo,
-    },
-    {
-      'name': 'Barbosa Police Station',
-      'number': '+63 920 518 7080',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/profile.php?id=61561626107272',
-      'phoneUri': 'tel:+639205187080',
-      'color': Colors.indigo,
     },
   ];
 
   @override
   Widget build(BuildContext context) {
-    final filteredHotlines =
-        _hotlines.where((hotline) {
-          return hotline['name'].toString().toLowerCase().contains(
+    final filtered =
+        _hotlines.where((h) {
+          return h['name'].toString().toLowerCase().contains(
             _searchText.toLowerCase(),
           );
         }).toList();
@@ -241,7 +109,7 @@ class _HotlinesPageState extends State<HotlinesPage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Search Field
+            // Search
             TextField(
               decoration: InputDecoration(
                 hintText: 'Search hotline...',
@@ -254,173 +122,226 @@ class _HotlinesPageState extends State<HotlinesPage> {
                   borderSide: BorderSide.none,
                 ),
               ),
-              onChanged: (text) {
-                setState(() {
-                  _searchText = text;
-                });
-              },
+              onChanged: (t) => setState(() => _searchText = t),
             ),
             const SizedBox(height: 16),
 
-            // Hotline Cards
+            // Scrollable list of hotlines + department buttons
             Expanded(
-              child:
-                  filteredHotlines.isEmpty
-                      ? const Center(
-                        child: Text(
-                          "No results found.",
-                          style: TextStyle(fontSize: 16),
+              child: ListView.builder(
+                controller: _scrollController,
+                itemCount: filtered.length + 4,
+                itemBuilder: (ctx, i) {
+                  if (i < filtered.length) {
+                    final h = filtered[i];
+                    return Padding(
+                      padding: EdgeInsets.only(
+                        bottom: i == filtered.length - 1 ? 16 : 16,
+                      ),
+                      child: Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                      )
-                      : ListView.builder(
-                        controller: _scrollController,
-                        itemCount: filteredHotlines.length,
-                        itemBuilder: (context, index) {
-                          final hotline = filteredHotlines[index];
-                          return Padding(
-                            padding: EdgeInsets.only(
-                              bottom:
-                                  index == filteredHotlines.length - 1 ? 0 : 16,
+                        elevation: 4,
+                        shadowColor: h['color'].withOpacity(0.3),
+                        child: ExpansionTile(
+                          tilePadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          leading: CircleAvatar(
+                            backgroundColor: h['color'],
+                            child: const Icon(
+                              Icons.local_phone,
+                              color: Colors.white,
                             ),
-                            child: Card(
-                              margin: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
+                          ),
+                          title: Text(
+                            h['name'],
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            h['number'],
+                            style: TextStyle(color: h['color']),
+                          ),
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                                vertical: 8,
                               ),
-                              elevation: 4,
-                              shadowColor: hotline['color'].withOpacity(0.3),
-                              child: ExpansionTile(
-                                tilePadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                title: Text(
-                                  hotline['name'],
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  hotline['number'],
-                                  style: TextStyle(color: hotline['color']),
-                                ),
-                                leading: CircleAvatar(
-                                  backgroundColor: hotline['color'],
-                                  child: const Icon(
-                                    Icons.local_phone,
-                                    color: Colors.white,
-                                  ),
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16.0,
-                                      vertical: 10,
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          hotline['description'],
-                                          style: const TextStyle(
-                                            color: Colors.black87,
+                                  Text(
+                                    h['description'],
+                                    style: const TextStyle(color: Colors.black),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      ElevatedButton.icon(
+                                        onPressed: () async {
+                                          final uri = Uri.parse(h['phoneUri']);
+                                          if (!await launchUrl(
+                                            uri,
+                                            mode:
+                                                LaunchMode.externalApplication,
+                                          )) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Could not open Phone App.',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                        icon: const Icon(
+                                          Icons.call,
+                                          color: Colors.white,
+                                        ),
+                                        label: const Text(
+                                          'Call',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: h['color'],
+                                          minimumSize: const Size(140, 40),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              30,
+                                            ),
                                           ),
                                         ),
-                                        const SizedBox(height: 12),
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            ElevatedButton.icon(
-                                              onPressed: () async {
-                                                final uri = Uri.parse(
-                                                  hotline['phoneUri'],
-                                                );
-                                                if (!await launchUrl(
-                                                  uri,
-                                                  mode:
-                                                      LaunchMode
-                                                          .externalApplication,
-                                                )) {
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text(
-                                                        'Could not open Phone App.',
-                                                      ),
-                                                    ),
-                                                  );
-                                                }
-                                              },
-                                              icon: const Icon(
-                                                Icons.call,
-                                                color: Colors.white,
-                                              ),
-                                              label: const Text(
-                                                'Call',
-                                                style: TextStyle(
-                                                  color: Colors.white,
+                                      ),
+                                      OutlinedButton.icon(
+                                        onPressed: () async {
+                                          final uri = Uri.parse(
+                                            h['facebookUrl'],
+                                          );
+                                          if (!await launchUrl(
+                                            uri,
+                                            mode:
+                                                LaunchMode.externalApplication,
+                                          )) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Could not open Facebook.',
                                                 ),
                                               ),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor:
-                                                    hotline['color'],
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(30),
-                                                ),
-                                              ),
+                                            );
+                                          }
+                                        },
+                                        icon: const Icon(Icons.facebook),
+                                        label: const Text('Facebook'),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: h['color'],
+                                          side: BorderSide(color: h['color']),
+                                          minimumSize: const Size(140, 40),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              30,
                                             ),
-                                            OutlinedButton.icon(
-                                              onPressed: () async {
-                                                final uri = Uri.parse(
-                                                  hotline['facebookUrl'],
-                                                );
-                                                if (!await launchUrl(
-                                                  uri,
-                                                  mode:
-                                                      LaunchMode
-                                                          .externalApplication,
-                                                )) {
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text(
-                                                        'Could not open Facebook.',
-                                                      ),
-                                                    ),
-                                                  );
-                                                }
-                                              },
-                                              icon: const Icon(Icons.facebook),
-                                              label: const Text('Facebook'),
-                                              style: OutlinedButton.styleFrom(
-                                                foregroundColor:
-                                                    hotline['color'],
-                                                side: BorderSide(
-                                                  color: hotline['color'],
-                                                ),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(30),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
+                                          ),
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
                             ),
-                          );
-                        },
+                          ],
+                        ),
                       ),
+                    );
+                  } else if (i == filtered.length) {
+                    return const SizedBox(height: 16);
+                  } else if (i == filtered.length + 1) {
+                    return ElevatedButton.icon(
+                      icon: const Icon(Icons.local_fire_department),
+                      label: const Text(
+                        'Fire Department',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        foregroundColor: Colors.black,
+                        backgroundColor: Colors.redAccent,
+                        minimumSize: const Size.fromHeight(80),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed:
+                          () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const FireDepartmentPage(),
+                            ),
+                          ),
+                    );
+                  } else if (i == filtered.length + 2) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.local_hospital),
+                        label: const Text(
+                          'Health Department',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.black,
+                          backgroundColor: Colors.green,
+                          minimumSize: const Size.fromHeight(80),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed:
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const HealthDepartmentPage(),
+                              ),
+                            ),
+                      ),
+                    );
+                  } else {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 12, bottom: 16),
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.local_police),
+                        label: const Text(
+                          'Police Department',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.black,
+                          backgroundColor: Colors.indigo,
+                          minimumSize: const Size.fromHeight(80),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed:
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const PoliceDepartmentPage(),
+                              ),
+                            ),
+                      ),
+                    );
+                  }
+                },
+              ),
             ),
           ],
         ),
