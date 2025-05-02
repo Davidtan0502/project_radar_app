@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/services/emergency_contact_service.dart';
 import 'package:project_radar_app/widgets/add_contact_dialog.dart';
+import 'package:another_flushbar/flushbar.dart';
 
 class EmergencyContactsScreen extends StatefulWidget {
   const EmergencyContactsScreen({super.key});
@@ -37,6 +38,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
             onSave: (name, phone) {
               setState(() => _contacts.add({'name': name, 'phone': phone}));
               _saveContacts();
+              _showTopSnackbar('$name has been added.', Colors.green);
             },
           ),
     );
@@ -53,14 +55,59 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
             onSave: (name, phone) {
               setState(() => _contacts[index] = {'name': name, 'phone': phone});
               _saveContacts();
+              _showTopSnackbar('$name has been updated.', Colors.orange);
             },
           ),
     );
   }
 
-  void _removeContact(int index) {
-    setState(() => _contacts.removeAt(index));
-    _saveContacts();
+  void _removeContact(int index) async {
+    final contact = _contacts[index];
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Confirm Deletion'),
+            content: Text(
+              'Are you sure you want to delete ${contact['name']}?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+    );
+
+    if (shouldDelete == true) {
+      setState(() => _contacts.removeAt(index));
+      _saveContacts();
+      _showTopSnackbar(
+        '${contact['name']} has been deleted.',
+        Colors.red.shade700,
+      );
+    }
+  }
+
+  void _showTopSnackbar(String message, Color color) {
+    Flushbar(
+      message: message,
+      duration: const Duration(seconds: 3),
+      flushbarPosition: FlushbarPosition.TOP,
+      backgroundColor: color,
+      margin: const EdgeInsets.all(8),
+      borderRadius: BorderRadius.circular(8),
+      icon: const Icon(Icons.info, color: Colors.white),
+    ).show(context);
   }
 
   @override
@@ -113,7 +160,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                 },
               ),
           Positioned(
-            bottom: 20, // floating button a little up from the bottom
+            bottom: 20,
             right: 16,
             child: SafeArea(
               child: FloatingActionButton.extended(

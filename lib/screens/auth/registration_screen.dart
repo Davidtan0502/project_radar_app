@@ -304,8 +304,15 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         controller: _phoneController,
                                         keyboardType: TextInputType.phone,
                                         validator: (val) {
-                                          if (val == null || val.length != 10) {
-                                            return 'Enter 10-digit number';
+                                          if (val == null || val.isEmpty) {
+                                            return 'Please enter your contact number';
+                                          }
+                                          // Must be exactly 10 digits, all numeric, and start with 9
+                                          final digitsOnly = val.trim();
+                                          if (!RegExp(
+                                            r'^[9]\d{9}$',
+                                          ).hasMatch(digitsOnly)) {
+                                            return 'Enter a valid 10-digit number starting with 9';
                                           }
                                           return null;
                                         },

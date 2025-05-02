@@ -62,7 +62,6 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       _bloodTypeController.text = data['bloodType'] ?? '';
       _heightController.text = data['height'] ?? '';
       _weightController.text = data['weight'] ?? '';
-      // Prevent the initial load from marking the form dirty:
       _isFormDirty = false;
     });
   }
@@ -118,7 +117,10 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
         .child('${user.uid}.jpg');
     final uploadTask = ref.putFile(imageFile);
     uploadTask.snapshotEvents.listen((event) {
-      double progress = event.bytesTransferred / event.totalBytes;
+      final progress =
+          event.totalBytes > 0
+              ? event.bytesTransferred / event.totalBytes
+              : 0.0;
       setState(() {
         if (path.contains('profile_images')) {
           _profileUploadProgress = progress;
@@ -135,7 +137,6 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: source);
     if (picked == null) return;
-
     final file = File(picked.path);
     if (!_isFileSizeValid(file)) {
       if (!mounted) return;
@@ -147,7 +148,6 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       );
       return;
     }
-
     setState(() {
       if (isProfile) {
         _profileImage = file;
@@ -160,7 +160,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
+    final picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime(1900),
@@ -177,11 +177,9 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate() || _isSaving) return;
     setState(() => _isSaving = true);
-
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
-
       String? profileUrl;
       if (_removeProfileImage) {
         try {
@@ -195,12 +193,10 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
           'profile_images',
         );
       }
-
       String? idUrl;
       if (_idImage != null) {
         idUrl = await _uploadImageToStorage(_idImage!, 'id_uploads');
       }
-
       final docRef = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid);
@@ -220,7 +216,6 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
         'isVerified': true,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -228,9 +223,8 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
           backgroundColor: Colors.green,
         ),
       );
-
       setState(() => _isFormDirty = false);
-      Navigator.pop(context);
+      Navigator.pop(context, true);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -272,7 +266,6 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final radarBlue = const Color(0xFF1565C0);
-
     return WillPopScope(
       onWillPop: _confirmUnsavedChanges,
       child: Scaffold(
@@ -286,7 +279,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () async {
-              if (await _confirmUnsavedChanges()) Navigator.pop(context);
+              if (await _confirmUnsavedChanges()) Navigator.pop(context, true);
             },
           ),
         ),

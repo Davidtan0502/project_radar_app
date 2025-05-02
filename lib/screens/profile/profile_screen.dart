@@ -22,16 +22,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _photoURL = '';
   bool _isVerified = false;
   String _email = '';
+  Stream<DocumentSnapshot>? _userDocStream;
+  late final User? _user;
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    _user = FirebaseAuth.instance.currentUser;
+    if (_user != null) {
+      // Listen to the user document so changes (like isVerified) show up immediately
+      _userDocStream =
+          FirebaseFirestore.instance
+              .collection('users')
+              .doc(_user!.uid)
+              .snapshots();
+      _userDocStream!.listen(
+        (doc) {
+          if (!mounted) return;
+          final data = doc.data() as Map<String, dynamic>? ?? {};
+          setState(() {
+            _firstName = capitalizeName(data['firstName'] ?? '');
+            _lastName = capitalizeName(data['lastName'] ?? '');
+            _isVerified = data['isVerified'] ?? false;
+            _photoURL = _user!.photoURL ?? '';
+            _email = _user!.email ?? '';
+            _isLoading = false;
+          });
+        },
+        onError: (_) {
+          // Fallback to one-time load if stream errors
+          _loadUserData();
+        },
+      );
+    } else {
+      _loadUserData();
+    }
   }
 
   Future<void> _loadUserData() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = _user;
       if (user != null) {
         final doc =
             await FirebaseFirestore.instance
@@ -40,25 +70,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 .get();
 
         if (doc.exists) {
+          final data = doc.data()!;
           setState(() {
-            _firstName = capitalizeName(doc.data()?['firstName'] ?? '');
-            _lastName = capitalizeName(doc.data()?['lastName'] ?? '');
-            _isVerified = doc.data()?['isVerified'] ?? false;
+            _firstName = capitalizeName(data['firstName'] ?? '');
+            _lastName = capitalizeName(data['lastName'] ?? '');
+            _isVerified = data['isVerified'] ?? false;
             _photoURL = user.photoURL ?? '';
             _email = user.email ?? '';
             _isLoading = false;
           });
         } else {
+          // fallback to FirebaseAuth info
+          final displayName = user.displayName ?? '';
+          final parts = displayName.split(' ');
           setState(() {
-            final displayName = user.displayName ?? '';
-            _firstName =
-                displayName.split(' ').isNotEmpty
-                    ? capitalize(displayName.split(' ').first)
-                    : 'User';
-            _lastName =
-                displayName.split(' ').length > 1
-                    ? capitalize(displayName.split(' ').last)
-                    : '';
+            _firstName = parts.isNotEmpty ? capitalize(parts.first) : 'User';
+            _lastName = parts.length > 1 ? capitalize(parts.last) : '';
             _isVerified = user.emailVerified;
             _photoURL = user.photoURL ?? '';
             _email = user.email ?? '';
@@ -66,14 +93,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           });
         }
       } else {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
       debugPrint('Error loading user data: $e');
     }
   }
