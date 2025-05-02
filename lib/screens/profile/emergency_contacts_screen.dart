@@ -38,7 +38,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
             onSave: (name, phone) {
               setState(() => _contacts.add({'name': name, 'phone': phone}));
               _saveContacts();
-              _showTopSnackbar('$name has been added.', Colors.green);
+              _showTopSnackbar('$name contact has been added.', Colors.green);
             },
           ),
     );
@@ -55,7 +55,10 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
             onSave: (name, phone) {
               setState(() => _contacts[index] = {'name': name, 'phone': phone});
               _saveContacts();
-              _showTopSnackbar('$name has been updated.', Colors.orange);
+              _showTopSnackbar(
+                '$name contact has been updated.',
+                Colors.orange,
+              );
             },
           ),
     );
@@ -92,7 +95,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       setState(() => _contacts.removeAt(index));
       _saveContacts();
       _showTopSnackbar(
-        '${contact['name']} has been deleted.',
+        '${contact['name']} contact has been deleted.',
         Colors.red.shade700,
       );
     }
