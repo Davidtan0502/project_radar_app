@@ -11,19 +11,20 @@ class HealthDepartmentPage extends StatefulWidget {
 class _HealthDepartmentPageState extends State<HealthDepartmentPage> {
   final List<Map<String, dynamic>> _hotlines = [
     {
-      'name': 'DOH COVID-19 Hotline',
-      'number': '1555 / +63 2 894-COVID (26843)',
-      'description': 'COVID-19 support hotline of the Department of Health.',
-      'facebookUrl': 'https://www.facebook.com/OfficialDOHgov',
-      'phoneUri': 'tel:+63289426843',
+      'name': 'Sampaloc Manila Hospital',
+      'number': '+63 960 588 9068',
+      'description':
+          'Provides health services, responds to medical emergencies and outbreaks.',
+      'facebookUrl': 'https://www.facebook.com/OspitalNgSampalocManila/',
+      'phoneUri': 'tel:09605889068',
       'color': Colors.green,
     },
     {
-      'name': 'Red Cross PH',
-      'number': '+63 2 8790 2300',
+      'name': 'Sample Call',
+      'number': '+63 977 778 8472',
       'description': 'Emergency health response and blood donation services.',
       'facebookUrl': 'https://www.facebook.com/phredcross',
-      'phoneUri': 'tel:+63287902300',
+      'phoneUri': 'tel:09777788472',
       'color': Colors.green,
     },
   ];

@@ -21,65 +21,47 @@ class _FireDepartmentPageState extends State<FireDepartmentPage> {
     },
     {
       'name': 'Tanduay - Fire Station',
-      'number': '+63 976-483-6353',
+      'number': '+63 993 483 2700',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/MDFRVI',
-      'phoneUri': 'tel:+639764836353',
+      'facebookUrl': 'https://www.facebook.com/bfp.ncr.tanduay.fs',
+      'phoneUri': 'tel:09934832700',
       'color': Colors.redAccent,
     },
     {
       'name': 'Paco - Fire Station',
-      'number': '+63 998-283-4355',
+      'number': '+63 976 483 6353',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/MDFRVI',
-      'phoneUri': 'tel:+639982834355',
+      'facebookUrl': 'https://www.facebook.com/pacofspaco',
+      'phoneUri': 'tel:09764836353',
       'color': Colors.redAccent,
     },
     {
       'name': 'Intramuros - Fire Station',
-      'number': '+63 956-686-8201',
+      'number': '+63 956 958 6301',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/MDFRVI',
-      'phoneUri': 'tel:+63 9566868201',
+      'facebookUrl': 'https://www.facebook.com/intramuros.firestation',
+      'phoneUri': 'tel:09569586301',
       'color': Colors.redAccent,
     },
     {
       'name': 'Pandacan - Fire Station',
-      'number': '+63 905-489-6601',
+      'number': '+63 950 429 2897',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/MDFRVI',
-      'phoneUri': 'tel:+63 9054896601',
-      'color': Colors.redAccent,
-    },
-    {
-      'name': 'Pandacan - Fire Station',
-      'number': '+63 905-489-6601',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639985987894',
-      'color': Colors.redAccent,
-    },
-    {
-      'name': 'Tondo - Fire Station',
-      'number': '+63 920-721-6126',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639207216126',
+      'facebookUrl': 'https://www.facebook.com/pandacan.fss.3',
+      'phoneUri': 'tel:09504292897',
       'color': Colors.redAccent,
     },
     {
       'name': 'San Lazaro - Fire Station',
-      'number': '+63 945-779-0717',
+      'number': '+63 928 940 6032',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639457790717',
+      'facebookUrl': 'https://www.facebook.com/sanlazaro.engine',
+      'phoneUri': 'tel:09289406032',
       'color': Colors.redAccent,
     },
     {
@@ -93,38 +75,29 @@ class _FireDepartmentPageState extends State<FireDepartmentPage> {
     },
     {
       'name': 'Gagalangin - Fire Station',
-      'number': '+63 956-942-6172',
+      'number': '+63 976 045 7030',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639569426172',
+      'facebookUrl': 'https://www.facebook.com/gagalangin.firestation',
+      'phoneUri': 'tel:09760457030',
       'color': Colors.redAccent,
     },
     {
       'name': 'Sta Ana - Fire Station',
-      'number': '+63 995-218-0830',
+      'number': '+63 915 484 6575',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639952180830',
-      'color': Colors.redAccent,
-    },
-    {
-      'name': 'Arroceros - Fire Station',
-      'number': '+63 966-234-1645',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639662341645',
+      'facebookUrl': 'https://www.facebook.com/profile.php?id=100042525486496',
+      'phoneUri': 'tel:09154846575',
       'color': Colors.redAccent,
     },
     {
       'name': 'Sampaloc - Fire Station',
-      'number': '+63 967-526-2798',
+      'number': '+63 905 692 3584',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
       'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639675262798',
+      'phoneUri': 'tel:09056923584',
       'color': Colors.redAccent,
     },
     {
@@ -132,8 +105,8 @@ class _FireDepartmentPageState extends State<FireDepartmentPage> {
       'number': '+63 956-816-8301',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639568168301',
+      'facebookUrl': 'https://www.facebook.com/mfs.fam.92',
+      'phoneUri': 'tel:09568168301',
       'color': Colors.redAccent,
     },
     {
@@ -146,56 +119,12 @@ class _FireDepartmentPageState extends State<FireDepartmentPage> {
       'color': Colors.redAccent,
     },
     {
-      'name': 'SRF - Fire Station',
-      'number': '+63 956-590-5141',
+      'name': 'Malacañang - Fire Station',
+      'number': '+63 956 816 8301',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639565905141',
-      'color': Colors.redAccent,
-    },
-    {
-      'name': 'Ems San Lazaro / Comet Alpha - Fire Station',
-      'number': '+63 967-580-4207',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639675804207',
-      'color': Colors.redAccent,
-    },
-    {
-      'name': 'Ems Intramuros / Comet Bravo - Fire Station',
-      'number': '+63 998-546-6555',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639985466555',
-      'color': Colors.redAccent,
-    },
-    {
-      'name': 'Ems Sampaloc / Comet Charlie - Fire Station',
-      'number': '+63 966-409-8706',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639664098706',
-      'color': Colors.redAccent,
-    },
-    {
-      'name': 'Commel Manila - Fire Station',
-      'number': '+63 969-398-9700',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639693989700',
-      'color': Colors.redAccent,
-    },
-    {
-      'name': 'Bureau of Fire - NCR Intramuros FS',
-      'number': '+63 956 958 6301',
-      'description': 'Responds to fire emergencies and promotes fire safety.',
-      'facebookUrl': 'https://www.facebook.com/intramuros.firestation',
-      'phoneUri': 'tel:+639569586301',
+      'facebookUrl': 'https://www.facebook.com/trese.161',
+      'phoneUri': 'tel:09568168301',
       'color': Colors.redAccent,
     },
   ];
