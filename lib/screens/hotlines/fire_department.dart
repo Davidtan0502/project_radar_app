@@ -12,11 +12,11 @@ class _FireDepartmentPageState extends State<FireDepartmentPage> {
   final List<Map<String, dynamic>> _fireHotlines = [
     {
       'name': 'San Nicolas - Fire Station',
-      'number': '+63 956-942-6172',
+      'number': '+63 994 009 6243',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
       'facebookUrl': 'https://www.facebook.com/MDFRVI',
-      'phoneUri': 'tel:+639569426172',
+      'phoneUri': 'tel:09940096243',
       'color': Colors.redAccent,
     },
     {
@@ -66,11 +66,11 @@ class _FireDepartmentPageState extends State<FireDepartmentPage> {
     },
     {
       'name': 'Sta Mesa - Fire Station',
-      'number': '+63 915-089-7830',
+      'number': '+63 917 635 8578',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639150897830',
+      'facebookUrl': 'https://www.facebook.com/stamesafss',
+      'phoneUri': 'tel:09176358578',
       'color': Colors.redAccent,
     },
     {
@@ -102,7 +102,7 @@ class _FireDepartmentPageState extends State<FireDepartmentPage> {
     },
     {
       'name': 'Malacañang - Fire Station',
-      'number': '+63 956-816-8301',
+      'number': '+63 956 816 8301',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
       'facebookUrl': 'https://www.facebook.com/mfs.fam.92',
@@ -111,11 +111,11 @@ class _FireDepartmentPageState extends State<FireDepartmentPage> {
     },
     {
       'name': 'Bacood - Fire Station',
-      'number': '+63 966-293-8652',
+      'number': '+63 912 542 0294',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
-      'phoneUri': 'tel:+639662938652',
+      'facebookUrl': 'https://www.facebook.com/profile.php?id=61571422847293',
+      'phoneUri': 'tel:09125420294',
       'color': Colors.redAccent,
     },
     {
@@ -125,6 +125,15 @@ class _FireDepartmentPageState extends State<FireDepartmentPage> {
           'Responds to fire emergencies and promotes fire safety and prevention.',
       'facebookUrl': 'https://www.facebook.com/trese.161',
       'phoneUri': 'tel:09568168301',
+      'color': Colors.redAccent,
+    },
+    {
+      'name': 'Arroceros - Fire Station',
+      'number': '+63 995 987 0248',
+      'description':
+          'Responds to fire emergencies and promotes fire safety and prevention.',
+      'facebookUrl': 'https://www.facebook.com/trese.161',
+      'phoneUri': 'tel:09959870248',
       'color': Colors.redAccent,
     },
   ];

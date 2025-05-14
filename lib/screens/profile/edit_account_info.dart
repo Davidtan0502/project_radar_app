@@ -161,13 +161,14 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
 
   Future<void> _selectDate(BuildContext context) async {
     final now = DateTime.now();
-    final eightyYearsAgo = now.subtract(Duration(days: 365 * 80));
+    final eightyYearsAgo = DateTime(now.year - 80, now.month, now.day);
+    final eightYearsAgo = DateTime(now.year - 8, now.month, now.day);
 
     final picked = await showDatePicker(
       context: context,
-      initialDate: now,
+      initialDate: eightYearsAgo,
       firstDate: eightyYearsAgo, // no older than 80 yrs
-      lastDate: now, // up to today
+      lastDate: eightYearsAgo, // no younger than 8 yrs
     );
 
     if (picked != null) {
@@ -571,16 +572,19 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
           if (isDateField) {
             try {
               final parts = value.split('/');
-              if (parts.length != 3) throw {};
-              final m = int.parse(parts[0]),
-                  d = int.parse(parts[1]),
-                  y = int.parse(parts[2]);
+              if (parts.length != 3) throw FormatException();
+              final m = int.parse(parts[0]);
+              final d = int.parse(parts[1]);
+              final y = int.parse(parts[2]);
               final dob = DateTime(y, m, d);
               final today = DateTime.now();
               int age = today.year - dob.year;
               if (today.month < dob.month ||
                   (today.month == dob.month && today.day < dob.day)) {
                 age--;
+              }
+              if (age < 8) {
+                return 'Age must be at least 8 years';
               }
               if (age >= 80) {
                 return 'Age must be less than 80 years';
