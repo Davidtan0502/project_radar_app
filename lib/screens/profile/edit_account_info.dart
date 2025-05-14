@@ -160,12 +160,16 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
+    final now = DateTime.now();
+    final eightyYearsAgo = now.subtract(Duration(days: 365 * 80));
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
+      initialDate: now,
+      firstDate: eightyYearsAgo, // no older than 80 yrs
+      lastDate: now, // up to today
     );
+
     if (picked != null) {
       setState(() {
         _dobController.text = "${picked.month}/${picked.day}/${picked.year}";
@@ -563,6 +567,27 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
         validator: (value) {
           if (value == null || value.isEmpty) {
             return 'Please enter $label';
+          }
+          if (isDateField) {
+            try {
+              final parts = value.split('/');
+              if (parts.length != 3) throw {};
+              final m = int.parse(parts[0]),
+                  d = int.parse(parts[1]),
+                  y = int.parse(parts[2]);
+              final dob = DateTime(y, m, d);
+              final today = DateTime.now();
+              int age = today.year - dob.year;
+              if (today.month < dob.month ||
+                  (today.month == dob.month && today.day < dob.day)) {
+                age--;
+              }
+              if (age >= 80) {
+                return 'Age must be less than 80 years';
+              }
+            } catch (_) {
+              return 'Invalid date format';
+            }
           }
           return null;
         },

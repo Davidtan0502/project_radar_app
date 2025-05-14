@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:project_radar_app/screens/profile/account_information.dart';
 import 'package:project_radar_app/screens/profile/emergency_contacts_screen.dart';
 import 'package:project_radar_app/screens/profile/help_and_support.dart';
 import 'package:project_radar_app/screens/profile/settings_screen.dart';
@@ -286,6 +287,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: ListView(
                 children: [
+                  _buildOptionTile(
+                    icon: Icons.person_outline,
+                    title: 'Account Information',
+                    onTap:
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => const AccountInformationScreen(),
+                          ),
+                        ),
+                  ),
                   _buildOptionTile(
                     icon: Icons.settings,
                     title: 'Settings',

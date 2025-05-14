@@ -71,10 +71,6 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
           centerTitle: true,
           elevation: 0,
           backgroundColor: const Color(0xFF28588B),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
         ),
         body: FutureBuilder<Map<String, dynamic>>(
           future: _userData,
@@ -325,11 +321,6 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
       subtitle: Text(
         value,
         style: const TextStyle(fontSize: 16, color: Colors.black87),
-      ),
-      trailing: const Icon(
-        Icons.arrow_forward_ios,
-        size: 16,
-        color: Colors.grey,
       ),
     );
   }

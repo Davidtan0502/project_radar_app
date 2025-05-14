@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/screens/profile/edit_account_info.dart';
 import 'package:project_radar_app/screens/profile/change_password.dart';
-import 'package:project_radar_app/screens/profile/account_information.dart';
-import 'package:project_radar_app/screens/profile/settings_screen.dart'; // ← import SettingsScreen
+import 'package:project_radar_app/screens/profile/settings_screen.dart';
 import 'package:project_radar_app/services/navigation.dart';
 
 class AccountManagementScreen extends StatelessWidget {
@@ -107,17 +106,6 @@ class AccountManagementScreen extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        _buildAccountOptionTile(
-                          context,
-                          icon: Icons.person_outline,
-                          title: 'Account Information',
-                          onTap:
-                              () => Navigation.push(
-                                context,
-                                const AccountInformationScreen(),
-                              ),
-                        ),
-                        const Divider(height: 1, indent: 16, endIndent: 16),
                         _buildAccountOptionTile(
                           context,
                           icon: Icons.edit_outlined,

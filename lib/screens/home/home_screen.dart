@@ -10,6 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:project_radar_app/widgets/capitalize_names.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:project_radar_app/screens/profile/account_information.dart';
 
 class Config {
   static const weatherApiKey = "1e0dbc808580ffe843728e24a729dcee";
@@ -252,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    "Project RADAR",
+                    "RADAR",
                     style: GoogleFonts.poppins(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
@@ -458,75 +459,86 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildProfileCard() {
-    return _cardContainer(
-      child: Row(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.grey[200],
+    return InkWell(
+      borderRadius: BorderRadius.circular(20), // match your card radius
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AccountInformationScreen()),
+        );
+      },
+      child: _cardContainer(
+        child: Row(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.grey[200],
+              ),
+              child: const Icon(
+                Icons.account_circle,
+                size: 60,
+                color: Colors.grey,
+              ),
             ),
-            child: const Icon(
-              Icons.account_circle,
-              size: 60,
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: FutureBuilder<Map<String, dynamic>?>(
-              future: _getUserProfile(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting)
-                  return const LinearProgressIndicator();
-                final data = snapshot.data;
-                if (data == null)
-                  return const Text(
-                    "No user data found",
-                    style: TextStyle(fontSize: 14),
-                  );
-                final name = [data['firstName'], data['lastName']]
-                    .where((e) => (e ?? '').toString().trim().isNotEmpty)
-                    .map((e) => capitalizeName(e.toString()))
-                    .join(' ');
-                final address = data['address'] ?? "No address set";
-                final isVerified = data['isVerified'] ?? false;
+            const SizedBox(width: 12),
+            Expanded(
+              child: FutureBuilder<Map<String, dynamic>?>(
+                future: _getUserProfile(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const LinearProgressIndicator();
+                  }
+                  final data = snapshot.data;
+                  if (data == null) {
+                    return const Text(
+                      "No user data found",
+                      style: TextStyle(fontSize: 14),
+                    );
+                  }
+                  final name = [data['firstName'], data['lastName']]
+                      .where((e) => (e ?? '').toString().trim().isNotEmpty)
+                      .map((e) => capitalizeName(e.toString()))
+                      .join(' ');
+                  final address = data['address'] ?? "No address set";
+                  final isVerified = data['isVerified'] ?? false;
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(address, style: const TextStyle(fontSize: 14)),
-                    if (isVerified)
-                      Container(
-                        margin: const EdgeInsets.only(top: 6),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.blue[900],
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          "Verified",
-                          style: TextStyle(color: Colors.white, fontSize: 12),
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                  ],
-                );
-              },
+                      Text(address, style: const TextStyle(fontSize: 14)),
+                      if (isVerified)
+                        Container(
+                          margin: const EdgeInsets.only(top: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue[900],
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            "Verified",
+                            style: TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
