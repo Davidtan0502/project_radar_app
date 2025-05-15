@@ -11,14 +11,17 @@ class AccountManagementScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder:
-          (_) => AlertDialog(
+          (dialogContext) => AlertDialog(
             title: const Text("Delete Account"),
             content: const Text(
               "Are you sure you want to delete your account? This action cannot be undone.",
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  // Use the dialog's context to close the dialog
+                  Navigator.of(dialogContext).pop();
+                },
                 child: const Text(
                   "Cancel",
                   style: TextStyle(color: Colors.grey),
@@ -26,7 +29,9 @@ class AccountManagementScreen extends StatelessWidget {
               ),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context);
+                  // First close the dialog
+                  Navigator.of(dialogContext).pop();
+                  // Then proceed
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text("Account deletion initiated."),

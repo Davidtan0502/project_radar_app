@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:project_radar_app/screens/profile/account_management_screen.dart';
+import 'package:project_radar_app/services/navigation.dart';
 
 class EditAccountinfo extends StatefulWidget {
   const EditAccountinfo({super.key});
@@ -161,13 +163,13 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
 
   Future<void> _selectDate(BuildContext context) async {
     final now = DateTime.now();
-    final eightyYearsAgo = DateTime(now.year - 80, now.month, now.day);
+    final ninetyfiveYearsAgo = DateTime(now.year - 95, now.month, now.day);
     final eightYearsAgo = DateTime(now.year - 8, now.month, now.day);
 
     final picked = await showDatePicker(
       context: context,
       initialDate: eightYearsAgo,
-      firstDate: eightyYearsAgo, // no older than 80 yrs
+      firstDate: ninetyfiveYearsAgo, // no older than 95 yrs
       lastDate: eightYearsAgo, // no younger than 8 yrs
     );
 
@@ -236,34 +238,39 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   }
 
   Future<bool> _confirmUnsavedChanges() async {
+    // If no edits, allow pop immediately
     if (!_isFormDirty) return true;
-    final discard =
-        await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder:
-              (_) => AlertDialog(
-                title: const Text('Unsaved Changes'),
-                content: const Text(
-                  'You have unsaved changes. Discard them and go back?',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: const Text(
-                      'Discard',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                  ),
-                ],
+
+    // Otherwise show confirmation dialog
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Unsaved Changes'),
+            content: const Text(
+              'You have unsaved changes. Discard them and go back?',
+            ),
+            actions: [
+              TextButton(
+                // Close the dialog and return `false`
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
               ),
-        ) ??
-        false;
-    return discard;
+              TextButton(
+                // Close the dialog and return `true`
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text(
+                  'Discard',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+    );
+
+    // If somehow null, treat as cancel
+    return result ?? false;
   }
 
   @override
@@ -586,8 +593,8 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
               if (age < 8) {
                 return 'Age must be at least 8 years';
               }
-              if (age >= 80) {
-                return 'Age must be less than 80 years';
+              if (age >= 95) {
+                return 'Age must be less than 95 years';
               }
             } catch (_) {
               return 'Invalid date format';

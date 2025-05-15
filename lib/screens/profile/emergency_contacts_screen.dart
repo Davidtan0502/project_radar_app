@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:project_radar_app/services/emergency_contact_service.dart';
 import 'package:project_radar_app/widgets/add_contact_dialog.dart';
 import 'package:another_flushbar/flushbar.dart';
@@ -14,14 +17,35 @@ class EmergencyContactsScreen extends StatefulWidget {
 class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
   final EmergencyContactService _service = EmergencyContactService();
   List<Map<String, String>> _contacts = [];
+  late final Stream<User?> _authStream;
+  late final StreamSubscription<User?> _authSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadContacts();
+    // Reload contacts whenever auth state changes (login/logout)
+    _authStream = FirebaseAuth.instance.authStateChanges();
+    _authSubscription = _authStream.listen((user) {
+      if (user == null) {
+        setState(() => _contacts = []);
+      } else {
+        _loadContacts();
+      }
+    });
+    // Initial fetch if already signed in
+    if (FirebaseAuth.instance.currentUser != null) {
+      _loadContacts();
+    }
+  }
+
+  @override
+  void dispose() {
+    _authSubscription.cancel();
+    super.dispose();
   }
 
   Future<void> _loadContacts() async {
+    setState(() => _contacts = []); // clear stale data
     final data = await _service.loadContacts();
     setState(() => _contacts = data);
   }
@@ -66,32 +90,33 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
 
   void _removeContact(int index) async {
     final contact = _contacts[index];
-
-    final shouldDelete = await showDialog<bool>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Confirm Deletion'),
-            content: Text(
-              'Are you sure you want to delete ${contact['name']}?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text(
-                  'Delete',
-                  style: TextStyle(color: Colors.red),
+    final shouldDelete =
+        await showDialog<bool>(
+          context: context,
+          builder:
+              (context) => AlertDialog(
+                title: const Text('Confirm Deletion'),
+                content: Text(
+                  'Are you sure you want to delete ${contact['name']}?',
                 ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text(
+                      'Delete',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-    );
+        ) ??
+        false;
 
-    if (shouldDelete == true) {
+    if (shouldDelete) {
       setState(() => _contacts.removeAt(index));
       _saveContacts();
       _showTopSnackbar(
