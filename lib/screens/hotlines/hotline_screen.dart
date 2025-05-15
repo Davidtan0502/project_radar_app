@@ -18,11 +18,11 @@ class _HotlinesPageState extends State<HotlinesPage> {
   final List<Map<String, dynamic>> _hotlines = [
     {
       'name': 'Manila City Disaster Risk Reduction Management Office',
-      'number': '+63 950 700 3710',
+      'number': '+63 932 662 2322',
       'description':
           'Handles disaster preparedness, response, and mitigation in Manila.',
       'facebookUrl': 'https://www.facebook.com/sagipmanila',
-      'phoneUri': 'tel:0950 700 3710',
+      'phoneUri': 'tel:0932 662 2322',
       'color': Colors.blue,
     },
     {
