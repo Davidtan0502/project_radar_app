@@ -109,16 +109,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           _createRoute(const AboutUs()),
                         ),
                   ),
-                  SwitchListTile(
-                    title: const Text('Notifications'),
-                    value: _notificationsEnabled,
-                    activeColor: const Color(0xFF28588B),
-                    onChanged: (value) {
-                      setState(() {
-                        _notificationsEnabled = value;
-                      });
-                    },
-                  ),
+                  // SwitchListTile(
+                  //  title: const Text('Notifications'),
+                  //  value: _notificationsEnabled,
+                  // activeColor: const Color(0xFF28588B),
+                  // onChanged: (value) {
+                  //  setState(() {
+                  //    _notificationsEnabled = value;
+                  //  });
+                  // },
+                  // ),
                   SwitchListTile(
                     title: const Text('Dark Mode'),
                     value: _isDarkMode,
