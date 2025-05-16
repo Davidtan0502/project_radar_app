@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 
 class IncidentReportPage extends StatefulWidget {
   const IncidentReportPage({super.key});
@@ -30,6 +31,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
   bool _isSubmitting = false;
+  Timer? _addressTypingTimer;
 
   final CollectionReference _incidentsCollection = FirebaseFirestore.instance
       .collection('incidents');
@@ -56,6 +58,30 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     _animationController.forward();
     _loadUserInfo();
     _getCurrentLocation();
+
+    // Add listener to detect manual address entry
+    _addressController.addListener(() {
+      _addressTypingTimer?.cancel();
+      _addressTypingTimer = Timer(const Duration(milliseconds: 1000), () {
+        _updateLatLongFromAddress(_addressController.text);
+      });
+    });
+  }
+
+  Future<void> _updateLatLongFromAddress(String address) async {
+    if (address.trim().isEmpty) return;
+    try {
+      final locations = await locationFromAddress(address);
+      if (locations.isNotEmpty) {
+        final loc = locations.first;
+        setState(() {
+          _latitudeController.text = loc.latitude.toStringAsFixed(6);
+          _longitudeController.text = loc.longitude.toStringAsFixed(6);
+        });
+      }
+    } catch (e) {
+      // silently fail (don't show Snackbar here to avoid constant spam while typing)
+    }
   }
 
   Future<void> _loadUserInfo() async {
@@ -69,12 +95,10 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     if (!doc.exists) return;
     final data = doc.data()!;
     setState(() {
-      // Name
       final first = data['firstName'] as String? ?? '';
       final last = data['lastName'] as String? ?? '';
       _nameController.text = [first, last].where((s) => s.isNotEmpty).join(' ');
 
-      // Phone: convert +63XXXXXXXXXX to 09XXXXXXXXX
       String phone = data['phone'] as String? ?? '';
       if (phone.startsWith('+63') && phone.length == 13) {
         phone = '0${phone.substring(3)}';
@@ -156,6 +180,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     _otherIncidentTypeController.dispose();
     _latitudeController.dispose();
     _longitudeController.dispose();
+    _addressTypingTimer?.cancel();
     super.dispose();
   }
 
@@ -171,13 +196,11 @@ class _IncidentReportPageState extends State<IncidentReportPage>
       _incidentType = null;
       _isSubmitting = false;
     });
-    // Keep name & phone since loaded
   }
 
   Future<void> _submitForm() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isSubmitting = true);
-
     try {
       final incidentData = {
         'name': _nameController.text.trim(),
@@ -195,7 +218,6 @@ class _IncidentReportPageState extends State<IncidentReportPage>
         'longitude': double.tryParse(_longitudeController.text),
       };
       await _incidentsCollection.add(incidentData);
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Incident report submitted successfully!'),
