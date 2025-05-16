@@ -131,7 +131,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       Flushbar(
         message:
             'Verification email sent. Please check your inbox and verify your email to login.',
-        duration: const Duration(seconds: 4),
+        duration: const Duration(seconds: 8),
         margin: const EdgeInsets.all(8),
         borderRadius: BorderRadius.circular(8),
         backgroundColor: const Color.fromARGB(255, 25, 167, 0),
