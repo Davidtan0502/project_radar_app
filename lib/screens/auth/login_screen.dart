@@ -209,7 +209,7 @@ class _LoginScreenState extends State<LoginScreen>
           (context) => AlertDialog(
             title: const Text(
               'RADAR',
-              style: TextStyle(color: Color.fromARGB(255, 28, 217, 255)),
+              style: TextStyle(color: const Color(0xFF336699)),
             ),
             content: Text(message),
             actions: [

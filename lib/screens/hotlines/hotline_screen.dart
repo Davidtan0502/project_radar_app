@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:project_radar_app/screens/hotlines/fire_department.dart';
-import 'package:project_radar_app/screens/hotlines/health_department.dart';
 import 'package:project_radar_app/screens/hotlines/police_department.dart';
 
 class HotlinesPage extends StatefulWidget {
@@ -109,28 +108,11 @@ class _HotlinesPageState extends State<HotlinesPage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Search
-            TextField(
-              decoration: InputDecoration(
-                hintText: 'Search hotline...',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              onChanged: (t) => setState(() => _searchText = t),
-            ),
-            const SizedBox(height: 16),
-
             // Scrollable list of hotlines + department buttons
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
-                itemCount: filtered.length + 4,
+                itemCount: filtered.length + 2,
                 itemBuilder: (ctx, i) {
                   if (i < filtered.length) {
                     final h = filtered[i];
@@ -263,80 +245,65 @@ class _HotlinesPageState extends State<HotlinesPage> {
                       ),
                     );
                   } else if (i == filtered.length) {
-                    return const SizedBox(height: 16);
-                  } else if (i == filtered.length + 1) {
-                    return ElevatedButton.icon(
-                      icon: const Icon(Icons.local_fire_department),
-                      label: const Text(
-                        'Fire Department',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        foregroundColor: Colors.black,
-                        backgroundColor: Colors.redAccent,
-                        minimumSize: const Size.fromHeight(80),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed:
-                          () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const FireDepartmentPage(),
-                            ),
-                          ),
-                    );
-                  } else if (i == filtered.length + 2) {
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.local_hospital),
-                        label: const Text(
-                          'Health Department',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          foregroundColor: Colors.black,
-                          backgroundColor: Colors.green,
-                          minimumSize: const Size.fromHeight(80),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed:
-                            () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const HealthDepartmentPage(),
-                              ),
-                            ),
-                      ),
-                    );
+                    return const SizedBox(height: 15);
                   } else {
+                    // Fire + Police side by side square buttons
                     return Padding(
-                      padding: const EdgeInsets.only(top: 12, bottom: 16),
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.local_police),
-                        label: const Text(
-                          'Police Department',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          foregroundColor: Colors.black,
-                          backgroundColor: Colors.indigo,
-                          minimumSize: const Size.fromHeight(80),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed:
-                            () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const PoliceDepartmentPage(),
+                      padding: const EdgeInsets.only(top: 10, bottom: 16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.local_fire_department),
+                              label: const Text(
+                                'Fire',
+                                style: TextStyle(fontSize: 14),
                               ),
+                              style: ElevatedButton.styleFrom(
+                                foregroundColor: Colors.black,
+                                backgroundColor: Colors.redAccent,
+                                minimumSize: const Size(100, 100),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              onPressed:
+                                  () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (_) => const FireDepartmentPage(),
+                                    ),
+                                  ),
                             ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.local_police),
+                              label: const Text(
+                                'Police',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                foregroundColor: Colors.black,
+                                backgroundColor: Colors.indigo,
+                                minimumSize: const Size(100, 100),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              onPressed:
+                                  () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (_) => const PoliceDepartmentPage(),
+                                    ),
+                                  ),
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   }

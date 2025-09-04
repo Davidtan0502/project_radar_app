@@ -37,7 +37,7 @@ class TermsConditionScreen {
                   child: SingleChildScrollView(
                     child: Text(
                       'By registering, you agree to our Terms and Conditions, including the collection and use of your personal and location data to provide emergency services.\n\n'
-                      'You also agree to use the app responsibly and understand that it does not replace professional emergency responders.\n',
+                      'You also agree to use the application responsibly and understand that it does not replace professional emergency responders.\n',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.black87,

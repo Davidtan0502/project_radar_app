@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:project_radar_app/screens/profile/account_information.dart';
 import 'package:project_radar_app/screens/profile/emergency_contacts_screen.dart';
 import 'package:project_radar_app/screens/profile/help_and_support.dart';
-import 'package:project_radar_app/screens/profile/settings_screen.dart';
+import 'package:project_radar_app/screens/profile/settings&privacy_screen.dart';
 import 'package:project_radar_app/screens/auth/login_screen.dart';
 import 'package:project_radar_app/widgets/capitalize_names.dart';
 import 'package:shimmer/shimmer.dart';
@@ -301,7 +301,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   _buildOptionTile(
                     icon: Icons.settings,
-                    title: 'Settings',
+                    title: 'Settings & Privacy',
                     onTap:
                         () => Navigator.push(
                           context,

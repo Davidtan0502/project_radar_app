@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'feedback_page.dart';
 
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
@@ -11,7 +12,10 @@ class HelpSupportScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
-        title: const Text("Help & Support", style: TextStyle(color: Colors.white)),
+        title: const Text(
+          "Help & Support",
+          style: TextStyle(color: Colors.white),
+        ),
         centerTitle: true,
         elevation: 4,
         flexibleSpace: Container(
@@ -49,9 +53,12 @@ class HelpSupportScreen extends StatelessWidget {
             _buildCard(
               child: Column(
                 children: [
-                  _contactItem(Icons.email_outlined, "support@projectradar.com"),
+                  _contactItem(
+                    Icons.email_outlined,
+                    "radarconnects2025@gmail.com",
+                  ),
                   const Divider(height: 1),
-                  _contactItem(Icons.phone_outlined, "+1 800 123 4567"),
+                  _contactItem(Icons.phone_outlined, "+63 991-034-3976"),
                 ],
               ),
             ),
@@ -64,7 +71,10 @@ class HelpSupportScreen extends StatelessWidget {
               backgroundColor: themeColor,
               textColor: Colors.white,
               onPressed: () {
-                // Navigate to feedback
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FeedbackPage()),
+                );
               },
             ),
             const SizedBox(height: 12),
@@ -102,10 +112,7 @@ class HelpSupportScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       color: Colors.white,
       shadowColor: Colors.black26,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: child,
-      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
     );
   }
 
@@ -133,10 +140,7 @@ class HelpSupportScreen extends StatelessWidget {
   Widget _contactItem(IconData icon, String info) {
     return ListTile(
       leading: Icon(icon, color: Color(0xFFD32F2F)),
-      title: Text(
-        info,
-        style: const TextStyle(fontSize: 15),
-      ),
+      title: Text(info, style: const TextStyle(fontSize: 15)),
       dense: true,
     );
   }
@@ -155,14 +159,20 @@ class HelpSupportScreen extends StatelessWidget {
         icon: Icon(icon, color: textColor),
         label: Text(
           label,
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: textColor),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+          ),
         ),
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           backgroundColor: backgroundColor,
           side: border,
           padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       ),
     );

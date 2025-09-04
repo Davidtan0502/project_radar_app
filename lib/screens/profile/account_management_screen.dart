@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/screens/profile/edit_account_info.dart';
 import 'package:project_radar_app/screens/profile/change_password.dart';
-import 'package:project_radar_app/screens/profile/settings_screen.dart';
+import 'package:project_radar_app/screens/profile/settings&privacy_screen.dart';
 import 'package:project_radar_app/services/navigation.dart';
 
 class AccountManagementScreen extends StatelessWidget {
@@ -28,16 +30,60 @@ class AccountManagementScreen extends StatelessWidget {
                 ),
               ),
               ElevatedButton(
-                onPressed: () {
-                  // First close the dialog
-                  Navigator.of(dialogContext).pop();
-                  // Then proceed
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Account deletion initiated."),
-                    ),
-                  );
-                  // TODO: Add delete logic
+                onPressed: () async {
+                  try {
+                    // Close the dialog first
+                    Navigator.of(dialogContext).pop();
+
+                    // Get the current user
+                    final user = FirebaseAuth.instance.currentUser;
+
+                    if (user != null) {
+                      // 🔹 Step 1: Delete user data from Firestore
+                      await FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(user.uid)
+                          .delete();
+
+                      // 🔹 Step 2: Delete user account from Firebase Auth
+                      await user.delete();
+
+                      // 🔹 Step 3: Show success message
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            "Account successfully deleted. You cannot log in again.",
+                          ),
+                        ),
+                      );
+
+                      // 🔹 Step 4: Redirect to login page (user is now signed out automatically)
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        '/login',
+                        (route) => false, // clear all previous routes
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("No user found.")),
+                      );
+                    }
+                  } catch (e) {
+                    // 🔹 Handle re-authentication required error
+                    if (e is FirebaseAuthException &&
+                        e.code == 'requires-recent-login') {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            "Please re-login before deleting your account.",
+                          ),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Error deleting account: $e")),
+                      );
+                    }
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
@@ -86,7 +132,7 @@ class AccountManagementScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 const Text(
-                  'Account',
+                  'Settings',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 22,

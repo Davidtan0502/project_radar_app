@@ -67,7 +67,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(width: 10),
                 const Text(
-                  'Settings',
+                  'Settings & Privacy',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 26,
@@ -87,18 +87,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: ListView(
                 children: [
                   _buildOptionTile(
-                    icon: Icons.person,
-                    title: 'Account',
+                    icon: Icons.lock,
+                    title: 'Settings',
                     onTap:
                         () => Navigator.push(
                           context,
                           _createRoute(const AccountManagementScreen()),
-                        ),
-                  ),
-                  _buildOptionTile(
-                    icon: Icons.lock,
-                    title: 'Privacy & Security',
-                    onTap: () {}, // stub
+                        ), // stub
                   ),
                   _buildOptionTile(
                     icon: Icons.info_outline,
@@ -119,17 +114,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   //  });
                   // },
                   // ),
-                  SwitchListTile(
-                    title: const Text('Dark Mode'),
-                    value: _isDarkMode,
-                    activeColor: const Color(0xFF28588B),
-                    onChanged: (value) {
-                      setState(() {
-                        _isDarkMode = value;
-                      });
-                      // trigger theme change here if needed
-                    },
-                  ),
+                  // SwitchListTile(
+                  //   title: const Text('Dark Mode'),
+                  //   value: _isDarkMode,
+                  //   activeColor: const Color(0xFF28588B),
+                  //   onChanged: (value) {
+                  //     setState(() {
+                  //       _isDarkMode = value;
+                  //     });
+                  //     // trigger theme change here if needed
+                  //   },
+                  // ),
                   ListTile(
                     title: const Text('App Version'),
                     subtitle: Text(_appVersion),
