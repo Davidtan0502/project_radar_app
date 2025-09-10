@@ -257,31 +257,35 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _newPasswordController,
-                      obscureText: !_showNewPassword,
-                      decoration: _buildInputDecoration(
-                        'New Password',
-                        _showNewPassword,
-                        () => setState(
-                          () => _showNewPassword = !_showNewPassword,
-                        ),
-                        errorText: _newPasswordError,
+                   TextFormField(
+                    controller: _newPasswordController,
+                    obscureText: !_showNewPassword,
+                    decoration: _buildInputDecoration(
+                      'New Password',
+                      _showNewPassword,
+                      () => setState(
+                        () => _showNewPassword = !_showNewPassword,
                       ),
-                      validator: (value) {
-                        final val = value?.trim() ?? '';
-                        if (val.isEmpty) return 'Enter a new password';
-                        if (val.length < 6) {
-                          return 'Password must be at least 6 characters';
-                        }
-                        final regex = RegExp(r'^(?=.*[A-Za-z])(?=.*\d).{6,}$');
-                        if (!regex.hasMatch(val)) {
-                          return 'Password must contain letters and numbers';
-                        }
-                        if (_newPasswordError != null) return _newPasswordError;
-                        return null;
-                      },
+                      errorText: _newPasswordError,
                     ),
+                    validator: (value) {
+                      final val = value?.trim() ?? '';
+                      if (val.isEmpty) return 'Enter a new password';
+                      if (val.length < 6) {
+                        return 'Password must be at least 6 characters';
+                      }
+
+                      //At least one letter, one number, one special char
+                      final regex = RegExp(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}$');
+                      if (!regex.hasMatch(val)) {
+                        return 'Must include letters, numbers & special characters';
+                      }
+
+                      if (_newPasswordError != null) return _newPasswordError;
+                      return null;
+                    },
+                  ),
+
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _confirmPasswordController,

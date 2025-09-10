@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "com.example.project_radar_app"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -23,8 +23,8 @@ android {
 
     defaultConfig {
         applicationId = "com.example.project_radar_app"
-        minSdk = 21
-        targetSdk = 33
+        minSdk = flutter.minSdkVersion
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
     }

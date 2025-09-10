@@ -38,7 +38,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 5),
+      duration: const Duration(seconds: 3),
     )..repeat(reverse: true);
 
     _colorAnimation = ColorTween(
@@ -353,35 +353,37 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       TextFormField(
                                         controller: _passwordController,
                                         obscureText: !_isPasswordVisible,
-                                        validator:
-                                            (val) =>
-                                                val == null || val.length < 6
-                                                    ? 'At least 6 characters'
-                                                    : null,
+                                        validator: (val) {
+                                          if (val == null || val.isEmpty) {
+                                            return 'Password is required';
+                                          }
+                                          if (val.length < 6) {
+                                            return 'At least 6 characters';
+                                          }
+                                          // Must contain letters, numbers, and special characters
+                                          final regex = RegExp(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$');
+                                          if (!regex.hasMatch(val)) {
+                                            return 'Include letters, numbers, and special characters';
+                                          }
+                                          return null;
+                                        },
                                         decoration: InputDecoration(
                                           labelText: 'Password',
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
+                                            borderRadius: BorderRadius.circular(12),
                                           ),
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                vertical: 14,
-                                                horizontal: 16,
-                                              ),
+                                          contentPadding: const EdgeInsets.symmetric(
+                                            vertical: 14,
+                                            horizontal: 16,
+                                          ),
                                           prefixIcon: const Icon(Icons.lock),
                                           suffixIcon: IconButton(
                                             icon: Icon(
-                                              _isPasswordVisible
-                                                  ? Icons.visibility
-                                                  : Icons.visibility_off,
+                                              _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
                                             ),
-                                            onPressed:
-                                                () => setState(() {
-                                                  _isPasswordVisible =
-                                                      !_isPasswordVisible;
-                                                }),
+                                            onPressed: () => setState(() {
+                                              _isPasswordVisible = !_isPasswordVisible;
+                                            }),
                                           ),
                                         ),
                                       ),

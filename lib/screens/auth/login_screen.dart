@@ -107,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen>
   final String userDisabledMsg = 'This account has been disabled.';
   final String tooManyReqMsg = 'Too many attempts. Please try again later.';
 
-  Future<void> _handleLogin() async {
+    Future<void> _handleLogin() async {
     setState(() {
       _emailError = null;
       _passwordError = null;
@@ -120,29 +120,30 @@ class _LoginScreenState extends State<LoginScreen>
     try {
       await _auth.signInWithEmailAndPassword(email: email, password: password);
 
+      // reload user to get latest info
       await _auth.currentUser!.reload();
       final user = _auth.currentUser;
 
+      // block login if email not verified
       if (user == null || !user.emailVerified) {
-        await user?.sendEmailVerification();
-        await _auth.signOut();
+        await _auth.signOut(); // logout user
 
         setState(() {
           _isLoading = false;
           _showPasswordStep = false;
           _passwordController.clear();
-          _emailError = notVerifiedMsg;
+          _emailError = notVerifiedMsg; // <-- your custom message
         });
         _emailFocusNode.requestFocus();
         return;
       }
 
-      // 4) (Optional) mark verified in Firestore
+      // mark verified in Firestore (optional)
       await FirebaseFirestore.instance.collection('users').doc(user.uid).update(
         {'emailVerified': true},
       );
 
-      // 5) Go into the app
+      // Go into the app
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
@@ -156,17 +157,15 @@ class _LoginScreenState extends State<LoginScreen>
         case 'user-not-found':
         case 'user-disabled':
         case 'too-many-requests':
-          // existing email‐field cases…
           setState(() {
             _showPasswordStep = false;
             _passwordController.clear();
-            _emailError =
-                {
-                  'invalid-email': invalidEmailMsg,
-                  'user-not-found': notFoundMsg,
-                  'user-disabled': userDisabledMsg,
-                  'too-many-requests': tooManyReqMsg,
-                }[e.code];
+            _emailError = {
+              'invalid-email': invalidEmailMsg,
+              'user-not-found': notFoundMsg,
+              'user-disabled': userDisabledMsg,
+              'too-many-requests': tooManyReqMsg,
+            }[e.code];
           });
           _emailFocusNode.requestFocus();
           break;
@@ -187,6 +186,7 @@ class _LoginScreenState extends State<LoginScreen>
       _showErrorDialog('An unexpected error occurred. Please try again.');
     }
   }
+
 
   Future<void> _handlePasswordReset() async {
     try {

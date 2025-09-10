@@ -12,94 +12,96 @@ class AccountManagementScreen extends StatelessWidget {
   void _confirmDeleteAccount(BuildContext context) {
     showDialog(
       context: context,
-      builder:
-          (dialogContext) => AlertDialog(
-            title: const Text("Delete Account"),
-            content: const Text(
-              "Are you sure you want to delete your account? This action cannot be undone.",
+      builder: (dialogContext) => AlertDialog(
+        title: const Text("Delete Account"),
+        content: const Text(
+          "Are you sure you want to delete your account? This action cannot be undone.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop(); // close dialog
+            },
+            child: const Text(
+              "Cancel",
+              style: TextStyle(color: Color.fromARGB(255, 4, 4, 4)),
             ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  // Use the dialog's context to close the dialog
-                  Navigator.of(dialogContext).pop();
-                },
-                child: const Text(
-                  "Cancel",
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  try {
-                    // Close the dialog first
-                    Navigator.of(dialogContext).pop();
-
-                    // Get the current user
-                    final user = FirebaseAuth.instance.currentUser;
-
-                    if (user != null) {
-                      // 🔹 Step 1: Delete user data from Firestore
-                      await FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(user.uid)
-                          .delete();
-
-                      // 🔹 Step 2: Delete user account from Firebase Auth
-                      await user.delete();
-
-                      // 🔹 Step 3: Show success message
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            "Account successfully deleted. You cannot log in again.",
-                          ),
-                        ),
-                      );
-
-                      // 🔹 Step 4: Redirect to login page (user is now signed out automatically)
-                      Navigator.of(context).pushNamedAndRemoveUntil(
-                        '/login',
-                        (route) => false, // clear all previous routes
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("No user found.")),
-                      );
-                    }
-                  } catch (e) {
-                    // 🔹 Handle re-authentication required error
-                    if (e is FirebaseAuthException &&
-                        e.code == 'requires-recent-login') {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            "Please re-login before deleting your account.",
-                          ),
-                        ),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Error deleting account: $e")),
-                      );
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text(
-                  "Delete",
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
           ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                Navigator.of(dialogContext).pop(); // close dialog
+
+                final user = FirebaseAuth.instance.currentUser;
+
+                if (user != null) {
+                  // 🔹 Step 1: Delete Firestore user data
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .delete();
+
+                  // 🔹 Step 2: Delete Auth account
+                  await user.delete();
+
+                  // 🔹 Step 3: Ensure sign out
+                  await FirebaseAuth.instance.signOut();
+
+                  // 🔹 Step 4: Redirect to login page
+                  if (context.mounted) {
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      '/login',
+                      (route) => false,
+                    );
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("No user found.")),
+                  );
+                }
+              } catch (e) {
+                if (e is FirebaseAuthException &&
+                    e.code == 'requires-recent-login') {
+                  // 🔹 Session is too old → force logout + redirect
+                  await FirebaseAuth.instance.signOut();
+
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          "Session expired. Please log in again to delete your account.",
+                        ),
+                      ),
+                    );
+
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      '/login',
+                      (route) => false,
+                    );
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Error deleting account: $e")),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              "Delete",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {

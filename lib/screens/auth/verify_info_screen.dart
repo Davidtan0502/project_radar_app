@@ -40,6 +40,15 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen> {
     Navigator.pop(context, true);
   }
 
+  /// Capitalize each word in a multi-word string
+  String _capitalizeEachWord(String value) {
+    return value
+        .split(' ')
+        .where((word) => word.isNotEmpty)
+        .map((word) => word[0].toUpperCase() + word.substring(1).toLowerCase())
+        .join(' ');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -67,9 +76,9 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildInfoTile('Last Name', widget.lastName),
-                _buildInfoTile('First Name', widget.firstName),
-                _buildInfoTile('Middle Name', widget.middleName),
+                _buildInfoTile('Last Name', _capitalizeEachWord(widget.lastName)),
+                _buildInfoTile('First Name', _capitalizeEachWord(widget.firstName)),
+                _buildInfoTile('Middle Name', _capitalizeEachWord(widget.middleName)),
                 _buildInfoTile('Email', widget.email),
                 _buildInfoTile('Phone', '+63${widget.phone}'),
                 _buildInfoTile('Password', '*' * widget.password.length),
@@ -106,23 +115,22 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child:
-                            _isLoading
-                                ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                                : const Text(
-                                  'Confirm',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.white,
-                                  ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
                                 ),
+                              )
+                            : const Text(
+                                'Confirm',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ),
                   ],

@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:project_radar_app/services/emergency_contact_service.dart';
@@ -57,14 +56,13 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
   void _addContact() {
     showDialog(
       context: context,
-      builder:
-          (_) => AddContactDialog(
-            onSave: (name, phone) {
-              setState(() => _contacts.add({'name': name, 'phone': phone}));
-              _saveContacts();
-              _showTopSnackbar('$name contact has been added.', Colors.green);
-            },
-          ),
+      builder: (_) => AddContactDialog(
+        onSave: (name, phone) {
+          setState(() => _contacts.add({'name': name, 'phone': phone}));
+          _saveContacts();
+          _showTopSnackbar('$name contact has been added.', Colors.green);
+        },
+      ),
     );
   }
 
@@ -72,47 +70,44 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
     final contact = _contacts[index];
     showDialog(
       context: context,
-      builder:
-          (_) => AddContactDialog(
-            initialName: contact['name'],
-            initialPhone: contact['phone'],
-            onSave: (name, phone) {
-              setState(() => _contacts[index] = {'name': name, 'phone': phone});
-              _saveContacts();
-              _showTopSnackbar(
-                '$name contact has been updated.',
-                Colors.orange,
-              );
-            },
-          ),
+      builder: (_) => AddContactDialog(
+        initialName: contact['name'],
+        initialPhone: contact['phone'],
+        onSave: (name, phone) {
+          setState(() => _contacts[index] = {'name': name, 'phone': phone});
+          _saveContacts();
+          _showTopSnackbar(
+            '$name contact has been updated.',
+            Colors.orange,
+          );
+        },
+      ),
     );
   }
 
   void _removeContact(int index) async {
     final contact = _contacts[index];
-    final shouldDelete =
-        await showDialog<bool>(
+    final shouldDelete = await showDialog<bool>(
           context: context,
-          builder:
-              (context) => AlertDialog(
-                title: const Text('Confirm Deletion'),
-                content: Text(
-                  'Are you sure you want to delete ${contact['name']}?',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: const Text(
-                      'Delete',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                  ),
-                ],
+          builder: (context) => AlertDialog(
+            title: const Text('Confirm Deletion'),
+            content: Text(
+              'Are you sure you want to delete ${contact['name']}?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
               ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
         ) ??
         false;
 
@@ -152,41 +147,52 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
         children: [
           _contacts.isEmpty
               ? const Center(
-                child: Text(
-                  'No emergency contacts added yet.',
-                  style: TextStyle(fontSize: 16),
+                  child: Text(
+                    'No emergency contacts added yet.',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                )
+              : ReorderableListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _contacts.length,
+                  onReorder: (oldIndex, newIndex) async {
+                    setState(() {
+                      if (newIndex > oldIndex) newIndex -= 1;
+                      final item = _contacts.removeAt(oldIndex);
+                      _contacts.insert(newIndex, item);
+                    });
+
+                    // 🔹 Save updated positions to Firestore
+                    await _saveContacts();
+                  },
+                  itemBuilder: (ctx, i) {
+                    final c = _contacts[i];
+                    return ListTile(
+                      key: ValueKey(c['id'] ?? c['phone']), // key for reorder
+                      onTap: () => _editContact(i),
+                      leading:
+                          const Icon(Icons.person, color: Color(0xFF1565C0)),
+                      title: Text(
+                        c['name']!,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      subtitle: Text(
+                        c['phone']!,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black54,
+                        ),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => _removeContact(i),
+                      ),
+                    );
+                  },
                 ),
-              )
-              : ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: _contacts.length,
-                separatorBuilder: (_, __) => const Divider(),
-                itemBuilder: (ctx, i) {
-                  final c = _contacts[i];
-                  return ListTile(
-                    onTap: () => _editContact(i),
-                    leading: const Icon(Icons.person, color: Color(0xFF1565C0)),
-                    title: Text(
-                      c['name']!,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    subtitle: Text(
-                      c['phone']!,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _removeContact(i),
-                    ),
-                  );
-                },
-              ),
           Positioned(
             bottom: 20,
             right: 16,

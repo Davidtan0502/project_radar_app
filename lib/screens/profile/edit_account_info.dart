@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:another_flushbar/flushbar.dart';
 import 'package:project_radar_app/screens/profile/account_management_screen.dart';
 import 'package:project_radar_app/services/navigation.dart';
 
@@ -41,6 +42,49 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     super.initState();
     _initializeFormListeners();
     _loadUserData();
+
+    _bloodTypeController.addListener(() {
+      final input = _bloodTypeController.text.toUpperCase(); // convert to uppercase
+      final validTypes = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+
+      // Only update if input is one of the valid types or a valid prefix
+      if (input.isEmpty || validTypes.any((type) => type.startsWith(input))) {
+        if (_bloodTypeController.text != input) {
+          _bloodTypeController.value = _bloodTypeController.value.copyWith(
+            text: input,
+            selection: TextSelection.fromPosition(
+              TextPosition(offset: input.length),
+            ),
+          );
+        }
+      }
+    });
+
+        // Auto-space for Height
+    _heightController.addListener(() {
+      String text = _heightController.text.trimRight();
+      if (text.isNotEmpty && text.toLowerCase().endsWith('cm')) {
+        // Remove any spaces before 'cm' and add exactly one
+        text = '${text.substring(0, text.length - 2).trim()} cm';
+        _heightController.text = text;
+        _heightController.selection = TextSelection.fromPosition(
+          TextPosition(offset: text.length),
+        );
+      }
+    });
+
+    // Auto-space for Weight
+    _weightController.addListener(() {
+      String text = _weightController.text.trimRight();
+      if (text.isNotEmpty && text.toLowerCase().endsWith('kg')) {
+        // Remove any spaces before 'kg' and add exactly one
+        text = '${text.substring(0, text.length - 2).trim()} kg';
+        _weightController.text = text;
+        _weightController.selection = TextSelection.fromPosition(
+          TextPosition(offset: text.length),
+        );
+      }
+    });
   }
 
   Future<void> _loadUserData() async {
@@ -54,11 +98,11 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     if (!doc.exists) return;
     final data = doc.data()!;
     setState(() {
-      _firstNameController.text = data['firstName'] ?? '';
-      _middleNameController.text = data['middleName'] ?? '';
-      _lastNameController.text = data['lastName'] ?? '';
+      _firstNameController.text = _capitalizeWords(data['firstName'] ?? '');
+  _middleNameController.text = _capitalizeWords(data['middleName'] ?? '');
+  _lastNameController.text = _capitalizeWords(data['lastName'] ?? '');
       _emailController.text = data['email'] ?? '';
-      _phoneController.text = data['phone'] ?? '';
+      _phoneController.text = _formatPhone(data['phone'] ?? '');
       _dobController.text = data['dob'] ?? '';
       _addressController.text = data['address'] ?? '';
       _bloodTypeController.text = data['bloodType'] ?? '';
@@ -181,12 +225,28 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     }
   }
 
+    String _capitalizeWords(String text) {
+    return text.split(' ').map((word) {
+      if (word.isEmpty) return '';
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
+  String _formatPhone(String phone) {
+    if (phone.startsWith('+63')) {
+      return '0${phone.substring(3)}';
+    }
+    return phone;
+  }
+
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate() || _isSaving) return;
     setState(() => _isSaving = true);
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
+
       String? profileUrl;
       if (_removeProfileImage) {
         try {
@@ -200,13 +260,13 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
           'profile_images',
         );
       }
+
       String? idUrl;
       if (_idImage != null) {
         idUrl = await _uploadImageToStorage(_idImage!, 'id_uploads');
       }
-      final docRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid);
+
+      final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
       await docRef.set({
         'firstName': _firstNameController.text.trim(),
         'middleName': _middleNameController.text.trim(),
@@ -223,15 +283,31 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
         'isVerified': true,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile saved successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+
+    // Top notification
+    if (!mounted) return;
+    await Flushbar(
+      message: 'Profile saved successfully!',
+      backgroundColor: const Color.fromARGB(255, 25, 167, 0),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      borderRadius: BorderRadius.circular(12),
+      flushbarPosition: FlushbarPosition.TOP,
+      icon: const Icon(
+        Icons.check_circle,
+        color: Colors.white,
+      ),
+      messageColor: const Color.fromARGB(255, 255, 255, 255),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      animationDuration: const Duration(milliseconds: 500),
+      duration: const Duration(seconds: 3),
+    ).show(context);
+
+    if (!mounted) return;
       setState(() => _isFormDirty = false);
+
+      // Pop after notification disappears
       Navigator.pop(context, true);
+
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -389,11 +465,12 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
           hint: 'Felix',
         ),
         _buildEditableField('Last Name', _lastNameController, hint: 'Doe'),
-        _buildEditableField(
+       _buildEditableField(
           'Email',
           _emailController,
           hint: 'you@example.com',
           keyboardType: TextInputType.emailAddress,
+          isReadOnly: true, // added to prevent editing
         ),
         _buildEditableField(
           'Phone Number',
@@ -416,7 +493,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('ID Upload'),
+        _buildSectionTitle('ID Upload (optional)'),
         GestureDetector(
           onTap: () => _pickImage(ImageSource.gallery, false),
           child: Container(
@@ -451,7 +528,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('Health Information'),
+        _buildSectionTitle('Health Information (optional)'),
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: TextFormField(
@@ -466,6 +543,15 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
                 borderSide: BorderSide.none,
               ),
             ),
+            validator: (value) {
+              if (value != null && value.isNotEmpty) {
+                final validTypes = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+                if (!validTypes.contains(value.toUpperCase())) {
+                  return 'Invalid blood type';
+                }
+              }
+              return null; // allow blank
+            },
           ),
         ),
         Padding(
@@ -482,6 +568,14 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
                 borderSide: BorderSide.none,
               ),
             ),
+            validator: (value) {
+              if (value != null && value.isNotEmpty) {
+                if (!value.toLowerCase().endsWith('cm')) {
+                  return 'Height must end with cm';
+                }
+              }
+              return null; // allow blank
+            },
           ),
         ),
         Padding(
@@ -498,6 +592,14 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
                 borderSide: BorderSide.none,
               ),
             ),
+            validator: (value) {
+              if (value != null && value.isNotEmpty) {
+                if (!value.toLowerCase().endsWith('kg')) {
+                  return 'Weight must end with kg';
+                }
+              }
+              return null; // allow blank
+            },
           ),
         ),
       ],
@@ -538,44 +640,44 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   }
 
   Widget _buildEditableField(
-    String label,
-    TextEditingController controller, {
-    String? hint,
-    TextInputType keyboardType = TextInputType.text,
-    bool isDateField = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextFormField(
-        controller: controller,
-        keyboardType: keyboardType,
-        readOnly: isDateField,
-        onTap:
-            isDateField
-                ? () async {
-                  FocusScope.of(context).requestFocus(FocusNode());
-                  await _selectDate(context);
-                }
-                : null,
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hint,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 14,
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide.none,
-          ),
-          suffixIcon: isDateField ? const Icon(Icons.calendar_today) : null,
+  String label,
+  TextEditingController controller, {
+  String? hint,
+  TextInputType keyboardType = TextInputType.text,
+  bool isDateField = false,
+  bool isReadOnly = false, // new
+}) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      readOnly: isDateField || isReadOnly,
+      onTap: isDateField
+          ? () async {
+              FocusScope.of(context).requestFocus(FocusNode());
+              await _selectDate(context);
+            }
+          : null,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
         ),
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Please enter $label';
-          }
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        suffixIcon: isDateField ? const Icon(Icons.calendar_today) : null,
+      ),
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter $label';
+        }
           if (isDateField) {
             try {
               final parts = value.split('/');
