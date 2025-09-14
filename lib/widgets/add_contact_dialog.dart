@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class AddContactDialog extends StatefulWidget {
   final void Function(String name, String phone) onSave;
@@ -25,14 +26,22 @@ class _AddContactDialogState extends State<AddContactDialog> {
   void initState() {
     super.initState();
     _name = widget.initialName ?? '';
-    _phone = widget.initialPhone ?? '';
+    // Always strip +63 for editing, keep only the digits after
+    if (widget.initialPhone != null &&
+        widget.initialPhone!.startsWith('+63')) {
+      _phone = widget.initialPhone!.substring(3);
+    } else {
+      _phone = widget.initialPhone ?? '';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(
-        widget.initialName == null ? 'Add Emergency Contact' : 'Edit Emergency Contact',
+        widget.initialName == null
+            ? 'Add Emergency Contact'
+            : 'Edit Emergency Contact',
         style: const TextStyle(color: Color(0xFF1565C0)),
       ),
       content: Form(
@@ -44,17 +53,32 @@ class _AddContactDialogState extends State<AddContactDialog> {
               initialValue: _name,
               decoration: const InputDecoration(labelText: 'Name'),
               onSaved: (value) => _name = value!.trim(),
-              validator: (value) => value!.trim().isEmpty ? 'Enter a name' : null,
+              validator: (value) =>
+                  value!.trim().isEmpty ? 'Enter a name' : null,
             ),
             TextFormField(
-              initialValue: _phone,
-              decoration: const InputDecoration(labelText: 'Phone'),
+              decoration: const InputDecoration(
+                labelText: 'Phone',
+                prefixText: '+63 ',
+              ),
               keyboardType: TextInputType.phone,
-              onSaved: (value) => _phone = value!.trim(),
+              initialValue: widget.initialPhone != null
+                  ? widget.initialPhone!.replaceFirst('+63', '')
+                  : '',
+              onSaved: (value) => _phone = '+63${value!.trim()}',
               validator: (value) {
-                if (value!.trim().isEmpty) return 'Enter a phone number';
-                final phonePattern = RegExp(r'^\d{10,11}$');
-                return phonePattern.hasMatch(value.trim()) ? null : 'Invalid phone number';
+                final digits = value!.trim();
+                if (digits.isEmpty) return 'Enter a phone number';
+                if (!digits.startsWith('9')) {
+                  return 'Number must start with 9';
+                }
+                if (digits.length != 10) {
+                  return 'Phone number must be 10 digits';
+                }
+                if (!RegExp(r'^[0-9]+$').hasMatch(digits)) {
+                  return 'Invalid characters in phone';
+                }
+                return null;
               },
             ),
           ],
@@ -63,7 +87,10 @@ class _AddContactDialogState extends State<AddContactDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: Color(0xFF1565C0))),
+          child: const Text(
+            'Cancel',
+            style: TextStyle(color: Color(0xFF1565C0)),
+          ),
         ),
         ElevatedButton(
           onPressed: () {
@@ -76,9 +103,14 @@ class _AddContactDialogState extends State<AddContactDialog> {
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF1565C0),
             padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
-          child: const Text('Save', style: TextStyle(fontSize: 16, color: Colors.white)),
+          child: const Text(
+            'Save',
+            style: TextStyle(fontSize: 16, color: Colors.white),
+          ),
         ),
       ],
     );

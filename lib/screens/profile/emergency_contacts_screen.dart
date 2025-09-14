@@ -22,7 +22,6 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
   @override
   void initState() {
     super.initState();
-    // Reload contacts whenever auth state changes (login/logout)
     _authStream = FirebaseAuth.instance.authStateChanges();
     _authSubscription = _authStream.listen((user) {
       if (user == null) {
@@ -31,7 +30,6 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
         _loadContacts();
       }
     });
-    // Initial fetch if already signed in
     if (FirebaseAuth.instance.currentUser != null) {
       _loadContacts();
     }
@@ -44,7 +42,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
   }
 
   Future<void> _loadContacts() async {
-    setState(() => _contacts = []); // clear stale data
+    setState(() => _contacts = []);
     final data = await _service.loadContacts();
     setState(() => _contacts = data);
   }
@@ -58,7 +56,28 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       context: context,
       builder: (_) => AddContactDialog(
         onSave: (name, phone) {
-          setState(() => _contacts.add({'name': name, 'phone': phone}));
+          final normalized = phone.replaceAll(' ', ''); // +639XXXXXXXXX
+          if (!RegExp(r'^\+639\d{9}$').hasMatch(normalized)) {
+            _showTopSnackbar(
+              'Enter a valid PH number (e.g. +639123456789)',
+              Colors.red,
+            );
+            return;
+          }
+
+          final display = '0${normalized.substring(3)}'; // 09XXXXXXXXX
+
+          // Prevent duplicates
+          final exists = _contacts.any((c) => c['phone'] == display);
+          if (exists) {
+            _showTopSnackbar(
+              'This phone number is already added.',
+              Colors.red,
+            );
+            return;
+          }
+
+          setState(() => _contacts.add({'name': name, 'phone': display}));
           _saveContacts();
           _showTopSnackbar('$name contact has been added.', Colors.green);
         },
@@ -72,9 +91,32 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       context: context,
       builder: (_) => AddContactDialog(
         initialName: contact['name'],
-        initialPhone: contact['phone'],
+        initialPhone: '+63${contact['phone']!.substring(1)}', // back to +63
         onSave: (name, phone) {
-          setState(() => _contacts[index] = {'name': name, 'phone': phone});
+          final normalized = phone.replaceAll(' ', ''); // +639XXXXXXXXX
+          if (!RegExp(r'^\+639\d{9}$').hasMatch(normalized)) {
+            _showTopSnackbar(
+              'Enter a valid PH number (e.g. +639123456789)',
+              Colors.red,
+            );
+            return;
+          }
+
+          final display = '0${normalized.substring(3)}'; // 09XXXXXXXXX
+
+          // Prevent duplicates except current contact
+          final exists = _contacts.any(
+            (c) => c['phone'] == display && c != contact,
+          );
+          if (exists) {
+            _showTopSnackbar(
+              'This phone number is already added.',
+              Colors.red,
+            );
+            return;
+          }
+
+          setState(() => _contacts[index] = {'name': name, 'phone': display});
           _saveContacts();
           _showTopSnackbar(
             '$name contact has been updated.',
@@ -161,34 +203,45 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                       final item = _contacts.removeAt(oldIndex);
                       _contacts.insert(newIndex, item);
                     });
-
-                    // 🔹 Save updated positions to Firestore
                     await _saveContacts();
                   },
                   itemBuilder: (ctx, i) {
                     final c = _contacts[i];
-                    return ListTile(
-                      key: ValueKey(c['id'] ?? c['phone']), // key for reorder
-                      onTap: () => _editContact(i),
-                      leading:
-                          const Icon(Icons.person, color: Color(0xFF1565C0)),
-                      title: Text(
-                        c['name']!,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.black87,
-                        ),
+                    return Card(
+                      key: ValueKey(c['id'] ?? c['phone']),
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      subtitle: Text(
-                        c['phone']!,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.black54,
+                      child: ListTile(
+                        onTap: () => _editContact(i),
+                        leading: const Icon(Icons.person, color: Color(0xFF1565C0)),
+                        title: Text(
+                          c['name']!,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _removeContact(i),
+                        subtitle: Text(
+                          c['phone']!,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.drag_handle, color: Colors.grey), // Drag hint
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _removeContact(i),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },

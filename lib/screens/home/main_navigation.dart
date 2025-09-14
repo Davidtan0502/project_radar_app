@@ -15,14 +15,25 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
   int _previousIndex = 0;
+
   final List<GlobalKey<NavigatorState>> _navigatorKeys =
       List.generate(5, (_) => GlobalKey<NavigatorState>());
 
+  // 🔹 Unique keys for all tabs to allow refresh on re-tap only
+  final List<Key> _tabKeys = List.generate(5, (_) => UniqueKey());
+
   void _onTabTapped(int index) {
-    if (index != _currentIndex) {
+    if (index == _currentIndex) {
+      // 🔹 Re-tap = silently refresh
+      setState(() {
+        _tabKeys[index] = UniqueKey(); // force rebuild
+      });
+    } else {
+      // 🔹 Switch to another tab = just switch, keep previous state
       setState(() {
         _previousIndex = _currentIndex;
         _currentIndex = index;
+        // no rebuild, state stays intact
       });
     }
   }
@@ -44,17 +55,17 @@ class _MainNavigationState extends State<MainNavigation> {
 
   List<Widget> _buildScreens() {
     return [
-      _buildNavigator(0, const HomeScreen()),
-      _buildNavigator(1, const MapScreen()),
-      _buildNavigator(2, const AlertScreen()),
-      _buildNavigator(3, const HotlinesPage()),
-      _buildNavigator(4, const ProfileScreen()),
+      _buildNavigator(0, const HomeScreen(), key: _tabKeys[0]),
+      _buildNavigator(1, const MapScreen(), key: _tabKeys[1]),
+      _buildNavigator(2, const AlertScreen(), key: _tabKeys[2]),
+      _buildNavigator(3, const HotlinesPage(), key: _tabKeys[3]),
+      _buildNavigator(4, const ProfileScreen(), key: _tabKeys[4]),
     ];
   }
 
-  Widget _buildNavigator(int index, Widget screen) {
+  Widget _buildNavigator(int index, Widget screen, {Key? key}) {
     return Navigator(
-      key: _navigatorKeys[index],
+      key: key ?? _navigatorKeys[index],
       onGenerateRoute: (_) => PageRouteBuilder(
         pageBuilder: (_, __, ___) => screen,
         transitionsBuilder: (_, animation, __, child) {
@@ -64,8 +75,8 @@ class _MainNavigationState extends State<MainNavigation> {
             curve: curve,
           );
 
-          final beginOffset = index > _previousIndex 
-              ? const Offset(1.0, 0.0) 
+          final beginOffset = index > _previousIndex
+              ? const Offset(1.0, 0.0)
               : const Offset(-1.0, 0.0);
 
           return SlideTransition(
@@ -92,18 +103,20 @@ class _MainNavigationState extends State<MainNavigation> {
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
-        extendBody: true, // Important for removing white space
+        extendBody: true,
         body: Stack(
-          children: _buildScreens().asMap().entries.map((entry) {
-            return IgnorePointer(
-              ignoring: entry.key != _currentIndex,
-              child: AnimatedOpacity(
-                opacity: entry.key == _currentIndex ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: entry.value,
-              ),
-            );
-          }).toList(),
+          children: [
+            ..._buildScreens().asMap().entries.map((entry) {
+              return IgnorePointer(
+                ignoring: entry.key != _currentIndex,
+                child: AnimatedOpacity(
+                  opacity: entry.key == _currentIndex ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: entry.value,
+                ),
+              );
+            }).toList(),
+          ],
         ),
         bottomNavigationBar: _BottomNavigationBar(
           currentIndex: _currentIndex,
@@ -113,6 +126,8 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 }
+
+// ---------------- Bottom Navigation ----------------
 
 class _BottomNavigationBar extends StatelessWidget {
   final int currentIndex;

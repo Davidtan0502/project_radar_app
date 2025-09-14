@@ -7,6 +7,31 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:another_flushbar/flushbar.dart';
 import 'package:project_radar_app/screens/profile/account_management_screen.dart';
 import 'package:project_radar_app/services/navigation.dart';
+import 'package:flutter/services.dart'; // for TextInputFormatter
+
+class UnitFormatter extends TextInputFormatter {
+  final String unit;
+
+  UnitFormatter(this.unit);
+
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    final text = newValue.text;
+    final lower = text.toLowerCase();
+
+    if (lower.endsWith(unit)) {
+      // Ensure a single space before the unit
+      final core = text.substring(0, text.length - unit.length).trimRight();
+      final formatted = '$core $unit';
+      return TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    }
+    return newValue;
+  }
+}
 
 class EditAccountinfo extends StatefulWidget {
   const EditAccountinfo({super.key});
@@ -57,32 +82,6 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
             ),
           );
         }
-      }
-    });
-
-        // Auto-space for Height
-    _heightController.addListener(() {
-      String text = _heightController.text.trimRight();
-      if (text.isNotEmpty && text.toLowerCase().endsWith('cm')) {
-        // Remove any spaces before 'cm' and add exactly one
-        text = '${text.substring(0, text.length - 2).trim()} cm';
-        _heightController.text = text;
-        _heightController.selection = TextSelection.fromPosition(
-          TextPosition(offset: text.length),
-        );
-      }
-    });
-
-    // Auto-space for Weight
-    _weightController.addListener(() {
-      String text = _weightController.text.trimRight();
-      if (text.isNotEmpty && text.toLowerCase().endsWith('kg')) {
-        // Remove any spaces before 'kg' and add exactly one
-        text = '${text.substring(0, text.length - 2).trim()} kg';
-        _weightController.text = text;
-        _weightController.selection = TextSelection.fromPosition(
-          TextPosition(offset: text.length),
-        );
       }
     });
   }
@@ -568,13 +567,14 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
                 borderSide: BorderSide.none,
               ),
             ),
+            inputFormatters: [UnitFormatter("cm")], // Auto space cm
             validator: (value) {
               if (value != null && value.isNotEmpty) {
                 if (!value.toLowerCase().endsWith('cm')) {
                   return 'Height must end with cm';
                 }
               }
-              return null; // allow blank
+              return null;
             },
           ),
         ),
@@ -592,13 +592,14 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
                 borderSide: BorderSide.none,
               ),
             ),
+            inputFormatters: [UnitFormatter("kg")], // Auto space kg
             validator: (value) {
               if (value != null && value.isNotEmpty) {
                 if (!value.toLowerCase().endsWith('kg')) {
                   return 'Weight must end with kg';
                 }
               }
-              return null; // allow blank
+              return null;
             },
           ),
         ),

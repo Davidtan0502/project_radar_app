@@ -49,7 +49,7 @@ class EmergencyContactService {
       batch.set(docRef, {
         'name': contact['name'],
         'phone': contact['phone'],
-        'position': i, // ✅ enforce order
+        'position': i, //  enforce order
       });
     }
 
