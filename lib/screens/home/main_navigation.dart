@@ -19,17 +19,17 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<GlobalKey<NavigatorState>> _navigatorKeys =
       List.generate(5, (_) => GlobalKey<NavigatorState>());
 
-  // 🔹 Unique keys for all tabs to allow refresh on re-tap only
+  // Unique keys for all tabs to allow refresh on re-tap only
   final List<Key> _tabKeys = List.generate(5, (_) => UniqueKey());
 
   void _onTabTapped(int index) {
     if (index == _currentIndex) {
-      // 🔹 Re-tap = silently refresh
+      // Re-tap = silently refresh
       setState(() {
         _tabKeys[index] = UniqueKey(); // force rebuild
       });
     } else {
-      // 🔹 Switch to another tab = just switch, keep previous state
+      // Switch to another tab = just switch, keep previous state
       setState(() {
         _previousIndex = _currentIndex;
         _currentIndex = index;
