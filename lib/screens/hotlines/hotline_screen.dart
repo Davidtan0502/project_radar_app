@@ -55,12 +55,11 @@ class _HotlinesPageState extends State<HotlinesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered =
-        _hotlines.where((h) {
-          return h['name'].toString().toLowerCase().contains(
+    final filtered = _hotlines.where((h) {
+      return h['name'].toString().toLowerCase().contains(
             _searchText.toLowerCase(),
           );
-        }).toList();
+    }).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F8FC),
@@ -108,24 +107,38 @@ class _HotlinesPageState extends State<HotlinesPage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Scrollable list of hotlines + department buttons
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
-                itemCount: filtered.length + 2,
+                itemCount: filtered.length + 3, // +3 for 2 titles + dept buttons
                 itemBuilder: (ctx, i) {
-                  if (i < filtered.length) {
-                    final h = filtered[i];
+                  if (i == 0) {
+                    // Title for the emergency hotlines
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8.0),
+                      child: Text(
+                        "Emergency Hotlines",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    );
+                  } else if (i > 0 && i <= filtered.length) {
+                    final h = filtered[i - 1];
                     return Padding(
                       padding: EdgeInsets.only(
-                        bottom: i == filtered.length - 1 ? 16 : 16,
+                        bottom: i == filtered.length ? 16 : 16,
                       ),
                       child: Card(
+                        color: const Color.fromARGB(255, 245, 245, 245),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
                         elevation: 4,
-                        shadowColor: h['color'].withOpacity(0.3),
+                        shadowColor:
+                            const Color.fromARGB(255, 199, 199, 199).withOpacity(0.3),
                         child: ExpansionTile(
                           tilePadding: const EdgeInsets.symmetric(
                             horizontal: 16,
@@ -169,12 +182,9 @@ class _HotlinesPageState extends State<HotlinesPage> {
                                           final uri = Uri.parse(h['phoneUri']);
                                           if (!await launchUrl(
                                             uri,
-                                            mode:
-                                                LaunchMode.externalApplication,
+                                            mode: LaunchMode.externalApplication,
                                           )) {
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
+                                            ScaffoldMessenger.of(context).showSnackBar(
                                               const SnackBar(
                                                 content: Text(
                                                   'Could not open Phone App.',
@@ -195,25 +205,18 @@ class _HotlinesPageState extends State<HotlinesPage> {
                                           backgroundColor: h['color'],
                                           minimumSize: const Size(140, 40),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              30,
-                                            ),
+                                            borderRadius: BorderRadius.circular(30),
                                           ),
                                         ),
                                       ),
                                       OutlinedButton.icon(
                                         onPressed: () async {
-                                          final uri = Uri.parse(
-                                            h['facebookUrl'],
-                                          );
+                                          final uri = Uri.parse(h['facebookUrl']);
                                           if (!await launchUrl(
                                             uri,
-                                            mode:
-                                                LaunchMode.externalApplication,
+                                            mode: LaunchMode.externalApplication,
                                           )) {
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
+                                            ScaffoldMessenger.of(context).showSnackBar(
                                               const SnackBar(
                                                 content: Text(
                                                   'Could not open Facebook.',
@@ -229,9 +232,7 @@ class _HotlinesPageState extends State<HotlinesPage> {
                                           side: BorderSide(color: h['color']),
                                           minimumSize: const Size(140, 40),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              30,
-                                            ),
+                                            borderRadius: BorderRadius.circular(30),
                                           ),
                                         ),
                                       ),
@@ -244,10 +245,21 @@ class _HotlinesPageState extends State<HotlinesPage> {
                         ),
                       ),
                     );
-                  } else if (i == filtered.length) {
-                    return const SizedBox(height: 15);
+                  } else if (i == filtered.length + 1) {
+                    // Title for department buttons
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8.0),
+                      child: Text(
+                        "Department Hotlines",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    );
                   } else {
-                    // Fire + Police side by side square buttons
+                    // square buttons
                     return Padding(
                       padding: const EdgeInsets.only(top: 10, bottom: 16),
                       child: Row(
@@ -267,14 +279,12 @@ class _HotlinesPageState extends State<HotlinesPage> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-                              onPressed:
-                                  () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (_) => const FireDepartmentPage(),
-                                    ),
-                                  ),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const FireDepartmentPage(),
+                                ),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -293,14 +303,12 @@ class _HotlinesPageState extends State<HotlinesPage> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-                              onPressed:
-                                  () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (_) => const PoliceDepartmentPage(),
-                                    ),
-                                  ),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const PoliceDepartmentPage(),
+                                ),
+                              ),
                             ),
                           ),
                         ],

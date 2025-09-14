@@ -35,19 +35,19 @@ class AccountManagementScreen extends StatelessWidget {
                 final user = FirebaseAuth.instance.currentUser;
 
                 if (user != null) {
-                  // 🔹 Step 1: Delete Firestore user data
+                  //  Step 1: Delete Firestore user data
                   await FirebaseFirestore.instance
                       .collection('users')
                       .doc(user.uid)
                       .delete();
 
-                  // 🔹 Step 2: Delete Auth account
+                  //  Step 2: Delete Auth account
                   await user.delete();
 
-                  // 🔹 Step 3: Ensure sign out
+                  //  Step 3: Ensure sign out
                   await FirebaseAuth.instance.signOut();
 
-                  // 🔹 Step 4: Redirect to login page
+                  //  Step 4: Redirect to login page
                   if (context.mounted) {
                     Navigator.of(context).pushNamedAndRemoveUntil(
                       '/login',
@@ -62,7 +62,7 @@ class AccountManagementScreen extends StatelessWidget {
               } catch (e) {
                 if (e is FirebaseAuthException &&
                     e.code == 'requires-recent-login') {
-                  // 🔹 Session is too old → force logout + redirect
+                  //  Session is too old → force logout + redirect
                   await FirebaseAuth.instance.signOut();
 
                   if (context.mounted) {

@@ -28,67 +28,62 @@ class HelpSupportScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionTitle("📖 Frequently Asked Questions"),
-            const SizedBox(height: 12),
-            _buildCard(
-              child: _buildFAQItem(
-                "How does Project RADAR work?",
-                "Project RADAR sends real-time disaster alerts based on your location. It helps you stay safe during emergencies.",
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top content (FAQ + Contact)
+              _sectionTitle("📖 Frequently Asked Questions"),
+              const SizedBox(height: 12),
+              _buildCard(
+                child: _buildFAQItem(
+                  "How does Project RADAR work?",
+                  "Project RADAR sends real-time disaster alerts based on your location. It helps you stay safe during emergencies.",
+                ),
               ),
-            ),
-            _buildCard(
-              child: _buildFAQItem(
-                "Can I report incidents?",
-                "Yes, use the Alert button (⚠️) at the center of the bottom navigation bar to report an emergency quickly.",
+              _buildCard(
+                child: _buildFAQItem(
+                  "Can I report incidents?",
+                  "Yes, use the Alert button (⚠️) at the center of the bottom navigation bar to report an emergency quickly.",
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            _sectionTitle("📞 Contact Us"),
-            const SizedBox(height: 12),
-            _buildCard(
-              child: Column(
-                children: [
-                  _contactItem(
-                    Icons.email_outlined,
-                    "radarconnects2025@gmail.com",
-                  ),
-                  const Divider(height: 1),
-                  _contactItem(Icons.phone_outlined, "+63 991-034-3976"),
-                ],
+              const SizedBox(height: 24),
+              _sectionTitle("📞 Contact Us"),
+              const SizedBox(height: 12),
+              _buildCard(
+                child: Column(
+                  children: [
+                    _contactItem(
+                      Icons.email_outlined,
+                      "radarconnects2025@gmail.com",
+                    ),
+                    const Divider(height: 1),
+                    _contactItem(Icons.phone_outlined, "+63 991-034-3976"),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            _sectionTitle("🛠️ Support Tools"),
-            const SizedBox(height: 12),
-            _buildButton(
-              icon: Icons.feedback_outlined,
-              label: "Send Feedback",
-              backgroundColor: themeColor,
-              textColor: Colors.white,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const FeedbackPage()),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-            _buildButton(
-              icon: Icons.bug_report_outlined,
-              label: "Report an Issue",
-              backgroundColor: Colors.white,
-              textColor: themeColor,
-              border: BorderSide(color: themeColor),
-              onPressed: () {
-                // Navigate to report
-              },
-            ),
-          ],
+              const SizedBox(height: 24),
+              _sectionTitle("🛠️ Support Tools"),
+              const SizedBox(height: 4),
+
+              // Button is always below content, scrolls naturally
+              _buildButton(
+                icon: Icons.feedback_outlined,
+                label: "Share your Feedback",
+                backgroundColor: themeColor,
+                textColor: Colors.white,
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const FeedbackPage()),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
         ),
       ),
     );

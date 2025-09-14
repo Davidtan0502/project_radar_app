@@ -113,7 +113,9 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
                     context,
                     capitalizeName(fullName),
                     userData['email'],
-                    userData['phone'],
+                    userData['phone'] != null && userData['phone'].toString().startsWith('+63')
+                    ? userData['phone'].toString().replaceFirst('+63', '0')
+                    : userData['phone'],
                     userData['dob'],
                     userData['address'],
                     userData['bloodType'],
