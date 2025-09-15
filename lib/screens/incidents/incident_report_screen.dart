@@ -4,6 +4,9 @@ import 'package:geocoding/geocoding.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class IncidentReportPage extends StatefulWidget {
   const IncidentReportPage({super.key});
@@ -36,6 +39,46 @@ class _IncidentReportPageState extends State<IncidentReportPage>
 
   final CollectionReference _incidentsCollection = 
       FirebaseFirestore.instance.collection('incidents');
+  List<File> _selectedImages = [];
+
+  // Image picker function
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickMultiImage(imageQuality: 70);
+    if (picked.isNotEmpty) {
+      setState(() {
+        _selectedImages = picked.map((x) => File(x.path)).toList();
+      });
+    }
+  }
+
+  // Remove image function
+  void _removeImage(int index) {
+    setState(() {
+      _selectedImages.removeAt(index);
+    });
+  }
+
+  // Upload images to Firebase Storage
+Future<List<String>> _uploadImages(String incidentId) async {
+  final storage = FirebaseStorage.instance;
+  List<String> urls = [];
+
+  for (final img in _selectedImages) {
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final ref = storage.ref().child('incidents/$incidentId/$fileName');
+
+    try {
+      final snapshot = await ref.putFile(img);
+      final url = await snapshot.ref.getDownloadURL();
+      urls.add(url);
+    } catch (e) {
+      print('Error uploading image $fileName: $e');
+    }
+  }
+
+  return urls;
+}
 
   @override
   void initState() {
@@ -253,10 +296,11 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     setState(() {
       _incidentType = null;
       _isSubmitting = false;
+      _selectedImages.clear();
     });
   }
 
-Future<void> _submitForm() async {
+ Future<void> _submitForm() async {
   if (!(_formKey.currentState?.validate() ?? false)) return;
 
   setState(() => _isSubmitting = true);
@@ -264,7 +308,7 @@ Future<void> _submitForm() async {
   try {
     final description = _concernController.text.trim();
 
-    // Analyze content using enhanced client-side checking
+    // 🔹 Analyze content for suspicious patterns
     final analysis = _analyzeText(description);
     final isSuspicious = analysis['isSuspicious'] ?? false;
     final suspicionScore = analysis['score'] ?? 0.0;
@@ -272,8 +316,8 @@ Future<void> _submitForm() async {
 
     if (isSuspicious) {
       String message =
-          'Your report contains content that appears to be inappropriate or spam-like '
-          '(suspicion score: ${(suspicionScore * 100).toStringAsFixed(1)}%).';
+          'Your report contains content that appears suspicious '
+          '(score: ${(suspicionScore * 100).toStringAsFixed(1)}%).';
 
       if (matchedPatterns.isNotEmpty) {
         message += '\n\nDetected patterns: ${matchedPatterns.join(', ')}';
@@ -306,7 +350,8 @@ Future<void> _submitForm() async {
       }
     }
 
-    final incidentData = {
+    // 🔹 Add incident to Firestore first (without images)
+    final docRef = await _incidentsCollection.add({
       'name': _nameController.text.trim(),
       'address': _addressController.text.trim(),
       'landmark': _landmarkController.text.trim(),
@@ -323,47 +368,23 @@ Future<void> _submitForm() async {
       'requiresReview': isSuspicious,
       'userId': FirebaseAuth.instance.currentUser?.uid,
       if (matchedPatterns.isNotEmpty) 'matchedPatterns': matchedPatterns,
-      // 👇 add initial timeline for tracker screen
       'statusUpdates': [
         {
           'status': isSuspicious ? 'Under Review' : 'Pending',
-          'timestamp': FieldValue.serverTimestamp(),
+          'timestamp': Timestamp.now(),
           'note': 'Report submitted',
         }
       ],
-    };
+    });
 
-    // Add incident first (without statusUpdates)
-      final docRef = await _incidentsCollection.add({
-        'name': _nameController.text.trim(),
-        'address': _addressController.text.trim(),
-        'landmark': _landmarkController.text.trim(),
-        'contactNumber': _cellphoneController.text.trim(),
-        'incidentType': _incidentType == 'Other'
-            ? _otherIncidentTypeController.text.trim()
-            : _incidentType,
-        'description': description,
-        'timestamp': FieldValue.serverTimestamp(),
-        'status': isSuspicious ? 'Under Review' : 'Pending',
-        'latitude': double.tryParse(_latitudeController.text) ?? 0.0,
-        'longitude': double.tryParse(_longitudeController.text) ?? 0.0,
-        'suspicionScore': suspicionScore,
-        'requiresReview': isSuspicious,
-        'userId': FirebaseAuth.instance.currentUser?.uid,
-        if (matchedPatterns.isNotEmpty) 'matchedPatterns': matchedPatterns,
-      });
-
-      // Safely update statusUpdates as an array
-      await docRef.update({
-        'statusUpdates': FieldValue.arrayUnion([
-          {
-            'status': isSuspicious ? 'Under Review' : 'Pending',
-            'timestamp': Timestamp.now(), // ✅ Use Firestore Timestamp, not serverTimestamp()
-            'note': 'Report submitted',
-          }
-        ])
-      });
-
+    // 🔹 Upload images (if any)
+    List<String> imageUrls = [];
+    if (_selectedImages.isNotEmpty) {
+      imageUrls = await _uploadImages(docRef.id);
+      if (imageUrls.isNotEmpty) {
+        await docRef.update({'imageUrls': imageUrls});
+      }
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -642,6 +663,9 @@ Future<void> _submitForm() async {
                               ],
                               const SizedBox(height: 16),
                               _buildConcernField(),
+                              const SizedBox(height: 16),
+                              // Image upload section
+                              _buildImageUploadSection(),
                               const SizedBox(height: 32),
                               SizedBox(
                                 width: double.infinity,
@@ -694,6 +718,114 @@ Future<void> _submitForm() async {
           ],
         ),
       ),
+    );
+  }
+
+  // Image upload section widget
+  Widget _buildImageUploadSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Upload Images (Optional)',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade800,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Add photos to help us better understand the situation',
+          style: TextStyle(
+            color: Colors.grey.shade600,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Upload button
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: _pickImage,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _primaryColor,
+              side: BorderSide(color: _primaryColor),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.camera_alt_outlined),
+                SizedBox(width: 8),
+                Text('Select Images'),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Display selected images
+        if (_selectedImages.isNotEmpty) ...[
+          Text(
+            'Selected Images (${_selectedImages.length})',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _selectedImages.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          image: DecorationImage(
+                            image: FileImage(_selectedImages[index]),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: GestureDetector(
+                          onTap: () => _removeImage(index),
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -758,7 +890,6 @@ Future<void> _submitForm() async {
         prefixIcon: Icon(Icons.description_outlined, color: _primaryColor),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

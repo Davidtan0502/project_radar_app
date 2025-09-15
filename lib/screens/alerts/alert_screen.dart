@@ -119,18 +119,20 @@ class _AlertScreenState extends State<AlertScreen> {
     final sectionSpacing = screenHeight * 0.025;
     final sidePadding = screenWidth * 0.05;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 70.0),
-        child: FloatingActionButton(
-          heroTag: "report_tracker",
-          backgroundColor: Colors.green,
-          onPressed: () => _navigateToReportTracker(context),
-          child: const Icon(Icons.track_changes, color: Colors.white),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+return Scaffold(
+  backgroundColor: const Color(0xFFF0F4F8),
+  floatingActionButton: Padding(
+    padding: EdgeInsets.only(
+      bottom: MediaQuery.of(context).padding.bottom + 8, // ✅ dynamic bottom padding
+    ),
+    child: FloatingActionButton(
+      heroTag: "report_tracker",
+      backgroundColor: Colors.green,
+      onPressed: () => _navigateToReportTracker(context),
+      child: const Icon(Icons.track_changes, color: Colors.white),
+    ),
+  ),
+  floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -332,19 +334,19 @@ class _AlertScreenState extends State<AlertScreen> {
                           icon: 'assets/ambulance.png',
                           label: 'Ambulance',
                           onTap: () =>
-                              AlertService.launchPhone(context, '09123456789'),
+                              AlertService.launchPhone(context, '09326622322'),
                         ),
                         buildSquareButton(
                           icon: 'assets/firetruck.png',
                           label: 'Fire Truck',
                           onTap: () =>
-                              AlertService.launchPhone(context, '09123456789'),
+                              AlertService.launchPhone(context, '09326622322'),
                         ),
                         buildSquareButton(
                           icon: 'assets/police.png',
                           label: 'Police',
                           onTap: () =>
-                              AlertService.launchPhone(context, '09123456789'),
+                              AlertService.launchPhone(context, '09326622322'),
                         ),
                       ],
                     ),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:photo_view/photo_view.dart';
 
 class ReportDetailScreen extends StatefulWidget {
   final DocumentSnapshot report;
@@ -67,6 +69,33 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
         content: Text('Opening map for: $address'),
         backgroundColor: Colors.blue[800],
         behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showImagePreview(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Stack(
+          children: [
+            PhotoView(
+              imageProvider: NetworkImage(imageUrl),
+              minScale: PhotoViewComputedScale.contained,
+              maxScale: PhotoViewComputedScale.covered * 2,
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -191,6 +220,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     final double? longitude = data['longitude'] as double?;
     final bool requiresReview = data['requiresReview'] ?? false;
     final double suspicionScore = (data['suspicionScore'] ?? 0.0).toDouble();
+    final List<dynamic> imageUrls = data['imageUrls'] ?? [];
 
     final String formattedDate = data['timestamp'] != null
         ? DateFormat('MMMM d, yyyy')
@@ -220,6 +250,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
             longitude,
             requiresReview,
             suspicionScore,
+            imageUrls,
           ),
         ),
         SliverToBoxAdapter(
@@ -245,6 +276,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     double? longitude,
     bool requiresReview,
     double suspicionScore,
+    List<dynamic> imageUrls,
   ) {
     return Container(
       margin: const EdgeInsets.all(16),
@@ -370,8 +402,72 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
             const SizedBox(height: 8),
             _buildCoordinatesRow(latitude, longitude),
           ],
+          
+          // Images if available
+          if (imageUrls.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _buildImagesSection(imageUrls),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildImagesSection(List<dynamic> imageUrls) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Attached Images",
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF2C3E50),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 100,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: imageUrls.length,
+            itemBuilder: (context, index) {
+              final imageUrl = imageUrls[index] as String;
+              return GestureDetector(
+                onTap: () => _showImagePreview(context, imageUrl),
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.grey[200],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey[300],
+                        child: const Center(
+                          child: Icon(Icons.image, color: Colors.grey),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey[300],
+                        child: const Center(
+                          child: Icon(Icons.broken_image, color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
