@@ -163,6 +163,7 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
           itemBuilder: (context, index) {
             final incident = filteredDocs[index];
             final data = incident.data() as Map<String, dynamic>;
+            final docId = incident.id;
 
             final incidentType = data['incidentType'] ?? 'Unknown';
             final description = data['description'] ?? '';
@@ -257,34 +258,44 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 16),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Delete button
+                            IconButton(
+                              icon: Icon(Icons.delete_outline, color: Colors.red[600]),
+                              onPressed: () => _showDeleteConfirmation(docId),
+                              tooltip: 'Delete Report',
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  "View Details",
-                                  style: TextStyle(
-                                    color: Colors.grey[700],
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
+                            
+                            // View details button
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    "View Details",
+                                    style: TextStyle(
+                                      color: Colors.grey[700],
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 6),
-                                Icon(
-                                  Icons.arrow_forward_rounded,
-                                  size: 16,
-                                  color: Colors.grey[600],
-                                ),
-                              ],
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.arrow_forward_rounded,
+                                    size: 16,
+                                    color: Colors.grey[600],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
@@ -297,6 +308,90 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
       },
     );
   }
+
+  // Function to show delete confirmation dialog
+  void _showDeleteConfirmation(String docId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Delete Report"),
+          content: const Text("Are you sure you want to delete your report? This action cannot be undone."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                _deleteReport(docId);
+                Navigator.of(context).pop();
+              },
+              child: const Text(
+                "Delete",
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Function to delete report from Firestore
+ Future<void> _deleteReport(String docId) async {
+  try {
+    // 🔹 Get the document before deleting (so we can restore if needed)
+    final docRef = FirebaseFirestore.instance.collection('incidents').doc(docId);
+    final docSnapshot = await docRef.get();
+
+    Map<String, dynamic>? deletedData;
+    if (docSnapshot.exists) {
+      deletedData = docSnapshot.data() as Map<String, dynamic>;
+    }
+
+    // 🔹 Delete the document
+    await docRef.delete();
+
+    // 🔹 Show snackbar with Undo option
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text("Report deleted"),
+        backgroundColor: Colors.red,
+        action: deletedData != null
+            ? SnackBarAction(
+                label: "UNDO",
+                textColor: Colors.white,
+                onPressed: () async {
+                  try {
+                    await FirebaseFirestore.instance
+                        .collection('incidents')
+                        .doc(docId)
+                        .set(deletedData!); // 🔹 Restore document
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Failed to restore: $e"),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+              )
+            : null,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Error deleting report: $e"),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
 
 Widget _buildFilteredResolvedReports() {
   return Column(
@@ -406,6 +501,7 @@ Widget _buildFilteredResolvedReports() {
               itemCount: docs.length,
               itemBuilder: (context, index) {
                 final data = docs[index].data() as Map<String, dynamic>;
+                final docId = docs[index].id;
 
                 final incidentType = data['incidentType'] ?? 'Unknown';
                 final description = data['description'] ?? '';
@@ -425,15 +521,22 @@ Widget _buildFilteredResolvedReports() {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ✅ Incident type at the top
-                        Text(
-                          incidentType,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: Color(0xFF3F73A3),
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // ✅ Incident type at the top
+                            Text(
+                              incidentType,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Color(0xFF3F73A3),
+                              ),
+                            ),
+                            // ❌ No delete button in Others tab
+                          ],
                         ),
+
                         const SizedBox(height: 6),
                         Text(description,
                             style: const TextStyle(
@@ -463,146 +566,6 @@ Widget _buildFilteredResolvedReports() {
   );
 }
 
-  Widget _buildAllResolvedReports() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('incidents')
-          .where('status', isEqualTo: 'resolved')
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return _buildErrorState("Unable to load resolved reports.");
-        if (snapshot.connectionState == ConnectionState.waiting) return _buildLoadingState();
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return _buildEmptyState(true);
-
-        final now = DateTime.now();
-        final docs = snapshot.data!.docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          final ts = data['timestamp'] as Timestamp?;
-          if (ts == null) return false;
-          final date = ts.toDate();
-
-          if (_filter == "24h") {
-            return date.isAfter(now.subtract(const Duration(hours: 24)));
-          } else if (_filter == "7d") {
-            return date.isAfter(now.subtract(const Duration(days: 7)));
-          }
-          return true; // all
-        }).toList();
-
-        docs.sort((a, b) {
-          final aTimestamp = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-          final bTimestamp = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-          if (aTimestamp == null && bTimestamp == null) return 0;
-          if (aTimestamp == null) return 1;
-          if (bTimestamp == null) return -1;
-          return bTimestamp.compareTo(aTimestamp);
-        });
-
-        if (docs.isEmpty) return _buildEmptyState(true);
-
-        return ListView.builder(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            16,
-            16,
-            MediaQuery.of(context).padding.bottom + 20,
-          ),
-          itemCount: docs.length,
-          itemBuilder: (context, index) {
-            final data = docs[index].data() as Map<String, dynamic>;
-
-            final description = data['description'] ?? '';
-            final location = data['address'] ?? 'No location specified';
-            final latitude = data['latitude']?.toString() ?? '';
-            final longitude = data['longitude']?.toString() ?? '';
-            final timestamp = data['timestamp'] as Timestamp?;
-            final formattedDate = timestamp != null
-                ? DateFormat('MMM dd, yyyy • hh:mm a').format(timestamp.toDate())
-                : 'Unknown date';
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              child: Card(
-                elevation: 1.5,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.check_circle, 
-                              size: 20, 
-                              color: Colors.green[600]),
-                          const SizedBox(width: 8),
-                          Text("Resolved Incident",
-                              style: TextStyle(
-                                  color: Colors.grey[700], 
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(description,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                              color: Color(0xFF2C3E50))),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Icon(Icons.location_on, 
-                              size: 16, 
-                              color: Colors.grey[600]),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(location,
-                                style: TextStyle(
-                                    color: Colors.grey[700], 
-                                    fontSize: 14)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(Icons.map, 
-                              size: 16, 
-                              color: Colors.grey[600]),
-                          const SizedBox(width: 6),
-                          Text("Coordinates: $latitude, $longitude",
-                              style: TextStyle(
-                                  color: Colors.grey[600], 
-                                  fontSize: 13)),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(Icons.access_time, 
-                              size: 16, 
-                              color: Colors.grey[600]),
-                          const SizedBox(width: 6),
-                          Text(formattedDate,
-                              style: TextStyle(
-                                  color: Colors.grey[600], 
-                                  fontSize: 13)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   Widget _buildLoadingState() {
     return Center(
       child: Column(
@@ -621,7 +584,7 @@ Widget _buildFilteredResolvedReports() {
                 fontWeight: FontWeight.w500),
           ),
         ],
-      ),
+      )
     );
   }
 
@@ -711,10 +674,12 @@ Widget _buildEmptyState(bool filterResolved) {
         return const Color(0xFF4CAF50);
       case 'pending':
         return const Color(0xFFFF9800);
-      case 'processing':
+      case 'in progress':
         return const Color(0xFF2196F3);
       case 'under review':
-        return const Color(0xFF9C27B0);
+        return const Color.fromRGBO(156, 39, 176, 1);
+      case 'declined':
+        return const Color.fromARGB(255, 176, 39, 39);
       default:
         return const Color(0xFF607D8B);
     }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:project_radar_app/evacuation/evacuation_center_lists.dart';
 import 'package:project_radar_app/screens/alerts/alert_screen.dart';
 import 'package:project_radar_app/screens/home/home_screen.dart';
 import 'package:project_radar_app/screens/hotlines/hotline_screen.dart';
-import 'package:project_radar_app/screens/map/map_screen.dart';
 import 'package:project_radar_app/screens/profile/profile_screen.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -56,7 +56,7 @@ class _MainNavigationState extends State<MainNavigation> {
   List<Widget> _buildScreens() {
     return [
       _buildNavigator(0, const HomeScreen(), key: _tabKeys[0]),
-      _buildNavigator(1, const MapScreen(), key: _tabKeys[1]),
+      _buildNavigator(1, const EvacuationCentersScreen(), key: _tabKeys[1]),
       _buildNavigator(2, const AlertScreen(), key: _tabKeys[2]),
       _buildNavigator(3, const HotlinesPage(), key: _tabKeys[3]),
       _buildNavigator(4, const ProfileScreen(), key: _tabKeys[4]),
@@ -127,7 +127,7 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 }
 
-// ---------------- Bottom Navigation ----------------
+// ---------------- Bottom Navigation ---------------
 
 class _BottomNavigationBar extends StatelessWidget {
   final int currentIndex;
@@ -167,7 +167,7 @@ class _BottomNavigationBar extends StatelessWidget {
               _NavItem(
                 icon: Icons.map_outlined,
                 activeIcon: Icons.map,
-                label: "Maps",
+                label: "Evacuation",
                 isActive: currentIndex == 1,
                 onTap: () => onTap(1),
               ),

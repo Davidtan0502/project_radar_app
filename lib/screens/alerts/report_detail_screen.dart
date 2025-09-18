@@ -757,11 +757,13 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
       case 'resolved':
         return Colors.green;
       case 'in progress':
-        return Colors.orange;
+        return const Color(0xFF2196F3);
       case 'pending':
-        return Colors.amber;
+        return const Color(0xFFFF9800);
       case 'under review':
         return Colors.purple;
+      case 'declined':
+        return const Color.fromARGB(255, 176, 39, 39);
       default:
         return const Color(0xFF3F73A3);
     }

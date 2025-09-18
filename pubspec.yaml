@@ -54,6 +54,7 @@ dependencies:
   flutter_email_sender: ^6.0.2
   cached_network_image: ^3.4.1
   photo_view: ^0.15.0
+  flutter_polyline_points: ^3.0.1
 
 # Launcher icon configuration
 flutter_icons:
