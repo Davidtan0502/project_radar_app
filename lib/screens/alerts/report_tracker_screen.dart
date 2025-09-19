@@ -13,6 +13,7 @@ class ReportTrackerScreen extends StatefulWidget {
 
 class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
   String _filter = "24h";
+  String _searchQuery = ""; // ✅ add this line
 
   @override
   Widget build(BuildContext context) {
@@ -121,193 +122,251 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
     );
   }
 
-  Widget _buildReportsList({required String userId, required bool filterResolved}) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('incidents')
-          .where('userId', isEqualTo: userId)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return _buildErrorState("Unable to load reports.");
-        if (snapshot.connectionState == ConnectionState.waiting) return _buildLoadingState();
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState(filterResolved);
-        }
+Widget _buildReportsList({
+  required String userId,
+  required bool filterResolved,
+}) {
+  return StreamBuilder<QuerySnapshot>(
+    stream: FirebaseFirestore.instance
+        .collection('incidents')
+        .where('userId', isEqualTo: userId)
+        .snapshots(),
+    builder: (context, snapshot) {
+      if (snapshot.hasError) return _buildErrorState("Unable to load reports.");
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return _buildLoadingState();
+      }
+      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        return _buildEmptyState(filterResolved);
+      }
 
-        final docs = snapshot.data!.docs;
-        final filteredDocs = docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          final status = (data['status'] ?? '').toString().toLowerCase();
-          return filterResolved ? status == "resolved" : status != "resolved";
-        }).toList();
+      final docs = snapshot.data!.docs;
+      final filteredDocs = docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final status = (data['status'] ?? '').toString().toLowerCase();
+        return filterResolved ? status == "resolved" : status != "resolved";
+      }).toList();
 
-        if (filteredDocs.isEmpty) return _buildEmptyState(filterResolved);
+      if (filteredDocs.isEmpty) return _buildEmptyState(filterResolved);
 
-        filteredDocs.sort((a, b) {
-          final aTimestamp = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-          final bTimestamp = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-          if (aTimestamp == null && bTimestamp == null) return 0;
-          if (aTimestamp == null) return 1;
-          if (bTimestamp == null) return -1;
-          return bTimestamp.compareTo(aTimestamp);
-        });
+      filteredDocs.sort((a, b) {
+        final aTimestamp =
+            (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
+        final bTimestamp =
+            (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
+        if (aTimestamp == null && bTimestamp == null) return 0;
+        if (aTimestamp == null) return 1;
+        if (bTimestamp == null) return -1;
+        return bTimestamp.compareTo(aTimestamp);
+      });
 
-        return ListView.builder(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            20,
-            16,
-            MediaQuery.of(context).padding.bottom + 20,
-          ),
-          itemCount: filteredDocs.length,
-          itemBuilder: (context, index) {
-            final incident = filteredDocs[index];
-            final data = incident.data() as Map<String, dynamic>;
-            final docId = incident.id;
+      return ListView.builder(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          20,
+          16,
+          MediaQuery.of(context).padding.bottom + 20,
+        ),
+        itemCount: filteredDocs.length,
+        itemBuilder: (context, index) {
+          final incident = filteredDocs[index];
+          final data = incident.data() as Map<String, dynamic>;
+          final docId = incident.id;
 
-            final incidentType = data['incidentType'] ?? 'Unknown';
-            final description = data['description'] ?? '';
-            final status = data['status'] ?? 'Pending';
-            final timestamp = data['timestamp'] as Timestamp?;
-            final formattedDate = timestamp != null
-                ? DateFormat('MMM dd, yyyy • hh:mm a').format(timestamp.toDate())
-                : 'Date not available';
+          final incidentType = data['incidentType'] ?? 'Unknown';
+          final description = data['description'] ?? '';
+          final status = data['status'] ?? 'Pending';
+          final timestamp = data['timestamp'] as Timestamp?;
+          final formattedDate = timestamp != null
+              ? DateFormat('MMM dd, yyyy • hh:mm a')
+                  .format(timestamp.toDate())
+              : 'Date not available';
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 18),
-              child: Card(
-                elevation: 1.5,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
+          return Container(
+            margin: const EdgeInsets.only(bottom: 18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
-                child: InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ReportDetailScreen(report: incident),
-                      ),
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(18),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                incidentType,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 18,
-                                  color: Color(0xFF2C3E50),
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: _getStatusColor(status),
-                                borderRadius: BorderRadius.circular(14),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: _getStatusColor(status).withOpacity(0.3),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Text(
-                                status.toUpperCase(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Icon(Icons.calendar_today_outlined,
-                                size: 16, color: Colors.grey[500]),
-                            const SizedBox(width: 8),
-                            Text(formattedDate,
-                                style: TextStyle(
-                                    color: Colors.grey[600], 
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500)),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          description,
-                          style: TextStyle(
-                              color: Colors.grey[700], 
-                              fontSize: 15, 
-                              height: 1.5),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            // Delete button
-                            IconButton(
-                              icon: Icon(Icons.delete_outline, color: Colors.red[600]),
-                              onPressed: () => _showDeleteConfirmation(docId),
-                              tooltip: 'Delete Report',
-                            ),
-                            
-                            // View details button
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    "View Details",
-                                    style: TextStyle(
-                                      color: Colors.grey[700],
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Icon(
-                                    Icons.arrow_forward_rounded,
-                                    size: 16,
-                                    color: Colors.grey[600],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          ReportDetailScreen(report: incident),
                     ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(18),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 🔹 Incident type + status badge
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              incidentType,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 18,
+                                color: Color(0xFF2C3E50),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _getStatusColor(status),
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _getStatusColor(status)
+                                      .withOpacity(0.3),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              status.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // 🔹 Date
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today_outlined,
+                              size: 16, color: Colors.grey[500]),
+                          const SizedBox(width: 8),
+                          Text(
+                            formattedDate,
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      // 🔹 Description
+                      Text(
+                        description,
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 15,
+                          height: 1.5,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // 🔹 Actions row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          if (!filterResolved) // ✅ hide delete in Resolved tab
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.red[50],
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: Colors.red[200]!,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: IconButton(
+                                icon: Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.red[700],
+                                  size: 22,
+                                ),
+                                onPressed: () =>
+                                    _showDeleteConfirmation(docId),
+                                tooltip: 'Delete Report',
+                                splashRadius: 20,
+                                padding: const EdgeInsets.all(8),
+                              ),
+                            ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3F73A3),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF3F73A3)
+                                      .withOpacity(0.3),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Text(
+                                  "View Details",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(width: 6),
+                                Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
-            );
-          },
-        );
-      },
-    );
-  }
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
 
   // Function to show delete confirmation dialog
   void _showDeleteConfirmation(String docId) {
@@ -320,16 +379,19 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text("Cancel"),
+              child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
             ),
             TextButton(
               onPressed: () {
                 _deleteReport(docId);
                 Navigator.of(context).pop();
               },
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.red[50],
+              ),
               child: const Text(
                 "Delete",
-                style: TextStyle(color: Colors.red),
+                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -396,9 +458,10 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
 Widget _buildFilteredResolvedReports() {
   return Column(
     children: [
-      // 🔹 Filter chips UI
+      // 🔍 Search bar + filters
       Container(
         padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -410,42 +473,64 @@ Widget _buildFilteredResolvedReports() {
             ),
           ],
         ),
-        margin: const EdgeInsets.all(12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        child: Column(
           children: [
-            FilterChip(
-              label: const Text("Today",
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-              selected: _filter == "24h",
-              onSelected: (_) => setState(() => _filter = "24h"),
-              selectedColor: const Color(0xFF3F73A3),
-              checkmarkColor: Colors.white,
-              labelStyle: TextStyle(
-                color: _filter == "24h" ? Colors.white : Colors.grey[700],
+            // Search bar
+            TextField(
+              decoration: InputDecoration(
+                hintText: "Search reports...",
+                prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.grey[100],
               ),
+              onChanged: (value) {
+                setState(() => _searchQuery = value.toLowerCase());
+              },
             ),
-            FilterChip(
-              label: const Text("7 Days",
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-              selected: _filter == "7d",
-              onSelected: (_) => setState(() => _filter = "7d"),
-              selectedColor: const Color(0xFF3F73A3),
-              checkmarkColor: Colors.white,
-              labelStyle: TextStyle(
-                color: _filter == "7d" ? Colors.white : Colors.grey[700],
-              ),
-            ),
-            FilterChip(
-              label: const Text("All",
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-              selected: _filter == "all",
-              onSelected: (_) => setState(() => _filter = "all"),
-              selectedColor: const Color(0xFF3F73A3),
-              checkmarkColor: Colors.white,
-              labelStyle: TextStyle(
-                color: _filter == "all" ? Colors.white : Colors.grey[700],
-              ),
+            const SizedBox(height: 12),
+
+            // Filter chips
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                FilterChip(
+                  label: const Text("Today",
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  selected: _filter == "24h",
+                  onSelected: (_) => setState(() => _filter = "24h"),
+                  selectedColor: const Color(0xFF3F73A3),
+                  checkmarkColor: Colors.white,
+                  labelStyle: TextStyle(
+                    color: _filter == "24h" ? Colors.white : Colors.grey[700],
+                  ),
+                ),
+                FilterChip(
+                  label: const Text("7 Days",
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  selected: _filter == "7d",
+                  onSelected: (_) => setState(() => _filter = "7d"),
+                  selectedColor: const Color(0xFF3F73A3),
+                  checkmarkColor: Colors.white,
+                  labelStyle: TextStyle(
+                    color: _filter == "7d" ? Colors.white : Colors.grey[700],
+                  ),
+                ),
+                FilterChip(
+                  label: const Text("All",
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  selected: _filter == "all",
+                  onSelected: (_) => setState(() => _filter = "all"),
+                  selectedColor: const Color(0xFF3F73A3),
+                  checkmarkColor: Colors.white,
+                  labelStyle: TextStyle(
+                    color: _filter == "all" ? Colors.white : Colors.grey[700],
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -453,7 +538,7 @@ Widget _buildFilteredResolvedReports() {
 
       const SizedBox(height: 8),
 
-      // 🔹 Reports list with incidentType included
+      // 🔹 Reports list
       Expanded(
         child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
@@ -466,20 +551,29 @@ Widget _buildFilteredResolvedReports() {
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return _buildEmptyState(true);
 
             final now = DateTime.now();
-            final docs = snapshot.data!.docs.where((doc) {
+            var docs = snapshot.data!.docs.where((doc) {
               final data = doc.data() as Map<String, dynamic>;
               final ts = data['timestamp'] as Timestamp?;
               if (ts == null) return false;
               final date = ts.toDate();
 
-              if (_filter == "24h") {
-                return date.isAfter(now.subtract(const Duration(hours: 24)));
-              } else if (_filter == "7d") {
-                return date.isAfter(now.subtract(const Duration(days: 7)));
+              // Time filter
+              if (_filter == "24h" && date.isBefore(now.subtract(const Duration(hours: 24)))) return false;
+              if (_filter == "7d" && date.isBefore(now.subtract(const Duration(days: 7)))) return false;
+
+              // Search filter
+              if (_searchQuery.isNotEmpty) {
+                final incidentType = (data['incidentType'] ?? '').toString().toLowerCase();
+                final description = (data['description'] ?? '').toString().toLowerCase();
+                if (!incidentType.contains(_searchQuery) &&
+                    !description.contains(_searchQuery)) {
+                  return false;
+                }
               }
-              return true; // all
+              return true;
             }).toList();
 
+            // Sort by newest first
             docs.sort((a, b) {
               final aTimestamp = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
               final bTimestamp = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
@@ -501,7 +595,6 @@ Widget _buildFilteredResolvedReports() {
               itemCount: docs.length,
               itemBuilder: (context, index) {
                 final data = docs[index].data() as Map<String, dynamic>;
-                final docId = docs[index].id;
 
                 final incidentType = data['incidentType'] ?? 'Unknown';
                 final description = data['description'] ?? '';
@@ -513,18 +606,28 @@ Widget _buildFilteredResolvedReports() {
                     ? DateFormat('MMM dd, yyyy • hh:mm a').format(timestamp.toDate())
                     : 'Unknown date';
 
-                return Card(
-                  elevation: 1,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Top row: Type + ✅ Resolved badge
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            // ✅ Incident type at the top
                             Text(
                               incidentType,
                               style: const TextStyle(
@@ -533,11 +636,32 @@ Widget _buildFilteredResolvedReports() {
                                 color: Color(0xFF3F73A3),
                               ),
                             ),
-                            // ❌ No delete button in Others tab
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF4CAF50),
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF4CAF50).withOpacity(0.3),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Text(
+                                "RESOLVED",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
-
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 12),
                         Text(description,
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
@@ -565,6 +689,7 @@ Widget _buildFilteredResolvedReports() {
     ],
   );
 }
+
 
   Widget _buildLoadingState() {
     return Center(
