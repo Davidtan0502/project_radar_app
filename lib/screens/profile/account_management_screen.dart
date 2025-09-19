@@ -5,6 +5,8 @@ import 'package:project_radar_app/screens/profile/edit_account_info.dart';
 import 'package:project_radar_app/screens/profile/change_password.dart';
 import 'package:project_radar_app/screens/profile/settings&privacy_screen.dart';
 import 'package:project_radar_app/services/navigation.dart';
+import 'package:project_radar_app/screens/auth/login_screen.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class AccountManagementScreen extends StatelessWidget {
   const AccountManagementScreen({super.key});
@@ -35,22 +37,127 @@ class AccountManagementScreen extends StatelessWidget {
                 final user = FirebaseAuth.instance.currentUser;
 
                 if (user != null) {
-                  //  Step 1: Delete Firestore user data
-                  await FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(user.uid)
-                      .delete();
+                  final uid = user.uid;
+                  final firestore = FirebaseFirestore.instance;
 
-                  //  Step 2: Delete Auth account
-                  await user.delete();
+                  // ---------- 0) Read user doc (we'll use it for storage paths / urls) ----------
+                  Map<String, dynamic>? userDocData;
+                  try {
+                    final docSnap = await firestore.collection('users').doc(uid).get();
+                    userDocData = (docSnap.exists && docSnap.data() != null)
+                        ? Map<String, dynamic>.from(docSnap.data()!)
+                        : null;
+                  } catch (e) {
+                    debugPrint('Failed to read users/$uid doc before deletion: $e');
+                    userDocData = null;
+                  }
 
-                  //  Step 3: Ensure sign out
+                  // ---------- Optional helper: delete storage object from either URL or path ----------
+                  Future<void> _tryDeleteStorageObject(String? value) async {
+                    if (value == null) return;
+                    final v = value.toString().trim();
+                    if (v.isEmpty) return;
+
+                    try {
+                      if (v.startsWith('http://') || v.startsWith('https://')) {
+                        // If it's a download URL, try to get ref from URL
+                        try {
+                          final ref = FirebaseStorage.instance.refFromURL(v);
+                          await ref.delete();
+                          debugPrint('Deleted storage object from URL: $v');
+                          return;
+                        } catch (e) {
+                          debugPrint('refFromURL delete failed for $v: $e');
+                          // fallthrough to attempt treat as path
+                        }
+                      }
+
+                      // treat as a path (e.g. "profile_images/uid.jpg")
+                      try {
+                        final ref = FirebaseStorage.instance.ref().child(v);
+                        await ref.delete();
+                        debugPrint('Deleted storage object from path: $v');
+                      } catch (e) {
+                        debugPrint('ref.child delete failed for $v: $e');
+                        // final fallback: nothing else to try
+                      }
+                    } catch (e) {
+                      debugPrint('Unexpected storage delete error for "$v": $e');
+                    }
+                  }
+
+                  // ---------- 1) Delete emergency contacts subcollection ----------
+                  try {
+                    final subcolRef = firestore
+                        .collection('users')
+                        .doc(uid)
+                        .collection('emergency_contacts');
+
+                    final subSnap = await subcolRef.get();
+                    if (subSnap.docs.isNotEmpty) {
+                      WriteBatch batch = firestore.batch();
+                      int opCount = 0;
+                      for (final doc in subSnap.docs) {
+                        batch.delete(doc.reference);
+                        opCount++;
+                        if (opCount >= 400) {
+                          await batch.commit();
+                          batch = firestore.batch();
+                          opCount = 0;
+                        }
+                      }
+                      if (opCount > 0) await batch.commit();
+                    }
+                  } catch (e) {
+                    debugPrint('Failed to delete emergency_contacts subcollection: $e');
+                  }
+
+                  // ---------- 2) Try to delete photo & id files from Firebase Storage ----------
+                  try {
+                    final photoUrl = userDocData != null ? (userDocData['photoURL'] ?? '').toString() : '';
+                    final idUrl = userDocData != null ? (userDocData['idURL'] ?? '').toString() : '';
+
+                    await _tryDeleteStorageObject(photoUrl);
+                    await _tryDeleteStorageObject(idUrl);
+                  } catch (e) {
+                    debugPrint('Storage deletion encountered an error: $e');
+                  }
+
+                  // ---------- 3) Clear photoURL/idURL fields in Firestore (best-effort) ----------
+                  try {
+                    final userRef = firestore.collection('users').doc(uid);
+                    await userRef.update({'photoURL': '', 'idURL': ''});
+                  } catch (e) {
+                    debugPrint('Failed to clear photoURL/idURL fields: $e');
+                  }
+
+                  // ---------- 4) Delete main user document ----------
+                  try {
+                    await firestore.collection('users').doc(uid).delete();
+                  } catch (e) {
+                    debugPrint('Failed to delete users/$uid doc: $e');
+                  }
+
+                  // ---------- 5) Delete Auth account ----------
+                  try {
+                    await user.delete();
+                  } catch (e) {
+                    // If deletion fails due to requires-recent-login, rethrow so outer catch handles it.
+                    rethrow;
+                  }
+
+                  //  Step 6: Ensure sign out
                   await FirebaseAuth.instance.signOut();
 
-                  //  Step 4: Redirect to login page
+                  // Step 7: show success and navigate to Login, clearing backstack
                   if (context.mounted) {
-                    Navigator.of(context).pushNamedAndRemoveUntil(
-                      '/login',
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Your account was deleted.")),
+                    );
+
+                    // Replace stack with LoginScreen instance (passes empty onTap to match constructor)
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => LoginScreen(onTap: () {})),
                       (route) => false,
                     );
                   }
@@ -74,8 +181,8 @@ class AccountManagementScreen extends StatelessWidget {
                       ),
                     );
 
-                    Navigator.of(context).pushNamedAndRemoveUntil(
-                      '/login',
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => LoginScreen(onTap: () {})),
                       (route) => false,
                     );
                   }
@@ -101,7 +208,6 @@ class AccountManagementScreen extends StatelessWidget {
       ),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {

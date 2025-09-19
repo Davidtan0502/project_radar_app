@@ -1,3 +1,6 @@
+// <same imports as before>
+import 'package:flutter/foundation.dart'; // add for kIsWeb
+import 'dart:typed_data'; // for Uint8List (web)
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,6 +11,12 @@ import 'package:another_flushbar/flushbar.dart';
 import 'package:project_radar_app/screens/profile/account_management_screen.dart';
 import 'package:project_radar_app/services/navigation.dart';
 import 'package:flutter/services.dart'; // for TextInputFormatter
+import 'dart:math' as math;
+
+// WEB TESTING NOTE:
+// If images load on mobile but not in Chrome (web build): it's almost always a CORS configuration
+// issue on the Firebase Storage bucket. Mobile native SDKs don't need CORS.
+// Check bucket CORS if you see network console errors in the browser.
 
 class UnitFormatter extends TextInputFormatter {
   final String unit;
@@ -41,31 +50,108 @@ class EditAccountinfo extends StatefulWidget {
 }
 
 class _EditAccountinfoState extends State<EditAccountinfo> {
+  // Images: mobile uses File, web uses Uint8List (bytes). We keep both to support both platforms.
   File? _profileImage;
   File? _idImage;
+  String? _profileImageUrl; // remote profile image URL (if exists)
+  String? _idImageUrl; // remote id image URL (if exists)
+  Uint8List? _profileImageBytes; // for web preview/upload
+  Uint8List? _idImageBytes;      // for web preview/upload
+
+  // flags for deletion
   bool _removeProfileImage = false;
+  bool _removeIdImage = false;
+
+  // upload progress indicators
   double? _profileUploadProgress;
   double? _idUploadProgress;
+
   final _formKey = GlobalKey<FormState>();
   bool _isFormDirty = false;
   bool _isSaving = false;
 
-  // Controllers
+  // Basic Controllers
   final _firstNameController = TextEditingController();
   final _middleNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _dobController = TextEditingController();
+
+  // Keep legacy single address too (for backward compatibility)
   final _addressController = TextEditingController();
+
+  // Health / other
   final _bloodTypeController = TextEditingController();
   final _heightController = TextEditingController();
   final _weightController = TextEditingController();
+
+  // Town options (same as register)
+   final List<String> _towns = [
+    "Tondo",
+    "Binondo",
+    "Quiapo",
+    "Intramuros",
+    "Ermita",
+    "Malate",
+    "Paco",
+    "Pandacan",
+    "Port Area",
+    "San Nicolas",
+    "Santa Ana",
+    "Santa Cruz",
+    "Santa Mesa",
+    "San Miguel",
+    "San Andres Bukid",
+    "Sampaloc",
+  ];
+
+  // New: address controllers for Resident
+  final _resHouseController = TextEditingController();
+  final _resStreetController = TextEditingController();
+  final _resBarangayController = TextEditingController();
+  final _resTownController = TextEditingController();
+  final _resZipController = TextEditingController();
+  final _resCityController = TextEditingController(text: "Manila City, Metro Manila"); // always autofilled & read-only
+  final _resCountryController = TextEditingController(text: "Philippines"); // read-only
+
+  // New: Work address controllers
+  final _workStreetController = TextEditingController();
+  final _workBarangayController = TextEditingController();
+  final _workTownController = TextEditingController();
+  final _workZipController = TextEditingController();
+  final _workCityController = TextEditingController(text: "Manila City, Metro Manila"); // autofilled
+  final _workCountryController = TextEditingController(text: "Philippines"); // read-only
+
+  // New: Home address controllers (used by EMPLOYEE and STUDENT)
+  final _homeHouseController = TextEditingController();
+  final _homeStreetController = TextEditingController();
+  final _homeBarangayController = TextEditingController();
+  final _homeTownController = TextEditingController();
+  final _homeZipController = TextEditingController();
+  final _homeCityController = TextEditingController();
+  final _homeCountryController = TextEditingController(text: "Philippines"); // read-only
+
+  // New: School address controllers
+  final _schoolNameController = TextEditingController();
+  final _schoolStreetController = TextEditingController();
+  final _schoolBarangayController = TextEditingController();
+  final _schoolTownController = TextEditingController();
+  final _schoolZipController = TextEditingController();
+  final _schoolCityController = TextEditingController(text: "Manila City, Metro Manila"); // autofilled
+  final _schoolCountryController = TextEditingController(text: "Philippines"); // read-only
+
+  // track user category from firestore (RESIDENT / EMPLOYEE / STUDENT)
+  String? _userCategory;
+
+  // NEW: optional middle name checkbox state
+  bool _hasMiddleName = false;
 
   @override
   void initState() {
     super.initState();
     _initializeFormListeners();
+    _addAddressCapitalizationListeners();
     _loadUserData();
 
     _bloodTypeController.addListener(() {
@@ -90,23 +176,97 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     final doc =
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
     if (!doc.exists) return;
     final data = doc.data()!;
+    // read userCategory if present
+    _userCategory = (data['userCategory'] ?? '').toString().trim().toUpperCase();
+    // Compose address if legacy flat 'address' exists
+    String composedAddress = '';
+    if ((data['address'] ?? '').toString().trim().isNotEmpty) {
+      composedAddress = data['address'].toString();
+    }
+
+    // Helper to safely read nested maps
+    Map<String, dynamic>? safeMap(dynamic v) {
+      if (v is Map) return Map<String, dynamic>.from(v);
+      return null;
+    }
+
+    final residentMap = safeMap(data['residentAddress']);
+    final homeMap = safeMap(data['homeAddress']);
+    final workMap = safeMap(data['workAddress']);
+    final schoolMap = safeMap(data['schoolAddress']);
+
     setState(() {
       _firstNameController.text = _capitalizeWords(data['firstName'] ?? '');
-  _middleNameController.text = _capitalizeWords(data['middleName'] ?? '');
-  _lastNameController.text = _capitalizeWords(data['lastName'] ?? '');
+      _middleNameController.text = _capitalizeWords(data['middleName'] ?? '');
+      // set hasMiddleName depending on whether middle name exists
+      _hasMiddleName = (_middleNameController.text.trim().isNotEmpty);
+
+      _lastNameController.text = _capitalizeWords(data['lastName'] ?? '');
       _emailController.text = data['email'] ?? '';
       _phoneController.text = _formatPhone(data['phone'] ?? '');
       _dobController.text = data['dob'] ?? '';
-      _addressController.text = data['address'] ?? '';
       _bloodTypeController.text = data['bloodType'] ?? '';
       _heightController.text = data['height'] ?? '';
       _weightController.text = data['weight'] ?? '';
+
+      // prefer Firestore photoURL, fallback to FirebaseAuth user photoURL
+      final fsPhoto = (data['photoURL'] ?? '')..toString().trim();
+      _profileImageUrl = fsPhoto.isNotEmpty ? fsPhoto : (user.photoURL ?? null);
+
+      final fsId = (data['idURL'] ?? '')..toString().trim();
+      _idImageUrl = fsId.isNotEmpty ? fsId : null;
+
+      // Populate address controllers according to priority:
+      // If nested maps exist for respective addresses, use those.
+      // Otherwise, if legacy composedAddress exists, keep it in _addressController.
+      _addressController.text = composedAddress;
+
+      // Resident
+      if (residentMap != null && residentMap.isNotEmpty) {
+        _resHouseController.text = residentMap['house']?.toString() ?? '';
+        _resStreetController.text = residentMap['street']?.toString() ?? '';
+        _resBarangayController.text = residentMap['barangay']?.toString() ?? '';
+        _resTownController.text = residentMap['town']?.toString() ?? '';
+        _resZipController.text = residentMap['zip']?.toString() ?? '';
+        _resCityController.text = residentMap['city']?.toString() ?? (_resCityController.text);
+        _resCountryController.text = residentMap['country']?.toString() ?? 'Philippines';
+      }
+
+      // Work
+      if (workMap != null && workMap.isNotEmpty) {
+        _workStreetController.text = workMap['street']?.toString() ?? '';
+        _workBarangayController.text = workMap['barangay']?.toString() ?? '';
+        _workTownController.text = workMap['town']?.toString() ?? '';
+        _workZipController.text = workMap['zip']?.toString() ?? '';
+        _workCityController.text = workMap['city']?.toString() ?? (_workCityController.text);
+        _workCountryController.text = workMap['country']?.toString() ?? 'Philippines';
+      }
+
+      // Home
+      if (homeMap != null && homeMap.isNotEmpty) {
+        _homeHouseController.text = homeMap['house']?.toString() ?? '';
+        _homeStreetController.text = homeMap['street']?.toString() ?? '';
+        _homeBarangayController.text = homeMap['barangay']?.toString() ?? '';
+        _homeTownController.text = homeMap['town']?.toString() ?? '';
+        _homeZipController.text = homeMap['zip']?.toString() ?? '';
+        _homeCityController.text = homeMap['city']?.toString() ?? _homeCityController.text;
+        _homeCountryController.text = homeMap['country']?.toString() ?? 'Philippines';
+      }
+
+      // School
+      if (schoolMap != null && schoolMap.isNotEmpty) {
+        _schoolNameController.text = schoolMap['schoolName']?.toString() ?? '';
+        _schoolStreetController.text = schoolMap['street']?.toString() ?? '';
+        _schoolBarangayController.text = schoolMap['barangay']?.toString() ?? '';
+        _schoolTownController.text = schoolMap['town']?.toString() ?? '';
+        _schoolZipController.text = schoolMap['zip']?.toString() ?? '';
+        _schoolCityController.text = schoolMap['city']?.toString() ?? (_schoolCityController.text);
+        _schoolCountryController.text = schoolMap['country']?.toString() ?? 'Philippines';
+      }
+
       _isFormDirty = false;
     });
   }
@@ -123,8 +283,78 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       _bloodTypeController,
       _heightController,
       _weightController,
+      // resident
+      _resHouseController,
+      _resStreetController,
+      _resBarangayController,
+      _resTownController,
+      _resZipController,
+      _resCityController,
+      _resCountryController,
+      // work
+      _workStreetController,
+      _workBarangayController,
+      _workTownController,
+      _workZipController,
+      _workCityController,
+      _workCountryController,
+      // home
+      _homeHouseController,
+      _homeStreetController,
+      _homeBarangayController,
+      _homeTownController,
+      _homeZipController,
+      _homeCityController,
+      _homeCountryController,
+      // school
+      _schoolNameController,
+      _schoolStreetController,
+      _schoolBarangayController,
+      _schoolTownController,
+      _schoolZipController,
+      _schoolCityController,
+      _schoolCountryController,
     ]) {
       ctrl.addListener(_markFormDirty);
+    }
+  }
+
+  void _addAddressCapitalizationListeners() {
+    // Controllers to auto-capitalize each word for addresses & school name
+    final addressControllers = [
+      _resHouseController,
+      _resStreetController,
+      _resBarangayController,
+      _resTownController,
+      _workStreetController,
+      _workBarangayController,
+      _workTownController,
+      _homeHouseController,
+      _homeStreetController,
+      _homeBarangayController,
+      _homeTownController,
+      _homeCityController,
+      _schoolNameController,
+      _schoolStreetController,
+      _schoolBarangayController,
+      _schoolTownController,
+    ];
+
+    for (final ctrl in addressControllers) {
+      ctrl.addListener(() {
+        final text = ctrl.text;
+        final capitalized = _capitalizeWords(text);
+        if (capitalized != text) {
+          // preserve cursor position as best as possible
+          final sel = ctrl.selection;
+          final int baseOffset = sel.baseOffset;
+          final int offset = math.min(baseOffset, capitalized.length);
+          ctrl.value = TextEditingValue(
+            text: capitalized,
+            selection: TextSelection.collapsed(offset: offset),
+          );
+        }
+      });
     }
   }
 
@@ -144,6 +374,38 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     _bloodTypeController.dispose();
     _heightController.dispose();
     _weightController.dispose();
+
+    _resHouseController.dispose();
+    _resStreetController.dispose();
+    _resBarangayController.dispose();
+    _resTownController.dispose();
+    _resZipController.dispose();
+    _resCityController.dispose();
+    _resCountryController.dispose();
+
+    _workStreetController.dispose();
+    _workBarangayController.dispose();
+    _workTownController.dispose();
+    _workZipController.dispose();
+    _workCityController.dispose();
+    _workCountryController.dispose();
+
+    _homeHouseController.dispose();
+    _homeStreetController.dispose();
+    _homeBarangayController.dispose();
+    _homeTownController.dispose();
+    _homeZipController.dispose();
+    _homeCityController.dispose();
+    _homeCountryController.dispose();
+
+    _schoolNameController.dispose();
+    _schoolStreetController.dispose();
+    _schoolBarangayController.dispose();
+    _schoolTownController.dispose();
+    _schoolZipController.dispose();
+    _schoolCityController.dispose();
+    _schoolCountryController.dispose();
+
     super.dispose();
   }
 
@@ -153,19 +415,27 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     return sizeInMB <= maxSizeMB;
   }
 
-  Future<String?> _uploadImageToStorage(File imageFile, String path) async {
+  // Upload helper: accepts File (mobile) or Uint8List (web)
+  Future<String?> _uploadImageToStorage(dynamic image, String path) async {
+    // image: either File (mobile) or Uint8List (web)
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return null;
-    final ref = FirebaseStorage.instance
-        .ref()
-        .child(path)
-        .child('${user.uid}.jpg');
-    final uploadTask = ref.putFile(imageFile);
+    final ref = FirebaseStorage.instance.ref().child(path).child('${user.uid}.jpg');
+
+    // set metadata for correct content-type
+    final metadata = SettableMetadata(contentType: 'image/jpeg');
+
+    UploadTask uploadTask;
+    if (image is File) {
+      uploadTask = ref.putFile(image, metadata);
+    } else if (image is Uint8List) {
+      uploadTask = ref.putData(image, metadata);
+    } else {
+      throw ArgumentError('Unsupported image type for upload');
+    }
+
     uploadTask.snapshotEvents.listen((event) {
-      final progress =
-          event.totalBytes > 0
-              ? event.bytesTransferred / event.totalBytes
-              : 0.0;
+      final progress = event.totalBytes > 0 ? event.bytesTransferred / event.totalBytes : 0.0;
       setState(() {
         if (path.contains('profile_images')) {
           _profileUploadProgress = progress;
@@ -174,35 +444,155 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
         }
       });
     });
-    final snapshot = await uploadTask;
-    return snapshot.ref.getDownloadURL();
+
+    try {
+      // Await upload and log debug info (useful to diagnose web issues)
+      final snapshot = await uploadTask;
+
+      // briefly show 100%
+      setState(() {
+        if (path.contains('profile_images')) {
+          _profileUploadProgress = 1.0;
+        } else {
+          _idUploadProgress = 1.0;
+        }
+      });
+      await Future.delayed(const Duration(milliseconds: 300));
+      setState(() {
+        if (path.contains('profile_images')) {
+          _profileUploadProgress = null;
+        } else {
+          _idUploadProgress = null;
+        }
+      });
+
+      // Try to get download URL and log it for debugging
+      try {
+        final downloadUrl = await snapshot.ref.getDownloadURL();
+        debugPrint('DEBUG: uploaded to path: ${snapshot.ref.fullPath}');
+        debugPrint('DEBUG: downloadURL -> $downloadUrl');
+        return downloadUrl;
+      } catch (e, st) {
+        debugPrint('DEBUG: getDownloadURL failed for ${snapshot.ref.fullPath} -> $e\n$st');
+        return null;
+      }
+    } catch (e, st) {
+      // Upload failed
+      debugPrint('DEBUG: upload failed for path ${ref.fullPath} -> $e\n$st');
+      // ensure progress cleared
+      setState(() {
+        if (path.contains('profile_images')) {
+          _profileUploadProgress = null;
+        } else {
+          _idUploadProgress = null;
+        }
+      });
+      return null;
+    }
   }
 
-  Future<void> _pickImage(ImageSource source, bool isProfile) async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: source);
-    if (picked == null) return;
-    final file = File(picked.path);
-    if (!_isFileSizeValid(file)) {
+ // UPDATED: show preview BEFORE committing selection, supports web + mobile
+Future<void> _pickImage(ImageSource source, bool isProfile) async {
+  final picker = ImagePicker();
+  final picked = await picker.pickImage(source: source);
+  if (picked == null) return;
+
+  // On web we read bytes; on mobile we can use File from path
+  Uint8List? bytes;
+  File? file;
+  try {
+    if (kIsWeb) {
+      // WEB: read image as bytes for preview and upload via putData
+      bytes = await picked.readAsBytes();
+      debugPrint('DEBUG: picked image (web) bytes=${bytes.lengthInBytes}');
+    } else {
+      // Mobile: we can use File path
+      file = File(picked.path);
+      debugPrint('DEBUG: picked image (mobile) path=${picked.path}');
+    }
+  } catch (e) {
+    debugPrint('Error reading picked image: $e');
+    return;
+  }
+
+  // Validate size (for web bytes or file)
+  if (bytes != null) {
+    final sizeInMB = bytes.lengthInBytes / (1024 * 1024);
+    if (sizeInMB > 5) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Image size too large (max 5MB)'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Image size too large (max 5MB)'), backgroundColor: Colors.red),
       );
       return;
     }
+  } else if (file != null && !_isFileSizeValid(file)) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Image size too large (max 5MB)'), backgroundColor: Colors.red),
+    );
+    return;
+  }
+
+  // Show a preview dialog so user can inspect before committing.
+  final action = await _showImagePreviewBeforeSave(bytes ?? file!, isProfile);
+  if (!mounted) return;
+
+  if (action == 'use') {
     setState(() {
       if (isProfile) {
         _profileImage = file;
+        _profileImageBytes = bytes;
         _removeProfileImage = false;
+        _profileImageUrl = null;
       } else {
         _idImage = file;
+        _idImageBytes = bytes;
+        _removeIdImage = false;
+        _idImageUrl = null;
       }
       _markFormDirty();
     });
+  } else if (action == 'retake') {
+    // reopen camera
+    await _pickImage(ImageSource.camera, isProfile);
+  } else if (action == 'gallery') {
+    await _pickImage(ImageSource.gallery, isProfile);
+  } else {
+    // cancel -> do nothing
   }
+}
+
+// NEW: generic preview dialog that accepts either File or Uint8List
+// returns 'use'|'retake'|'gallery'|'cancel'
+// Web testing note: on web this dialog displays Image.memory(...) (in-memory preview).
+Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
+  // image: File (mobile) or Uint8List (web)
+  return showDialog<String>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) {
+      Widget content;
+      if (image is Uint8List) {
+        // WEB: show in-memory preview using Image.memory
+        content = Image.memory(image, fit: BoxFit.contain);
+      } else if (image is File) {
+        content = Image.file(image, fit: BoxFit.contain);
+      } else {
+        content = const SizedBox.shrink();
+      }
+      return AlertDialog(
+        title: Text(isProfile ? 'Preview Profile Photo' : 'Preview ID Photo'),
+        content: SizedBox(width: double.maxFinite, child: content),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop('cancel'), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop('gallery'), child: const Text('Choose from Gallery')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop('retake'), child: const Text('Retake')),
+          ElevatedButton(onPressed: () => Navigator.of(ctx).pop('use'), child: const Text('Use Photo')),
+        ],
+      );
+    },
+  );
+}
 
   Future<void> _selectDate(BuildContext context) async {
     final now = DateTime.now();
@@ -224,7 +614,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     }
   }
 
-    String _capitalizeWords(String text) {
+  String _capitalizeWords(String text) {
     return text.split(' ').map((word) {
       if (word.isEmpty) return '';
       return word[0].toUpperCase() + word.substring(1).toLowerCase();
@@ -238,6 +628,53 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     return phone;
   }
 
+  Map<String, dynamic> _collectAddressMap({
+    required TextEditingController house,
+    required TextEditingController street,
+    required TextEditingController barangay,
+    required TextEditingController town,
+    required TextEditingController zip,
+    required TextEditingController city,
+    required TextEditingController country,
+  }) {
+    return {
+      'house': house.text.trim(),
+      'street': street.text.trim(),
+      'barangay': barangay.text.trim(),
+      'town': town.text.trim(),
+      'zip': zip.text.trim(),
+      'city': city.text.trim(),
+      'country': country.text.trim(),
+    };
+  }
+
+  String _composeAddressStringFromMap(Map<String, dynamic> m) {
+    final parts = <String>[];
+    void addIf(String? s) {
+      if (s != null && s.toString().trim().isNotEmpty) parts.add(s.toString().trim());
+    }
+
+    addIf(m['house']);
+    addIf(m['street']);
+    if (m['barangay'] != null && m['barangay'].toString().trim().isNotEmpty) {
+      parts.add('Barangay ${m['barangay'].toString().trim()}');
+    }
+    addIf(m['town']);
+    addIf(m['city']);
+    if (m['zip'] != null && m['zip'].toString().trim().isNotEmpty) parts.add('ZIP ${m['zip'].toString().trim()}');
+    return parts.join(', ');
+  }
+
+  // Helper to choose the right image provider depending on platform/source.
+  // WEB testing note: if you pick on web, the preview uses MemoryImage from _profileImageBytes.
+  ImageProvider _getProfileImageProvider() {
+    // priority: local File (mobile) -> in-memory bytes (web) -> remote URL -> placeholder
+    if (_profileImage != null) return FileImage(_profileImage!);
+    if (_profileImageBytes != null) return MemoryImage(_profileImageBytes!); // WEB: show picked image before upload
+    if (_profileImageUrl != null) return NetworkImage(_profileImageUrl!);
+    return const NetworkImage('https://via.placeholder.com/150');
+  }
+
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate() || _isSaving) return;
     setState(() => _isSaving = true);
@@ -247,33 +684,40 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       if (user == null) return;
 
       String? profileUrl;
+      // If removeProfileImage is true - we'll delete the storage object and remove field in Firestore
       if (_removeProfileImage) {
         try {
-          await FirebaseStorage.instance
-              .ref('profile_images/${user.uid}.jpg')
-              .delete();
-        } catch (_) {}
-      } else if (_profileImage != null) {
-        profileUrl = await _uploadImageToStorage(
-          _profileImage!,
-          'profile_images',
-        );
+          await FirebaseStorage.instance.ref('profile_images/${user.uid}.jpg').delete();
+        } catch (_) {
+          // ignore delete errors
+        }
+      } else if (_profileImage != null || _profileImageBytes != null) {
+        final img = _profileImage ?? _profileImageBytes!;
+        profileUrl = await _uploadImageToStorage(img, 'profile_images');
       }
 
       String? idUrl;
-      if (_idImage != null) {
-        idUrl = await _uploadImageToStorage(_idImage!, 'id_uploads');
+      if (_removeIdImage) {
+        try {
+          await FirebaseStorage.instance.ref('id_uploads/${user.uid}.jpg').delete();
+        } catch (_) {
+          // ignore delete errors
+        }
+      } else if (_idImage != null || _idImageBytes != null) {
+        final img = _idImage ?? _idImageBytes!;
+        idUrl = await _uploadImageToStorage(img, 'id_uploads');
       }
 
       final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
-      await docRef.set({
+
+      // Build maps conditionally depending on userCategory
+      final updates = <String, dynamic>{
         'firstName': _firstNameController.text.trim(),
-        'middleName': _middleNameController.text.trim(),
+        'middleName': _hasMiddleName ? _middleNameController.text.trim() : '',
         'lastName': _lastNameController.text.trim(),
         'email': _emailController.text.trim(),
         'phone': _phoneController.text.trim(),
         'dob': _dobController.text.trim(),
-        'address': _addressController.text.trim(),
         'bloodType': _bloodTypeController.text.trim(),
         'height': _heightController.text.trim(),
         'weight': _weightController.text.trim(),
@@ -281,32 +725,125 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
         if (idUrl != null) 'idURL': idUrl,
         'isVerified': true,
         'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      };
 
-    // Top notification
-    if (!mounted) return;
-    await Flushbar(
-      message: 'Profile saved successfully!',
-      backgroundColor: const Color.fromARGB(255, 25, 167, 0),
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      borderRadius: BorderRadius.circular(12),
-      flushbarPosition: FlushbarPosition.TOP,
-      icon: const Icon(
-        Icons.check_circle,
-        color: Colors.white,
-      ),
-      messageColor: const Color.fromARGB(255, 255, 255, 255),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      animationDuration: const Duration(milliseconds: 500),
-      duration: const Duration(seconds: 3),
-    ).show(context);
+      // debug: show what will be written to Firestore (helpful for testing)
+      debugPrint('DEBUG: firestore updates prepared = $updates');
 
-    if (!mounted) return;
+      // If user explicitly removed profile image -> remove field in Firestore
+      if (_removeProfileImage) {
+        updates['photoURL'] = FieldValue.delete();
+      }
+      if (_removeIdImage) {
+        updates['idURL'] = FieldValue.delete();
+      }
+
+      // always set legacy composed address for compatibility:
+      // choose the address map to compose from based on userCategory priority
+      if ((_userCategory ?? '').toUpperCase() == 'RESIDENT') {
+        final map = _collectAddressMap(
+          house: _resHouseController,
+          street: _resStreetController,
+          barangay: _resBarangayController,
+          town: _resTownController,
+          zip: _resZipController,
+          city: _resCityController,
+          country: _resCountryController,
+        );
+        updates['residentAddress'] = map;
+        updates['address'] = _composeAddressStringFromMap(map);
+      } else if ((_userCategory ?? '').toUpperCase() == 'EMPLOYEE') {
+        final workMap = _collectAddressMap(
+          house: TextEditingController(), // work has no house in register schema; keep empty
+          street: _workStreetController,
+          barangay: _workBarangayController,
+          town: _workTownController,
+          zip: _workZipController,
+          city: _workCityController,
+          country: _workCountryController,
+        );
+        final homeMap = _collectAddressMap(
+          house: _homeHouseController,
+          street: _homeStreetController,
+          barangay: _homeBarangayController,
+          town: _homeTownController,
+          zip: _homeZipController,
+          city: _homeCityController,
+          country: _homeCountryController,
+        );
+        updates['workAddress'] = workMap;
+        updates['homeAddress'] = homeMap;
+        // Put composed address as homeMap composition for 'address' legacy field
+        updates['address'] = _composeAddressStringFromMap(homeMap);
+      } else if ((_userCategory ?? '').toUpperCase() == 'STUDENT') {
+        final schoolMap = {
+          'schoolName': _schoolNameController.text.trim(),
+          'street': _schoolStreetController.text.trim(),
+          'barangay': _schoolBarangayController.text.trim(),
+          'town': _schoolTownController.text.trim(),
+          'zip': _schoolZipController.text.trim(),
+          'city': _schoolCityController.text.trim(),
+          'country': _schoolCountryController.text.trim(),
+        };
+        final homeMap = _collectAddressMap(
+          house: _homeHouseController,
+          street: _homeStreetController,
+          barangay: _homeBarangayController,
+          town: _homeTownController,
+          zip: _homeZipController,
+          city: _homeCityController,
+          country: _homeCountryController,
+        );
+        updates['schoolAddress'] = schoolMap;
+        updates['homeAddress'] = homeMap;
+        updates['address'] = _composeAddressStringFromMap(homeMap);
+      } else {
+        // if no category, fallback to writing legacy single address if the user edited it
+        if (_addressController.text.trim().isNotEmpty) {
+          updates['address'] = _addressController.text.trim();
+        }
+      }
+
+      await docRef.set(updates, SetOptions(merge: true));
+      debugPrint('DEBUG: Firestore set completed for user ${user.uid}');
+
+      // update FirebaseAuth user photo as well so other parts of app that read auth user are in sync
+      if (profileUrl != null) {
+        try {
+          await user.updatePhotoURL(profileUrl);
+          // reload user to ensure currentUser.photoURL is updated
+          await user.reload();
+        } catch (_) {}
+      } else if (_removeProfileImage) {
+        try {
+          await user.updatePhotoURL(null);
+          await user.reload();
+        } catch (_) {}
+      }
+
+      // Top notification
+      if (!mounted) return;
+      await Flushbar(
+        message: 'Profile saved successfully!',
+        backgroundColor: const Color.fromARGB(255, 25, 167, 0),
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        borderRadius: BorderRadius.circular(12),
+        flushbarPosition: FlushbarPosition.TOP,
+        icon: const Icon(
+          Icons.check_circle,
+          color: Colors.white,
+        ),
+        messageColor: const Color.fromARGB(255, 255, 255, 255),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        animationDuration: const Duration(milliseconds: 500),
+        duration: const Duration(seconds: 3),
+      ).show(context);
+
+      if (!mounted) return;
       setState(() => _isFormDirty = false);
 
       // Pop after notification disappears
       Navigator.pop(context, true);
-
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -320,28 +857,27 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Unsaved Changes'),
-            content: const Text(
-              'You have unsaved changes. Discard them and go back?',
-            ),
-            actions: [
-              TextButton(
-                // Close the dialog and return `false`
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                // Close the dialog and return `true`
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text(
-                  'Discard',
-                  style: TextStyle(color: Colors.red),
-                ),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('Unsaved Changes'),
+        content: const Text(
+          'You have unsaved changes. Discard them and go back?',
+        ),
+        actions: [
+          TextButton(
+            // Close the dialog and return `false`
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
           ),
+          TextButton(
+            // Close the dialog and return `true`
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text(
+              'Discard',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
     );
 
     // If somehow null, treat as cancel
@@ -359,7 +895,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
         appBar: AppBar(
           title: const Text(
             'Edit Profile',
-            style: TextStyle(color: Colors.white),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
           ),
           backgroundColor: radarBlue,
           iconTheme: const IconThemeData(color: Colors.white),
@@ -369,8 +905,9 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
               if (await _confirmUnsavedChanges()) Navigator.pop(context, true);
             },
           ),
+          elevation: 0,
         ),
-        backgroundColor: isDark ? Colors.black : Colors.grey[100],
+        backgroundColor: isDark ? Colors.grey[900] : Colors.grey[100],
         body: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Form(
@@ -378,11 +915,13 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
             child: ListView(
               children: [
                 _buildProfileImageSection(),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 _buildPersonalInfoSection(),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
+                _buildAddressSection(), // NEW: conditional address UI
+                const SizedBox(height: 24),
                 _buildIdUploadSection(),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 _buildHealthInfoSection(),
                 const SizedBox(height: 30),
                 _buildSaveButton(radarBlue),
@@ -401,54 +940,215 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
           Stack(
             children: [
               GestureDetector(
-                onTap: () => _pickImage(ImageSource.gallery, true),
-                child: CircleAvatar(
-                  radius: 50,
-                  backgroundImage:
-                      _profileImage != null
-                          ? FileImage(_profileImage!)
-                          : const NetworkImage(
-                                'https://via.placeholder.com/150',
-                              )
-                              as ImageProvider,
-                  child:
-                      _profileImage == null
-                          ? const Icon(
+                onTap: () => _showProfileImageOptions(),
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.grey.shade300, width: 2),
+                  ),
+                  child: CircleAvatar(
+                    radius: 48,
+                    backgroundColor: Colors.grey.shade200,
+                    backgroundImage: _getProfileImageProvider(),
+                    child: _profileImage == null &&
+                            _profileImageBytes == null && // WEB: prevent showing icon when using MemoryImage
+                            _profileImageUrl == null
+                        ? const Icon(
                             Icons.camera_alt,
                             size: 30,
-                            color: Colors.white70,
+                            color: Colors.grey,
                           )
-                          : null,
+                        : null,
+                  ),
                 ),
               ),
-              if (_profileImage != null)
+              if (_profileImage != null ||
+                  _profileImageBytes != null || // WEB: allow edit when MemoryImage is used
+                  _profileImageUrl != null)
                 Positioned(
                   bottom: 0,
                   right: 0,
-                  child: IconButton(
-                    icon: const Icon(Icons.edit, color: Colors.white),
-                    onPressed: () => _pickImage(ImageSource.gallery, true),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.grey.shade300),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        )
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.edit, size: 18, color: Colors.blue),
+                      onPressed: () => _showProfileImageOptions(),
+                    ),
+                  ),
+                ),
+              // Upload progress overlay
+              if (_profileUploadProgress != null)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            height: 36,
+                            width: 36,
+                            child: CircularProgressIndicator(
+                              value: _profileUploadProgress,
+                              strokeWidth: 3,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${((_profileUploadProgress ?? 0) * 100).toStringAsFixed(0)}%',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
             ],
           ),
-          if (_profileImage != null || !_removeProfileImage)
+          const SizedBox(height: 12),
+          // show remove button only if local or remote image exists and not already flagged removed
+          if ((_profileImage != null || _profileImageBytes != null || (_profileImageUrl != null && !_removeProfileImage)))
             TextButton.icon(
               onPressed: () {
                 setState(() {
                   _removeProfileImage = true;
                   _profileImage = null;
+                  _profileImageBytes = null; // clear web bytes too
+                  _profileImageUrl = null;
                   _markFormDirty();
                 });
               },
-              icon: const Icon(Icons.delete, color: Colors.red),
+              icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
               label: const Text(
                 'Remove Photo',
-                style: TextStyle(color: Colors.red),
+                style: TextStyle(color: Colors.red, fontSize: 13),
               ),
             ),
         ],
       ),
+    );
+  }
+
+  // show bottom sheet with options to view/take/choose/remove
+  void _showProfileImageOptions() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final hasAny = _profileImage != null || _profileImageBytes != null || _profileImageUrl != null;
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(16),
+            ),
+          ),
+          child: SafeArea(
+            child: Wrap(
+              children: [
+                if (hasAny)
+                  ListTile(
+                    leading: const Icon(Icons.remove_red_eye, color: Colors.blue),
+                    title: const Text('View Photo', style: TextStyle(fontWeight: FontWeight.w500)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      // VIEW: if local File -> show Image.file; if web bytes -> Image.memory; else Image.network
+                      if (_profileImage != null) {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => Dialog(
+                            backgroundColor: Colors.transparent,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(_profileImage!),
+                            ),
+                          ),
+                        );
+                      } else if (_profileImageBytes != null) {
+                        // WEB: preview memory image
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => Dialog(
+                            backgroundColor: Colors.transparent,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.memory(_profileImageBytes!),
+                            ),
+                          ),
+                        );
+                      } else if (_profileImageUrl != null) {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => Dialog(
+                            backgroundColor: Colors.transparent,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(_profileImageUrl!),
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt, color: Colors.blue),
+                  title: const Text('Take Photo', style: TextStyle(fontWeight: FontWeight.w500)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera, true);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library, color: Colors.blue),
+                  title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w500)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery, true);
+                  },
+                ),
+                if (hasAny)
+                  ListTile(
+                    leading: const Icon(Icons.delete, color: Colors.red),
+                    title: const Text('Remove Photo', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      setState(() {
+                        _removeProfileImage = true;
+                        _profileImage = null;
+                        _profileImageBytes = null;
+                        _profileImageUrl = null;
+                        _markFormDirty();
+                      });
+                    },
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.close, color: Colors.grey),
+                  title: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                  onTap: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -457,19 +1157,53 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle('Personal Information'),
-        _buildEditableField('First Name', _firstNameController, hint: 'John'),
-        _buildEditableField(
-          'Middle Name',
-          _middleNameController,
-          hint: 'Felix',
+        const SizedBox(height: 12),
+        _buildEditableField('First Name', _firstNameController, hint: 'First Name'),
+        // Middle name is optional with checkbox
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              Checkbox(
+                value: _hasMiddleName,
+                onChanged: (val) {
+                  setState(() {
+                    _hasMiddleName = val ?? false;
+                    if (!_hasMiddleName) {
+                      _middleNameController.clear();
+                    }
+                    _markFormDirty();
+                  });
+                },
+              ),
+              const Text("I have a middle name", style: TextStyle(fontSize: 15)),
+            ],
+          ),
         ),
-        _buildEditableField('Last Name', _lastNameController, hint: 'Doe'),
-       _buildEditableField(
+        if (_hasMiddleName)
+          _buildEditableField(
+            'Middle Name',
+            _middleNameController,
+            hint: 'Middle Name',
+            // make validator only when enabled
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) return 'Please enter Middle Name';
+              final pattern = RegExp(r"^[A-Za-z\s\.'-]+$");
+              if (!pattern.hasMatch(val.trim())) return 'Enter a valid middle name';
+              return null;
+            },
+          ),
+        _buildEditableField('Last Name', _lastNameController, hint: 'Last Name'),
+        _buildEditableField(
           'Email',
           _emailController,
           hint: 'you@example.com',
           keyboardType: TextInputType.emailAddress,
-          isReadOnly: true, // added to prevent editing
+          isReadOnly: true, // prevent editing
         ),
         _buildEditableField(
           'Phone Number',
@@ -483,9 +1217,178 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
           hint: 'MM/DD/YYYY',
           isDateField: true,
         ),
-        _buildEditableField('Address', _addressController, hint: '123 Main St'),
+        // legacy single Address left out visually; separate fields used instead
       ],
     );
+  }
+
+  Widget _buildAddressSection() {
+    // default fallback: show resident if no category known
+    final cat = (_userCategory ?? 'RESIDENT').toUpperCase();
+    if (cat == 'EMPLOYEE') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 6),
+          const Text('Work Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          _buildEditableField('Street/Building No.', _workStreetController, hint: 'Street / Building'),
+          _buildEditableField('Barangay/Subdivision', _workBarangayController, hint: 'Barangay / Subdivision'),
+          // Town Dropdown for work
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: DropdownButtonFormField<String>(
+              value: _workTownController.text.isNotEmpty ? _workTownController.text : null,
+              items: _towns.map((town) => DropdownMenuItem(value: town, child: Text(town))).toList(),
+              onChanged: (val) {
+                setState(() {
+                  _workTownController.text = val ?? '';
+                  _markFormDirty();
+                });
+              },
+              decoration: InputDecoration(
+                labelText: 'Town',
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              ),
+              validator: (val) {
+                if ((_workTownController.text ?? '').trim().isEmpty) return 'Select work town';
+                return null;
+              },
+            ),
+          ),
+          _buildEditableField('ZIP Code', _workZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
+            if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
+            if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
+            return null;
+          }),
+          // City auto-filled & read-only
+          _buildEditableField('City/Municipality', _workCityController, hint: 'Manila', isReadOnly: true),
+          // Country read-only
+          _buildEditableField('Country', _workCountryController, hint: 'Philippines', isReadOnly: true),
+          const SizedBox(height: 16),
+          const Text('Home Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          _buildEditableField('House/Unit/Building No.', _homeHouseController, hint: 'House/Unit'),
+          _buildEditableField('Street Name', _homeStreetController, hint: 'Street Name'),
+          _buildEditableField('Barangay/Subdivision', _homeBarangayController, hint: 'Barangay Name'),
+          // Home town remains manual text input (per your register logic) — keep as textfield
+          _buildEditableField('Town (Optional)', _homeTownController, hint: 'Town Name'),
+          _buildEditableField('ZIP Code', _homeZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
+            if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
+            if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
+            return null;
+          }),
+          _buildEditableField('City/Municipality', _homeCityController, hint: 'City',),
+          _buildEditableField('Country', _homeCountryController, hint: 'Philippines', isReadOnly: true),
+        ],
+      );
+    } else if (cat == 'STUDENT') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 6),
+          const Text('School Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          _buildEditableField('Full School Name', _schoolNameController, hint: 'Full School Name'),
+          _buildEditableField('Street Name', _schoolStreetController, hint: 'Street Name'),
+          _buildEditableField('Barangay/Subdivision', _schoolBarangayController, hint: 'Barangay Name'),
+          // School town dropdown
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: DropdownButtonFormField<String>(
+              value: _schoolTownController.text.isNotEmpty ? _schoolTownController.text : null,
+              items: _towns.map((town) => DropdownMenuItem(value: town, child: Text(town))).toList(),
+              onChanged: (val) {
+                setState(() {
+                  _schoolTownController.text = val ?? '';
+                  _markFormDirty();
+                });
+              },
+              decoration: InputDecoration(
+                labelText: 'Town',
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              ),
+              validator: (val) {
+                if ((_schoolTownController.text ?? '').trim().isEmpty) return 'Select school town';
+                return null;
+              },
+            ),
+          ),
+          _buildEditableField('ZIP Code', _schoolZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
+            if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
+            if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
+            return null;
+          }),
+          _buildEditableField('City/Municipality', _schoolCityController, hint: 'City', isReadOnly: true),
+          _buildEditableField('Country', _schoolCountryController, hint: 'Philippines', isReadOnly: true),
+          const SizedBox(height: 16),
+          const Text('Home Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          _buildEditableField('House/Unit/Building No.', _homeHouseController, hint: 'House/Unit'),
+          _buildEditableField('Street Name', _homeStreetController, hint: 'Street Name'),
+          _buildEditableField('Barangay/Subdivision', _homeBarangayController, hint: 'Barangay Name'),
+          _buildEditableField('Town (Optional)', _homeTownController, hint: 'Town Name', validator: (val) {return null;},),
+          _buildEditableField('ZIP Code', _homeZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
+            if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
+            if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
+            return null;
+          }),
+          _buildEditableField('City/Municipality', _homeCityController, hint: 'City',),
+          _buildEditableField('Country', _homeCountryController, hint: 'Philippines', isReadOnly: true),
+        ],
+      );
+    } else {
+      // RESIDENT or default — show resident address
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 6),
+          const Text('Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          _buildEditableField('House/Unit/Building No.', _resHouseController, hint: 'House/Unit'),
+          _buildEditableField('Street Name', _resStreetController, hint: 'Street Name'),
+          _buildEditableField('Barangay/Subdivision', _resBarangayController, hint: 'Barangay Name'),
+          // Resident town dropdown
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: DropdownButtonFormField<String>(
+              value: _resTownController.text.isNotEmpty ? _resTownController.text : null,
+              items: _towns.map((town) => DropdownMenuItem(value: town, child: Text(town))).toList(),
+              onChanged: (val) {
+                setState(() {
+                  _resTownController.text = val ?? '';
+                  _markFormDirty();
+                });
+              },
+              decoration: InputDecoration(
+                labelText: 'Town',
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              ),
+              validator: (val) {
+                if ((_resTownController.text ?? '').trim().isEmpty) return 'Select town';
+                return null;
+              },
+            ),
+          ),
+          _buildEditableField('ZIP Code', _resZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
+            if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
+            if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
+            return null;
+          }),
+          _buildEditableField('City/Municipality', _resCityController, hint: 'Manila', isReadOnly: true),
+          _buildEditableField('Country', _resCountryController, hint: 'Philippines', isReadOnly: true),
+        ],
+      );
+    }
   }
 
   Widget _buildIdUploadSection() {
@@ -493,30 +1396,115 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle('ID Upload (optional)'),
+        const SizedBox(height: 12),
         GestureDetector(
           onTap: () => _pickImage(ImageSource.gallery, false),
           child: Container(
             height: 150,
             decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.grey),
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300, width: 1.5),
             ),
-            child:
+            child: Stack(
+              children: [
+                // Show priority: local File -> in-memory bytes (web) -> remote URL -> placeholder
                 _idImage != null
-                    ? ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.file(_idImage!, fit: BoxFit.cover),
-                    )
-                    : const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.upload_file, size: 40),
-                          Text('Tap to upload ID'),
+  ? ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Image.file(_idImage!, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+    )
+  : (_idImageBytes != null
+      ? ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.memory(_idImageBytes!, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+        )
+      : (_idImageUrl != null
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(_idImageUrl!, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+            )
+          : Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.upload_file, size: 40, color: Colors.grey.shade400),
+                  const SizedBox(height: 8),
+                  Text('Tap to upload ID', style: TextStyle(color: Colors.grey.shade600)),
+                ],
+              ),
+            ))),
+                // Add a small remove icon overlay when id exists
+                if (_idImage != null || _idImageBytes != null || (_idImageUrl != null && !_removeIdImage))
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          )
                         ],
                       ),
+                      child: IconButton(
+                        icon: const Icon(Icons.close, color: Colors.red, size: 18),
+                        onPressed: () {
+                          setState(() {
+                            _removeIdImage = true;
+                            _idImage = null;
+                            _idImageBytes = null;
+                            _idImageUrl = null;
+                            _markFormDirty();
+                          });
+                        },
+                      ),
                     ),
+                  ),
+                if (_idUploadProgress != null)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              height: 36,
+                              width: 36,
+                              child: CircularProgressIndicator(
+                                value: _idUploadProgress,
+                                strokeWidth: 3,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${((_idUploadProgress ?? 0) * 100).toStringAsFixed(0)}%',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+          child: Text(
+            'Upload a valid government-issued ID.',
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
           ),
         ),
       ],
@@ -528,6 +1516,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle('Health Information (optional)'),
+        const SizedBox(height: 12),
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: TextFormField(
@@ -618,67 +1607,79 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
+          elevation: 2,
         ),
-        child:
-            _isSaving
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text(
-                  'Save Changes',
-                  style: TextStyle(fontSize: 16, color: Colors.white),
+        child: _isSaving
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
                 ),
+              )
+            : const Text(
+                'Save Changes',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+              ),
       ),
     );
   }
 
   Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(bottom: 4.0),
       child: Text(
         title,
-        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
       ),
     );
   }
 
+  // Slightly extended helper: accepts optional validator
   Widget _buildEditableField(
-  String label,
-  TextEditingController controller, {
-  String? hint,
-  TextInputType keyboardType = TextInputType.text,
-  bool isDateField = false,
-  bool isReadOnly = false, // new
-}) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      readOnly: isDateField || isReadOnly,
-      onTap: isDateField
-          ? () async {
-              FocusScope.of(context).requestFocus(FocusNode());
-              await _selectDate(context);
-            }
-          : null,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
+    String label,
+    TextEditingController controller, {
+    String? hint,
+    TextInputType keyboardType = TextInputType.text,
+    bool isDateField = false,
+    bool isReadOnly = false, // new
+    String? Function(String?)? validator,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        readOnly: isDateField || isReadOnly,
+        onTap: isDateField
+            ? () async {
+                FocusScope.of(context).requestFocus(FocusNode());
+                await _selectDate(context);
+              }
+            : null,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
+          suffixIcon: isDateField ? const Icon(Icons.calendar_today, size: 20) : null,
         ),
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
-        ),
-        suffixIcon: isDateField ? const Icon(Icons.calendar_today) : null,
-      ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Please enter $label';
-        }
+        validator: (value) {
+          // custom validator precedence
+          if (validator != null) return validator(value);
+          // default validation: required
+          if (value == null || value.isEmpty) {
+            return 'Please enter $label';
+          }
           if (isDateField) {
             try {
               final parts = value.split('/');

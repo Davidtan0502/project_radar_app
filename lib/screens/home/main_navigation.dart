@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:project_radar_app/evacuation/evacuation_center_lists.dart';
 import 'package:project_radar_app/screens/alerts/alert_screen.dart';
 import 'package:project_radar_app/screens/home/home_screen.dart';
 import 'package:project_radar_app/screens/hotlines/hotline_screen.dart';
+import 'package:project_radar_app/screens/map/map_screen.dart';
 import 'package:project_radar_app/screens/profile/profile_screen.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -16,31 +16,32 @@ class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
   int _previousIndex = 0;
 
+  // Keep a GlobalKey<NavigatorState> per tab so we can reset individual tab navigators.
   final List<GlobalKey<NavigatorState>> _navigatorKeys =
       List.generate(5, (_) => GlobalKey<NavigatorState>());
 
-  // Unique keys for all tabs to allow refresh on re-tap only
-  final List<Key> _tabKeys = List.generate(5, (_) => UniqueKey());
-
   void _onTabTapped(int index) {
     if (index == _currentIndex) {
-      // Re-tap = silently refresh
+      // Re-tap = replace the navigator key for this tab -> forces a fresh Navigator (reload)
       setState(() {
-        _tabKeys[index] = UniqueKey(); // force rebuild
+        _navigatorKeys[index] = GlobalKey<NavigatorState>();
       });
     } else {
-      // Switch to another tab = just switch, keep previous state
+      // Switching to a different tab:
+      // Replace the navigator key of the tab being entered so it loads fresh.
       setState(() {
+        _navigatorKeys[index] = GlobalKey<NavigatorState>(); // <<-- CHANGED: reset destination tab
         _previousIndex = _currentIndex;
         _currentIndex = index;
-        // no rebuild, state stays intact
       });
     }
   }
 
   Future<bool> _onWillPop() async {
+    // Ask the current tab's navigator whether it can pop.
     final isFirstRouteInCurrentTab =
-        !await _navigatorKeys[_currentIndex].currentState!.maybePop();
+        !await (_navigatorKeys[_currentIndex].currentState?.maybePop() ?? Future.value(true));
+
     if (isFirstRouteInCurrentTab) {
       if (_currentIndex != 0) {
         setState(() {
@@ -55,68 +56,42 @@ class _MainNavigationState extends State<MainNavigation> {
 
   List<Widget> _buildScreens() {
     return [
-      _buildNavigator(0, const HomeScreen(), key: _tabKeys[0]),
-      _buildNavigator(1, const EvacuationCentersScreen(), key: _tabKeys[1]),
-      _buildNavigator(2, const AlertScreen(), key: _tabKeys[2]),
-      _buildNavigator(3, const HotlinesPage(), key: _tabKeys[3]),
-      _buildNavigator(4, const ProfileScreen(), key: _tabKeys[4]),
+      _buildNavigator(0, const HomeScreen()),
+      _buildNavigator(1, const MapScreen()),
+      _buildNavigator(2, const AlertScreen()),
+      _buildNavigator(3, const HotlinesPage()),
+      _buildNavigator(4, const ProfileScreen()),
     ];
   }
 
-  Widget _buildNavigator(int index, Widget screen, {Key? key}) {
+  Widget _buildNavigator(int index, Widget screen) {
+    // Use a direct MaterialPageRoute (no custom transitions) so there are no animations.
     return Navigator(
-      key: key ?? _navigatorKeys[index],
-      onGenerateRoute: (_) => PageRouteBuilder(
-        pageBuilder: (_, __, ___) => screen,
-        transitionsBuilder: (_, animation, __, child) {
-          final curve = Curves.easeOut;
-          final curvedAnimation = CurvedAnimation(
-            parent: animation,
-            curve: curve,
-          );
-
-          final beginOffset = index > _previousIndex
-              ? const Offset(1.0, 0.0)
-              : const Offset(-1.0, 0.0);
-
-          return SlideTransition(
-            position: Tween<Offset>(
-              begin: beginOffset,
-              end: Offset.zero,
-            ).animate(curvedAnimation),
-            child: FadeTransition(
-              opacity: Tween<double>(
-                begin: 0.5,
-                end: 1.0,
-              ).animate(curvedAnimation),
-              child: child,
-            ),
-          );
-        },
-        transitionDuration: const Duration(milliseconds: 300),
-      ),
+      key: _navigatorKeys[index],
+      onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => screen),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final screens = _buildScreens();
+
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
         extendBody: true,
         body: Stack(
-          children: [
-            ..._buildScreens().asMap().entries.map((entry) {
-              return IgnorePointer(
-                ignoring: entry.key != _currentIndex,
-                child: AnimatedOpacity(
-                  opacity: entry.key == _currentIndex ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 300),
-                  child: entry.value,
-                ),
-              );
-            }).toList(),
-          ],
+          children: screens.asMap().entries.map((entry) {
+            final isActive = entry.key == _currentIndex;
+            // Use Offstage + TickerMode to show/hide without animation.
+            return Offstage(
+              offstage: !isActive,
+              child: TickerMode(
+                enabled: isActive,
+                child: entry.value,
+              ),
+            );
+          }).toList(),
         ),
         bottomNavigationBar: _BottomNavigationBar(
           currentIndex: _currentIndex,
@@ -127,7 +102,7 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 }
 
-// ---------------- Bottom Navigation ---------------
+// ---------------- Bottom Navigation ----------------
 
 class _BottomNavigationBar extends StatelessWidget {
   final int currentIndex;
@@ -167,7 +142,7 @@ class _BottomNavigationBar extends StatelessWidget {
               _NavItem(
                 icon: Icons.map_outlined,
                 activeIcon: Icons.map,
-                label: "Evacuation",
+                label: "Maps",
                 isActive: currentIndex == 1,
                 onTap: () => onTap(1),
               ),
@@ -227,18 +202,11 @@ class _NavItem extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                transitionBuilder: (child, animation) => ScaleTransition(
-                  scale: animation,
-                  child: child,
-                ),
-                child: Icon(
-                  isActive ? activeIcon : icon,
-                  key: ValueKey(isActive ? 'active_$icon' : icon),
-                  color: color,
-                  size: 24,
-                ),
+              Icon(
+                isActive ? activeIcon : icon,
+                key: ValueKey(isActive ? 'active_$icon' : icon),
+                color: color,
+                size: 24,
               ),
               const SizedBox(height: 4),
               Text(
@@ -276,11 +244,11 @@ class _AlertButton extends StatelessWidget {
         children: [
           GestureDetector(
             onTap: onTap,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
+            child: Container(
               height: 40,
               width: 40,
               decoration: BoxDecoration(
+                // keep same visual: gradient when active, solid when not.
                 gradient: isActive
                     ? const LinearGradient(
                         colors: [Color(0xFF2E72AD), Color(0xFF4AA8FF)],

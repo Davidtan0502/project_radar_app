@@ -115,7 +115,7 @@ class _HotlinesPageState extends State<HotlinesPage> {
                   if (i == 0) {
                     // Title for the emergency hotlines
                     return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8.0),
+                      padding: const EdgeInsets.only(top: 5, bottom: 20),
                       child: Text(
                         "Emergency Hotlines",
                         style: TextStyle(
@@ -268,11 +268,11 @@ class _HotlinesPageState extends State<HotlinesPage> {
                             child: ElevatedButton.icon(
                               icon: const Icon(Icons.local_fire_department),
                               label: const Text(
-                                'Fire',
-                                style: TextStyle(fontSize: 14),
+                                'Fire Department',
+                                style: TextStyle(fontSize: 16),
                               ),
                               style: ElevatedButton.styleFrom(
-                                foregroundColor: Colors.black,
+                                foregroundColor: Colors.white,
                                 backgroundColor: Colors.redAccent,
                                 minimumSize: const Size(100, 100),
                                 shape: RoundedRectangleBorder(
@@ -292,11 +292,11 @@ class _HotlinesPageState extends State<HotlinesPage> {
                             child: ElevatedButton.icon(
                               icon: const Icon(Icons.local_police),
                               label: const Text(
-                                'Police',
-                                style: TextStyle(fontSize: 14),
+                                'Police Department',
+                                style: TextStyle(fontSize: 16),
                               ),
                               style: ElevatedButton.styleFrom(
-                                foregroundColor: Colors.black,
+                                foregroundColor: Colors.white,
                                 backgroundColor: Colors.indigo,
                                 minimumSize: const Size(100, 100),
                                 shape: RoundedRectangleBorder(
