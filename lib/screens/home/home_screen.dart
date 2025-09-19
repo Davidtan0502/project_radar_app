@@ -8,6 +8,8 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import 'package:project_radar_app/screens/alerts/report_tracker_screen.dart';
 import 'package:project_radar_app/widgets/capitalize_names.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:project_radar_app/screens/profile/account_information.dart';
@@ -283,12 +285,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              _buildWeatherCard(),
-              const SizedBox(height: 20),
-              _buildLocationCard(),
-              const SizedBox(height: 20),
-              _buildProfileCard(),
+                  _buildWeatherCard(),
+                  const SizedBox(height: 20),
+                  _buildLocationCard(),
+                  const SizedBox(height: 20),
+                  _buildRecentIncidents(),  // <-- Add here below the map container
+                  const SizedBox(height: 20),
+                  _buildProfileCard(),
             ],
           ),
         ),
@@ -457,6 +460,171 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+Widget _buildRecentIncidents() {
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              "Recent Incidents",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const ReportTrackerScreen(initialTab: 0),
+                  ),
+                );
+              },
+              child: const Text(
+                "See all",
+                style: TextStyle(color: Colors.blue),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 185,
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('incidents')
+                .orderBy('timestamp', descending: true)
+                .limit(10)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Text('Error: ${snapshot.error}');
+              }
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              // ✅ filter out declined locally
+              final docs = (snapshot.data?.docs ?? [])
+                  .where((doc) => (doc['status'] ?? '').toLowerCase() != 'declined')
+                  .toList();
+
+              if (docs.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'No recent incidents found.',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                itemCount: docs.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final data = docs[index].data() as Map<String, dynamic>;
+                  final incidentType = data['incidentType'] ?? 'Unknown type';
+                  final address = data['address'] ?? 'Unknown address';
+                  final timestamp = data['timestamp'] as Timestamp?;
+                  final time = timestamp != null
+                      ? DateFormat('MMM d, h:mm a').format(timestamp.toDate())
+                      : 'Unknown time';
+
+                  IconData icon;
+                  Color color;
+
+                  switch (incidentType.toString().toLowerCase()) {
+                    case 'fire':
+                      icon = Icons.local_fire_department;
+                      color = Colors.redAccent;
+                      break;
+                    case 'flood':
+                      icon = Icons.water_drop;
+                      color = Colors.blueAccent;
+                      break;
+                    case 'accident':
+                      icon = Icons.car_crash;
+                      color = Colors.orangeAccent;
+                      break;
+                    default:
+                      icon = Icons.report;
+                      color = Colors.green;
+                  }
+
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: color.withOpacity(0.15),
+                          child: Icon(icon, color: color),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                incidentType.toString(),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                address,
+                                style: const TextStyle(
+                                  color: Colors.black54,
+                                  fontSize: 13,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                time,
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+
 
   Widget _buildProfileCard() {
     return InkWell(

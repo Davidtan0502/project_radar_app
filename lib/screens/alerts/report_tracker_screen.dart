@@ -5,7 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:project_radar_app/screens/alerts/report_detail_screen.dart';
 
 class ReportTrackerScreen extends StatefulWidget {
-  const ReportTrackerScreen({super.key});
+  final int initialTab;
+  const ReportTrackerScreen({super.key, this.initialTab = 0});
 
   @override
   State<ReportTrackerScreen> createState() => _ReportTrackerScreenState();
@@ -65,6 +66,7 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
 
     return DefaultTabController(
       length: 3,
+      initialIndex: widget.initialTab,
       child: Scaffold(
         backgroundColor: Colors.grey[50],
         appBar: AppBar(
