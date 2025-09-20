@@ -185,6 +185,12 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
     }
   }
 
+  bool _isHttpUrl(String? url) {
+    if (url == null) return false;
+    final u = url.trim();
+    return u.startsWith('http://') || u.startsWith('https://');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -287,12 +293,31 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
     );
   }
 
-  Widget _buildProfileHeader(
+    Widget _buildProfileHeader(
     BuildContext context,
-    Map<String, dynamic> userData,
-  ) {
+    Map<String, dynamic> userData,) 
+    {
     const primaryColor = Color(0xFF28588B);
     final String photoUrl = (userData['photoURL'] ?? '').toString();
+
+    // Gray circular placeholder with account icon
+    Widget _grayPlaceholder(double size) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Icon(
+            Icons.account_circle,
+            size: size * 0.6, // scale icon relative to container
+            color: Colors.grey,
+          ),
+        ),
+      );
+    }
 
     return Container(
       width: double.infinity,
@@ -321,27 +346,23 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
                   border: Border.all(color: primaryColor.withOpacity(0.2), width: 3),
                 ),
                 child: ClipOval(
-                  child: photoUrl.isNotEmpty
+                  child: _isHttpUrl(photoUrl)
                       ? Image.network(
                           photoUrl,
                           width: 94,
                           height: 94,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
-                            return Image.asset(
-                              'assets/images/profile_placeholder.png',
+                            // fallback to simple gray placeholder with icon if image fails to load
+                            return Container(
                               width: 94,
                               height: 94,
-                              fit: BoxFit.cover,
+                              color: Colors.grey[200],
+                              child: Icon(Icons.account_circle, size: 94, color: Colors.grey[600]),
                             );
                           },
                         )
-                      : Image.asset(
-                          'assets/images/profile_placeholder.png',
-                          width: 94,
-                          height: 94,
-                          fit: BoxFit.cover,
-                        ),
+                      : _grayPlaceholder(94),
                 ),
               ),
               Positioned(
@@ -374,9 +395,9 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
           Text(
             capitalizeName('${userData['firstName']} ${userData['lastName']}'),
             style: const TextStyle(
-              fontSize: 20, 
-              fontWeight: FontWeight.w600, 
-              color: Colors.black87
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
             ),
           ),
           const SizedBox(height: 4),
@@ -391,6 +412,7 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
       ),
     );
   }
+
 
   Widget _buildAccountInfoCard(
     BuildContext context,
@@ -486,6 +508,22 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
 
     final String idUrl = (userData['idURL'] ?? '').toString();
 
+    // helper placeholder for ID thumbnail
+    Widget _idPlaceholder() {
+      return Container(
+        width: 64,
+        height: 64,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.grey[100],
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: const Center(
+          child: Icon(Icons.image_not_supported, size: 28, color: Colors.grey),
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -518,7 +556,7 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
           _buildInfoTile(context, icon: Icons.cake_outlined, label: 'Date of Birth', value: dob.isNotEmpty ? dob : '--'),
           const Divider(height: 1, indent: 16, endIndent: 16),
 
-          if (idUrl.isNotEmpty) ...[
+          if (idUrl.isNotEmpty && _isHttpUrl(idUrl)) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
@@ -606,6 +644,34 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
                       );
                     },
                     child: const Text('View'),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+          ] else if (idUrl.isNotEmpty && !_isHttpUrl(idUrl)) ...[
+            // Stored value exists but is not an HTTP URL (likely a storage path). Show placeholder instead
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  _idPlaceholder(),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Uploaded ID',
+                          style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'ID record present but image not available on this device.',
+                          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

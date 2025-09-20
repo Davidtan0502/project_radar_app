@@ -665,15 +665,15 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
     return parts.join(', ');
   }
 
-  // Helper to choose the right image provider depending on platform/source.
-  // WEB testing note: if you pick on web, the preview uses MemoryImage from _profileImageBytes.
-  ImageProvider _getProfileImageProvider() {
-    // priority: local File (mobile) -> in-memory bytes (web) -> remote URL -> placeholder
-    if (_profileImage != null) return FileImage(_profileImage!);
-    if (_profileImageBytes != null) return MemoryImage(_profileImageBytes!); // WEB: show picked image before upload
-    if (_profileImageUrl != null) return NetworkImage(_profileImageUrl!);
-    return const NetworkImage('https://via.placeholder.com/150');
-  }
+  // ---------- REPLACE _getProfileImageProvider() ----------
+  ImageProvider? _getProfileImageProvider() {
+  // priority: local File (mobile) -> in-memory bytes (web) -> remote URL -> null (no image)
+  if (_profileImage != null) return FileImage(_profileImage!);
+  if (_profileImageBytes != null) return MemoryImage(_profileImageBytes!); // WEB: show picked image before upload
+  if (_profileImageUrl != null && _profileImageUrl!.isNotEmpty) return NetworkImage(_profileImageUrl!);
+  // Return null so CircleAvatar will display its child (icon/placeholder)
+  return null;
+}
 
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate() || _isSaving) return;
@@ -727,9 +727,6 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      // debug: show what will be written to Firestore (helpful for testing)
-      debugPrint('DEBUG: firestore updates prepared = $updates');
-
       // If user explicitly removed profile image -> remove field in Firestore
       if (_removeProfileImage) {
         updates['photoURL'] = FieldValue.delete();
@@ -738,8 +735,7 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
         updates['idURL'] = FieldValue.delete();
       }
 
-      // always set legacy composed address for compatibility:
-      // choose the address map to compose from based on userCategory priority
+      // address composition based on category (keeps your original logic)
       if ((_userCategory ?? '').toUpperCase() == 'RESIDENT') {
         final map = _collectAddressMap(
           house: _resHouseController,
@@ -773,7 +769,6 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
         );
         updates['workAddress'] = workMap;
         updates['homeAddress'] = homeMap;
-        // Put composed address as homeMap composition for 'address' legacy field
         updates['address'] = _composeAddressStringFromMap(homeMap);
       } else if ((_userCategory ?? '').toUpperCase() == 'STUDENT') {
         final schoolMap = {
@@ -798,20 +793,31 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
         updates['homeAddress'] = homeMap;
         updates['address'] = _composeAddressStringFromMap(homeMap);
       } else {
-        // if no category, fallback to writing legacy single address if the user edited it
-        if (_addressController.text.trim().isNotEmpty) {
-          updates['address'] = _addressController.text.trim();
-        }
+        // no extra address maps for unknown category; keep legacy single address if present
       }
 
-      await docRef.set(updates, SetOptions(merge: true));
-      debugPrint('DEBUG: Firestore set completed for user ${user.uid}');
+      debugPrint('DEBUG: firestore updates prepared = $updates');
+
+      // Write to Firestore: use update when delete flags present so FieldValue.delete() works reliably,
+      // otherwise use set(merge:true) to avoid overwriting unexpected fields.
+      try {
+        if (_removeProfileImage || _removeIdImage) {
+          await docRef.update(updates);
+        } else {
+          await docRef.set(updates, SetOptions(merge: true));
+        }
+      } catch (e) {
+        // Fallback: if update fails, attempt merge set (keeps behavior robust)
+        debugPrint('DEBUG: Firestore write fallback (update/set failed) -> $e');
+        await docRef.set(updates, SetOptions(merge: true));
+      }
+
+      debugPrint('DEBUG: Firestore set/update completed for user ${user.uid}');
 
       // update FirebaseAuth user photo as well so other parts of app that read auth user are in sync
       if (profileUrl != null) {
         try {
           await user.updatePhotoURL(profileUrl);
-          // reload user to ensure currentUser.photoURL is updated
           await user.reload();
         } catch (_) {}
       } else if (_removeProfileImage) {
@@ -819,6 +825,24 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
           await user.updatePhotoURL(null);
           await user.reload();
         } catch (_) {}
+      }
+
+      // Clear local state so UI shows placeholder immediately (no stale URL)
+      if (mounted) {
+        setState(() {
+          // profile
+          _profileImage = null;
+          _profileImageBytes = null;
+          _profileImageUrl = null;
+          _profileUploadProgress = null;
+          _removeProfileImage = false;
+          // id
+          _idImage = null;
+          _idImageBytes = null;
+          _idImageUrl = null;
+          _idUploadProgress = null;
+          _removeIdImage = false;
+        });
       }
 
       // Top notification
@@ -835,7 +859,7 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
         ),
         messageColor: const Color.fromARGB(255, 255, 255, 255),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        animationDuration: const Duration(milliseconds: 500),
+        animationDuration: const Duration(milliseconds: 300),
         duration: const Duration(seconds: 3),
       ).show(context);
 
@@ -848,7 +872,7 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
       if (mounted) setState(() => _isSaving = false);
     }
   }
-
+  
   Future<bool> _confirmUnsavedChanges() async {
     // If no edits, allow pop immediately
     if (!_isFormDirty) return true;

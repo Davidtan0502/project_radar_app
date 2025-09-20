@@ -6,6 +6,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:project_radar_app/widgets/capitalize_names.dart';
@@ -88,24 +89,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // UPDATED: _getUserProfile now resolves photoURL (storage path -> download URL)
+  // and sets photoURL to '' when resolution fails so the UI shows the placeholder.
   Future<Map<String, dynamic>?> _getUserProfile() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final doc =
-          await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       final data = doc.data();
       if (data == null) return null;
 
-      // Resolve photo URL if necessary:
       try {
-        final rawPhoto = (data['photoURL'] ?? user.photoURL ?? '').toString();
+        final rawPhoto = (data['photoURL'] ?? user.photoURL ?? '').toString().trim();
         String finalPhoto = '';
 
-        if (rawPhoto.trim().isEmpty) {
+        if (rawPhoto.isEmpty) {
           finalPhoto = '';
         } else {
-          final p = rawPhoto.trim();
-          // if it's already an http(s) URL, use directly
+          final p = rawPhoto;
+          // if it's already an http(s) URL, use directly (we'll add a cache-bust token)
           if (p.startsWith('http://') || p.startsWith('https://')) {
             finalPhoto = p;
           } else {
@@ -116,20 +116,29 @@ class _HomeScreenState extends State<HomeScreen> {
               finalPhoto = url;
               debugPrint('DEBUG: Resolved storage path "$p" -> $url');
             } catch (e) {
-              // fallback: maybe the DB already stored an encoded URL (rare) or the path is wrong
+              // resolution failed (file removed / invalid path) -> ensure empty so placeholder shows
               debugPrint('DEBUG: unable to resolve photo storage path "$p": $e');
-              finalPhoto = p; // leave as-is; Image.network will try it (and fail on web if CORS)
+              finalPhoto = '';
             }
           }
         }
 
-        // Create a copy to avoid mutating Firestore map directly
+        // Add small cache-busting suffix for web/mobile so a changed/removed photo is refetched.
+        if (finalPhoto.startsWith('http')) {
+          final ts = DateTime.now().millisecondsSinceEpoch;
+          finalPhoto = finalPhoto.contains('?') ? '$finalPhoto&v=$ts' : '$finalPhoto?v=$ts';
+        }
+
+        // Return a copy with our resolved URL (may be empty)
         final Map<String, dynamic> out = Map<String, dynamic>.from(data);
         out['photoURL'] = finalPhoto;
         return out;
       } catch (e) {
         debugPrint('DEBUG: _getUserProfile error resolving photo -> $e');
-        return Map<String, dynamic>.from(data);
+        // safest fallback: return original data but ensure photoURL is empty so placeholder is used
+        final Map<String, dynamic> out = Map<String, dynamic>.from(data);
+        out['photoURL'] = '';
+        return out;
       }
     }
     return null;
@@ -863,131 +872,104 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ---------- UPDATED profile card ----------
   // Keep the updated profile card from the second file (aligns avatar with name)
-Widget _buildProfileCard() {
-  return InkWell(
-    borderRadius: BorderRadius.circular(20),
-    onTap: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const AccountInformationScreen()),
-      );
-    },
-    child: _cardContainer(
-      child: FutureBuilder<Map<String, dynamic>?>(
-        future: _getUserProfile(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-          }
+  Widget _buildProfileCard() {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AccountInformationScreen()),
+        );
+      },
+      child: _cardContainer(
+        child: FutureBuilder<Map<String, dynamic>?>(
+          future: _getUserProfile(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+            }
 
-          final data = snapshot.data;
-          if (data == null) {
+            final data = snapshot.data;
+            if (data == null) {
+              return Row(
+                children: const [
+                  Icon(Icons.account_circle, size: 60, color: Colors.grey),
+                  SizedBox(width: 12),
+                  Text("No user data found", style: TextStyle(fontSize: 14)),
+                ],
+              );
+            }
+
+            // ---- Extract profile data ----
+            final photo = (data['photoURL'] ?? '').toString().trim();
+            final name = [data['firstName'], data['lastName']]
+                .where((e) => (e ?? '').toString().trim().isNotEmpty)
+                .map((e) => capitalizeName(e.toString()))
+                .join(' ');
+
+            final category = (data['userCategory'] ?? '').toString().toUpperCase();
+            final fallback = (data['address'] ?? "No address set").toString();
+
+            String displayedAddress = fallback;
+            if (category == 'RESIDENT') {
+              final addr = data['residentAddress'] is Map ? Map<String, dynamic>.from(data['residentAddress']) : null;
+              displayedAddress = _composeShortAddress(addr, fallback: fallback);
+            } else if (category == 'STUDENT') {
+              final addr = data['schoolAddress'] is Map ? Map<String, dynamic>.from(data['schoolAddress']) : null;
+              displayedAddress = _composeShortAddress(addr, fallback: fallback);
+            } else if (category == 'EMPLOYEE') {
+              final addr = data['workAddress'] is Map ? Map<String, dynamic>.from(data['workAddress']) : null;
+              displayedAddress = _composeShortAddress(addr, fallback: fallback);
+            }
+
+            final storedVerifiedRaw = data['isVerified'];
+            final bool storedVerified = storedVerifiedRaw == true ||
+                storedVerifiedRaw == 1 ||
+                storedVerifiedRaw == '1' ||
+                (storedVerifiedRaw is String && ['true', 'yes'].contains(storedVerifiedRaw.toLowerCase().trim()));
+
+            final isComplete = _isProfileCompleteForCategory(data);
+            final shouldShowVerified = storedVerified && isComplete;
+
+            final addressLabel = category == 'RESIDENT'
+                ? 'Address:'
+                : category == 'STUDENT'
+                    ? 'School Address:'
+                    : category == 'EMPLOYEE'
+                        ? 'Work Address:'
+                        : 'Address:';
+
+            // ---- UI ----
             return Row(
-              children: const [
-                Icon(Icons.account_circle, size: 60, color: Colors.grey),
-                SizedBox(width: 12),
-                Text("No user data found", style: TextStyle(fontSize: 14)),
-              ],
-            );
-          }
-
-          // ---- Extract profile data ----
-          final photo = (data['photoURL'] ?? '').toString().trim();
-          final name = [data['firstName'], data['lastName']]
-              .where((e) => (e ?? '').toString().trim().isNotEmpty)
-              .map((e) => capitalizeName(e.toString()))
-              .join(' ');
-
-          final category = (data['userCategory'] ?? '').toString().toUpperCase();
-          final fallback = (data['address'] ?? "No address set").toString();
-
-          String displayedAddress = fallback;
-          if (category == 'RESIDENT') {
-            final addr = data['residentAddress'] is Map ? Map<String, dynamic>.from(data['residentAddress']) : null;
-            displayedAddress = _composeShortAddress(addr, fallback: fallback);
-          } else if (category == 'STUDENT') {
-            final addr = data['schoolAddress'] is Map ? Map<String, dynamic>.from(data['schoolAddress']) : null;
-            displayedAddress = _composeShortAddress(addr, fallback: fallback);
-          } else if (category == 'EMPLOYEE') {
-            final addr = data['workAddress'] is Map ? Map<String, dynamic>.from(data['workAddress']) : null;
-            displayedAddress = _composeShortAddress(addr, fallback: fallback);
-          }
-
-          final storedVerifiedRaw = data['isVerified'];
-          final bool storedVerified = storedVerifiedRaw == true ||
-              storedVerifiedRaw == 1 ||
-              storedVerifiedRaw == '1' ||
-              (storedVerifiedRaw is String && ['true', 'yes'].contains(storedVerifiedRaw.toLowerCase().trim()));
-
-          final isComplete = _isProfileCompleteForCategory(data);
-          final shouldShowVerified = storedVerified && isComplete;
-
-          final addressLabel = category == 'RESIDENT'
-              ? 'Address:'
-              : category == 'STUDENT'
-                  ? 'School Address:'
-                  : category == 'EMPLOYEE'
-                      ? 'Work Address:'
-                      : 'Address:';
-
-          // ---- UI ----
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Avatar
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.grey[200],
-                ),
-                child: photo.isEmpty
-                    ? const Icon(Icons.account_circle, size: 60, color: Colors.grey)
-                    : ClipOval(
-                        child: Image.network(
-                          photo,
-                          width: 60,
-                          height: 60,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) {
-                            debugPrint('DEBUG: failed to load profile image -> $photo');
-                            return const Icon(Icons.account_circle, size: 60, color: Colors.grey);
-                          },
-                        ),
-                      ),
-              ),
-              const SizedBox(width: 12),
-
-              // Details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Avatar + category below it
+                Column(
                   children: [
-                    // Name + verified
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            name,
-                            style: const TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.bold,
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.grey[200],
+                      ),
+                      child: photo.isEmpty
+                          ? const Icon(Icons.account_circle, size: 60, color: Colors.grey)
+                          : ClipOval(
+                              child: Image.network(
+                                photo,
+                                width: 60,
+                                height: 60,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) {
+                                  debugPrint('DEBUG: failed to load profile image -> $photo');
+                                  return const Icon(Icons.account_circle, size: 60, color: Colors.grey);
+                                },
+                              ),
                             ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (shouldShowVerified) ...[
-                          const SizedBox(width: 2),
-                          const Icon(Icons.verified, size: 17, color: Colors.blueAccent),
-                        ],
-                      ],
                     ),
-
-                    const SizedBox(height: 4),
-
-                    // Category pill (below name)
+                    const SizedBox(height: 8),
+                    // Category pill below avatar
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                       decoration: BoxDecoration(
@@ -999,20 +981,46 @@ Widget _buildProfileCard() {
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(width: 12),
 
-                    const SizedBox(height: 8),
-
-                    // Address
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(addressLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 3),
-                        Text(
-                          displayedAddress.isNotEmpty ? displayedAddress : '-',
-                          style: const TextStyle(fontSize: 13),
+                // Details (name + verified adjacent, then address label + address)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Name + verified icon immediately beside the name
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            fit: FlexFit.loose,
+                            child: Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
+                          if (shouldShowVerified) ...[
+                            const SizedBox(width: 5),
+                            const Icon(Icons.verified, size: 18, color: Colors.blueAccent),
+                          ],
                         ],
+                      ),
+
+                      const SizedBox(height: 2),
+
+                      // Address label and address underneath (address can wrap)
+                      Text(addressLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 3),
+                      Text(
+                        displayedAddress.isNotEmpty ? displayedAddress : '-',
+                        style: const TextStyle(fontSize: 13),
+                        softWrap: true,
                       ),
                     ],
                   ),

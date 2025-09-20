@@ -46,15 +46,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         (doc) async {
           if (!mounted) return;
           final data = (doc.data() as Map<String, dynamic>?) ?? {};
+
+          // prefer photoURL stored in document, then auth user photoURL
+          final rawPhoto = (data['photoURL'] ?? _user!.photoURL ?? '').toString().trim();
+
           setState(() {
             _userDataMap = data; // store for completeness/dob checks
             _firstName = capitalizeName(data['firstName'] ?? '');
             _lastName = capitalizeName(data['lastName'] ?? '');
             _isVerified = data['isVerified'] ?? false;
-            _photoURL = (data['photoURL'] ?? _user!.photoURL) ?? '';
+            _photoURL = rawPhoto;
             _email = (data['email'] ?? _user!.email) ?? '';
             _isLoading = false;
           });
+
+          // If user removed their photo, clear cache & resolved url so placeholder is immediate
+          if (rawPhoto.isEmpty) {
+            _resolvedUrlCache.clear();
+            if (mounted) setState(() => _resolvedPhotoURL = '');
+            return;
+          }
 
           // resolve photo URL if needed (non-blocking)
           await _resolvePhotoUrlIfNeeded(_photoURL);
@@ -78,15 +89,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         if (doc.exists) {
           final data = doc.data()!;
+          final rawPhoto = (data['photoURL'] ?? user.photoURL ?? '').toString().trim();
+
           setState(() {
             _userDataMap = Map<String, dynamic>.from(data);
             _firstName = capitalizeName(data['firstName'] ?? '');
             _lastName = capitalizeName(data['lastName'] ?? '');
             _isVerified = data['isVerified'] ?? false;
-            _photoURL = (data['photoURL'] ?? user.photoURL) ?? '';
+            _photoURL = rawPhoto;
             _email = (data['email'] ?? user.email) ?? '';
             _isLoading = false;
           });
+
+          // If user removed photo, clear cache & resolved url immediately
+          if (rawPhoto.isEmpty) {
+            _resolvedUrlCache.clear();
+            if (mounted) setState(() => _resolvedPhotoURL = '');
+            return;
+          }
 
           // resolve photo URL if needed
           await _resolvePhotoUrlIfNeeded(_photoURL);
@@ -94,15 +114,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
           // fallback to FirebaseAuth info
           final displayName = user.displayName ?? '';
           final parts = displayName.split(' ');
+          final rawPhoto = (user.photoURL ?? '').toString().trim();
+
           setState(() {
             _userDataMap = null;
             _firstName = parts.isNotEmpty ? capitalize(parts.first) : 'User';
             _lastName = parts.length > 1 ? capitalize(parts.last) : '';
             _isVerified = user.emailVerified;
-            _photoURL = user.photoURL ?? '';
+            _photoURL = rawPhoto;
             _email = user.email ?? '';
             _isLoading = false;
           });
+
+          if (rawPhoto.isEmpty) {
+            _resolvedUrlCache.clear();
+            if (mounted) setState(() => _resolvedPhotoURL = '');
+            return;
+          }
 
           await _resolvePhotoUrlIfNeeded(_photoURL);
         }
@@ -337,7 +365,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final fullName = '$_firstName $_lastName'.trim();
-    
+
 
     // Determine whether we should show the verified icon:
     final dbIsVerified = (_userDataMap != null) ? (_userDataMap!['isVerified'] ?? false) : _isVerified;
@@ -388,6 +416,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               children: [
                 // Profile Picture
+                // <-- SAFER: prefer resolved http(s) URLs, avoid Image.network on raw storage paths,
+                // clear placeholder immediately when photo is removed
                 Container(
                   width: 120,
                   height: 120,
@@ -401,37 +431,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           highlightColor: Colors.grey[100]!,
                           child: const Icon(Icons.account_circle, size: 120),
                         )
-                      : (_resolvedPhotoURL.isNotEmpty || _photoURL.isNotEmpty)
-                          ? ClipRRect(
+                      : (() {
+                          // decide which URL to use (prefer resolved storage URLs)
+                          final resolved = _resolvedPhotoURL.trim();
+                          final raw = _photoURL.trim();
+
+                          // If we have a resolved http(s) url, use it
+                          if (resolved.isNotEmpty) {
+                            return ClipRRect(
                               borderRadius: BorderRadius.circular(60),
                               child: Image.network(
-                                // prefer resolved URL (from storage) but fall back to raw string (useful if it's already an http URL)
-                                _resolvedPhotoURL.isNotEmpty ? _resolvedPhotoURL : _photoURL,
+                                resolved,
                                 width: 120,
                                 height: 120,
                                 fit: BoxFit.cover,
                                 errorBuilder: (_, __, ___) {
-                                  // If loading fails, fall back to auth photo or placeholder
-                                  debugPrint('DEBUG: failed to load profile image -> ${_resolvedPhotoURL.isNotEmpty ? _resolvedPhotoURL : _photoURL}');
+                                  debugPrint('DEBUG: failed to load resolved profile image -> $resolved');
+                                  // fall back to auth photo (if any) or placeholder
                                   final fallback = _user?.photoURL ?? '';
                                   if (fallback.isNotEmpty) {
-                                    return Image.network(fallback, width: 120, height: 120, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.account_circle, size: 120, color: Colors.grey));
+                                    return Image.network(
+                                      fallback,
+                                      width: 120,
+                                      height: 120,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => const Icon(Icons.account_circle, size: 120, color: Colors.grey),
+                                    );
                                   }
-                                  return const Icon(
-                                    Icons.account_circle,
-                                    size: 120,
-                                    color: Colors.grey,
-                                  );
+                                  return const Icon(Icons.account_circle, size: 120, color: Colors.grey);
                                 },
                               ),
-                            )
-                          : const Icon(
-                              Icons.account_circle,
-                              size: 120,
-                              color: Colors.grey,
-                            ),
+                            );
+                          }
+
+                          // If raw looks like an http(s) URL, use it directly
+                          if (raw.toLowerCase().startsWith('http://') || raw.toLowerCase().startsWith('https://')) {
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(60),
+                              child: Image.network(
+                                raw,
+                                width: 120,
+                                height: 120,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) {
+                                  debugPrint('DEBUG: failed to load raw profile image -> $raw');
+                                  final fallback = _user?.photoURL ?? '';
+                                  if (fallback.isNotEmpty) {
+                                    return Image.network(
+                                      fallback,
+                                      width: 120,
+                                      height: 120,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => const Icon(Icons.account_circle, size: 120, color: Colors.grey),
+                                    );
+                                  }
+                                  return const Icon(Icons.account_circle, size: 120, color: Colors.grey);
+                                },
+                              ),
+                            );
+                          }
+
+                          // Otherwise show placeholder (we avoid calling Image.network on storage paths)
+                          return const Icon(Icons.account_circle, size: 120, color: Colors.grey);
+                        })(),
                 ),
-                
 
                 const SizedBox(height: 16),
 
