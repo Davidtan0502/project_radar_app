@@ -13,12 +13,13 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 
 import 'package:project_radar_app/screens/incidents/config_loader.dart';
 import 'package:project_radar_app/screens/incidents/suspicious_content_screen.dart';
+import '../../services/config.dart';
 import 'location_picker_screen.dart';
 
 
 class IncidentReportPage extends StatefulWidget {
   const IncidentReportPage({super.key});
-  static const String _apiKey = 'AIzaSyBiE1wLunKbhEBnRx7RjoVpqk0FIJIUpSg';
+  static const String _apiKey = Config.googleAIApiKey;
 
   @override
   State<IncidentReportPage> createState() => _IncidentReportPageState();
