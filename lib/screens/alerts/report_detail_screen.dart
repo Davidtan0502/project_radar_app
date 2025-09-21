@@ -208,19 +208,54 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
       ),
     );
   }
+String _formatAddress(String rawAddress, String barangay, String city) {
+  if (barangay.isEmpty) {
+    return rawAddress;
+  }
+  
+  // Check if barangay is already part of the address
+  if (rawAddress.toLowerCase().contains(barangay.toLowerCase())) {
+    return rawAddress;
+  }
+  
+  // Check if barangay is the same as city (common when Google Maps doesn't have barangay data)
+  if (city.isNotEmpty && barangay.toLowerCase() == city.toLowerCase()) {
+    return rawAddress; // Don't add duplicate
+  }
+  
+  // Check if address ends with city and barangay is different
+  if (city.isNotEmpty && rawAddress.toLowerCase().endsWith(city.toLowerCase())) {
+    // Replace city with barangay if they're different but address contains city
+    if (barangay.toLowerCase() != city.toLowerCase()) {
+      return '${rawAddress.substring(0, rawAddress.length - city.length).trim()}, $barangay';
+    }
+    return rawAddress;
+  }
+  
+  // Default: add barangay to address
+  return '$rawAddress, $barangay';
+}
 
-  Widget _buildReportContent(Map<String, dynamic> data) {
-    final String incidentType = data['incidentType'] ?? "Incident";
-    final String description = data['description'] ?? "No description provided";
-    final String status = data['status'] ?? "Pending";
-    final String address = data['address'] ?? "Unknown address";
-    final String name = data['name'] ?? "Anonymous";
-    final String contactNumber = data['contactNumber'] ?? "Not provided";
-    final double? latitude = data['latitude'] as double?;
-    final double? longitude = data['longitude'] as double?;
-    final bool requiresReview = data['requiresReview'] ?? false;
-    final double suspicionScore = (data['suspicionScore'] ?? 0.0).toDouble();
-    final List<dynamic> imageUrls = data['imageUrls'] ?? [];
+Widget _buildReportContent(Map<String, dynamic> data) {
+  final String incidentType = data['incidentType'] ?? "Incident";
+  final String description = data['description'] ?? "No description provided";
+  final String status = data['status'] ?? "Pending";
+  
+  // Get address components
+  final String rawAddress = data['address'] ?? "Unknown address";
+  final String barangay = data['barangay'] ?? "";
+  final String city = data['city'] ?? "";
+  
+  // Smart address formatting to avoid duplicates
+  final String address = _formatAddress(rawAddress, barangay, city);
+  
+  final String name = data['name'] ?? "Anonymous";
+  final String contactNumber = data['contactNumber'] ?? "Not provided";
+  final double? latitude = data['latitude'] as double?;
+  final double? longitude = data['longitude'] as double?;
+  final bool requiresReview = data['requiresReview'] ?? false;
+  final double suspicionScore = (data['suspicionScore'] ?? 0.0).toDouble();
+  final List<dynamic> imageUrls = data['imageUrls'] ?? [];
 
     final String formattedDate = data['timestamp'] != null
         ? DateFormat('MMMM d, yyyy')

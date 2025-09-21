@@ -55,6 +55,7 @@ dependencies:
   cached_network_image: ^3.4.1
   photo_view: ^0.15.0
   flutter_polyline_points: ^3.0.1
+  google_generative_ai: ^0.2.1
 
 # Launcher icon configuration
 flutter_icons:
@@ -87,6 +88,7 @@ flutter:
   - assets/google_icon.png
   - assets/facebook_icon.png
   - assets/report.png
+  - assets/config/incident_analysis_config.json
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

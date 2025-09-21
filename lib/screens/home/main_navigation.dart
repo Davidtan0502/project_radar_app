@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:project_radar_app/community/community_screen.dart';
 import 'package:project_radar_app/screens/alerts/alert_screen.dart';
 import 'package:project_radar_app/screens/home/home_screen.dart';
 import 'package:project_radar_app/screens/hotlines/hotline_screen.dart';
@@ -57,7 +58,7 @@ class _MainNavigationState extends State<MainNavigation> {
   List<Widget> _buildScreens() {
     return [
       _buildNavigator(0, const HomeScreen()),
-      _buildNavigator(1, const MapScreen()),
+      _buildNavigator(1, const CommunityScreen()),
       _buildNavigator(2, const AlertScreen()),
       _buildNavigator(3, const HotlinesPage()),
       _buildNavigator(4, const ProfileScreen()),
@@ -139,12 +140,12 @@ class _BottomNavigationBar extends StatelessWidget {
                 isActive: currentIndex == 0,
                 onTap: () => onTap(0),
               ),
-              _NavItem(
-                icon: Icons.map_outlined,
-                activeIcon: Icons.map,
-                label: "Maps",
-                isActive: currentIndex == 1,
-                onTap: () => onTap(1),
+                _NavItem(
+                  icon: Icons.people_outline, // Changed from map_outlined
+                  activeIcon: Icons.people,    // Changed from map
+                  label: "Community",          // Changed from "Maps"
+                  isActive: currentIndex == 1,
+                  onTap: () => onTap(1),
               ),
               _AlertButton(
                 isActive: currentIndex == 2,
