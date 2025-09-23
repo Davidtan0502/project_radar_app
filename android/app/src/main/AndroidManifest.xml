@@ -3,6 +3,8 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.CALL_PHONE" />
+    <!-- For Android 13+: add POST_NOTIFICATIONS permission. You still must request it at runtime. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:label="Project Radar"
@@ -13,6 +15,16 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyD72GRS8KWHU8yzaOX7qkolLP5uIW4P2Dk"/>
+        
+         <!-- Default small icon for system notifications (system tray) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+
+        <!-- Default channel id for system notifications (must match channel created in Dart) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="incident_updates_channel" />
 
         <activity
             android:name=".MainActivity"
