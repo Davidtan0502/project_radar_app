@@ -1,4 +1,3 @@
-// <same imports as before>
 import 'package:flutter/foundation.dart'; // add for kIsWeb
 import 'dart:typed_data'; // for Uint8List (web)
 import 'dart:io';
@@ -110,7 +109,8 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   final _resHouseController = TextEditingController();
   final _resStreetController = TextEditingController();
   final _resBarangayController = TextEditingController();
-  final _resTownController = TextEditingController();
+  final _resTownController = TextEditingController(); // this holds the dropdown value (dropdown-only)
+  final _resTownManualController = TextEditingController(); // kept but NOT used for resident (kept for compatibility)
   final _resZipController = TextEditingController();
   final _resCityController = TextEditingController(text: "Manila City, Metro Manila"); // always autofilled & read-only
   final _resCountryController = TextEditingController(text: "Philippines"); // read-only
@@ -119,8 +119,9 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   final _workStreetController = TextEditingController();
   final _workBarangayController = TextEditingController();
   final _workTownController = TextEditingController();
+  final _workTownManualController = TextEditingController();
   final _workZipController = TextEditingController();
-  final _workCityController = TextEditingController(text: "Manila City, Metro Manila"); // autofilled
+  final _workCityController = TextEditingController(text: "Manila City, Metro Manila"); // editable for EMPLOYEE
   final _workCountryController = TextEditingController(text: "Philippines"); // read-only
 
   // New: Home address controllers (used by EMPLOYEE and STUDENT)
@@ -128,6 +129,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   final _homeStreetController = TextEditingController();
   final _homeBarangayController = TextEditingController();
   final _homeTownController = TextEditingController();
+  final _homeTownManualController = TextEditingController();
   final _homeZipController = TextEditingController();
   final _homeCityController = TextEditingController();
   final _homeCountryController = TextEditingController(text: "Philippines"); // read-only
@@ -137,12 +139,15 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   final _schoolStreetController = TextEditingController();
   final _schoolBarangayController = TextEditingController();
   final _schoolTownController = TextEditingController();
+  final _schoolTownManualController = TextEditingController();
   final _schoolZipController = TextEditingController();
-  final _schoolCityController = TextEditingController(text: "Manila City, Metro Manila"); // autofilled
+  final _schoolCityController = TextEditingController(text: "Manila City, Metro Manila"); // editable for STUDENT
   final _schoolCountryController = TextEditingController(text: "Philippines"); // read-only
 
   // track user category from firestore (RESIDENT / EMPLOYEE / STUDENT)
   String? _userCategory;
+  // store initial category loaded from Firestore to detect changes
+  String? _initialUserCategory;
 
   // NEW: optional middle name checkbox state
   bool _hasMiddleName = false;
@@ -181,6 +186,8 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     final data = doc.data()!;
     // read userCategory if present
     _userCategory = (data['userCategory'] ?? '').toString().trim().toUpperCase();
+    // remember initial category to detect changes later and delete old maps if needed
+    _initialUserCategory = _userCategory;
     // Compose address if legacy flat 'address' exists
     String composedAddress = '';
     if ((data['address'] ?? '').toString().trim().isNotEmpty) {
@@ -267,8 +274,23 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
         _schoolCountryController.text = schoolMap['country']?.toString() ?? 'Philippines';
       }
 
+      // For resident: DO NOT convert unknown town into 'Other' manual.
+      // For work/home/school keep normalize behavior:
+      _normalizeLoadedTownValue(_workTownController, _workTownManualController);
+      _normalizeLoadedTownValue(_schoolTownController, _schoolTownManualController);
+      _normalizeLoadedTownValue(_homeTownController, _homeTownManualController);
+
       _isFormDirty = false;
     });
+  }
+
+  void _normalizeLoadedTownValue(TextEditingController main, TextEditingController manual) {
+    final val = main.text.trim();
+    if (val.isNotEmpty && !_towns.contains(val)) {
+      // move to manual controller and mark main as 'Other' so dropdown shows Other selected
+      manual.text = val;
+      main.text = 'Other';
+    }
   }
 
   void _initializeFormListeners() {
@@ -288,6 +310,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       _resStreetController,
       _resBarangayController,
       _resTownController,
+      _resTownManualController,
       _resZipController,
       _resCityController,
       _resCountryController,
@@ -295,6 +318,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       _workStreetController,
       _workBarangayController,
       _workTownController,
+      _workTownManualController,
       _workZipController,
       _workCityController,
       _workCountryController,
@@ -303,6 +327,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       _homeStreetController,
       _homeBarangayController,
       _homeTownController,
+      _homeTownManualController,
       _homeZipController,
       _homeCityController,
       _homeCountryController,
@@ -311,6 +336,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       _schoolStreetController,
       _schoolBarangayController,
       _schoolTownController,
+      _schoolTownManualController,
       _schoolZipController,
       _schoolCityController,
       _schoolCountryController,
@@ -338,6 +364,11 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       _schoolStreetController,
       _schoolBarangayController,
       _schoolTownController,
+      // Add manual town controllers so manual typed town names are also capitalized:
+      _resTownManualController,
+      _workTownManualController,
+      _homeTownManualController,
+      _schoolTownManualController,
     ];
 
     for (final ctrl in addressControllers) {
@@ -379,6 +410,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     _resStreetController.dispose();
     _resBarangayController.dispose();
     _resTownController.dispose();
+    _resTownManualController.dispose();
     _resZipController.dispose();
     _resCityController.dispose();
     _resCountryController.dispose();
@@ -386,6 +418,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     _workStreetController.dispose();
     _workBarangayController.dispose();
     _workTownController.dispose();
+    _workTownManualController.dispose();
     _workZipController.dispose();
     _workCityController.dispose();
     _workCountryController.dispose();
@@ -394,6 +427,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     _homeStreetController.dispose();
     _homeBarangayController.dispose();
     _homeTownController.dispose();
+    _homeTownManualController.dispose();
     _homeZipController.dispose();
     _homeCityController.dispose();
     _homeCountryController.dispose();
@@ -402,6 +436,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     _schoolStreetController.dispose();
     _schoolBarangayController.dispose();
     _schoolTownController.dispose();
+    _schoolTownManualController.dispose();
     _schoolZipController.dispose();
     _schoolCityController.dispose();
     _schoolCountryController.dispose();
@@ -632,20 +667,31 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
     required TextEditingController house,
     required TextEditingController street,
     required TextEditingController barangay,
-    required TextEditingController town,
+    required TextEditingController townMain, // main dropdown controller
+    required TextEditingController townManual, // manual controller
     required TextEditingController zip,
     required TextEditingController city,
     required TextEditingController country,
   }) {
+    final String townValue = _getTownValue(townMain, townManual);
     return {
       'house': house.text.trim(),
       'street': street.text.trim(),
       'barangay': barangay.text.trim(),
-      'town': town.text.trim(),
+      'town': townValue,
       'zip': zip.text.trim(),
       'city': city.text.trim(),
       'country': country.text.trim(),
     };
+  }
+
+  // Return actual town value to save: if main == 'Other' use manual controller, otherwise main value
+  String _getTownValue(TextEditingController main, TextEditingController manual) {
+    final mainVal = main.text.trim();
+    if (mainVal.toLowerCase() == 'other') {
+      return manual.text.trim();
+    }
+    return mainVal;
   }
 
   String _composeAddressStringFromMap(Map<String, dynamic> m) {
@@ -735,25 +781,36 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
         updates['idURL'] = FieldValue.delete();
       }
 
+      // Persist the userCategory as well (so change is saved to Firestore)
+      if ((_userCategory ?? '').isNotEmpty) {
+        updates['userCategory'] = (_userCategory ?? '').toString().toUpperCase();
+      }
+
       // address composition based on category (keeps your original logic)
-      if ((_userCategory ?? '').toUpperCase() == 'RESIDENT') {
+      final newCat = (_userCategory ?? '').toString().toUpperCase();
+      final oldCat = (_initialUserCategory ?? '').toString().toUpperCase();
+
+      if (newCat == 'RESIDENT') {
         final map = _collectAddressMap(
           house: _resHouseController,
           street: _resStreetController,
           barangay: _resBarangayController,
-          town: _resTownController,
+          townMain: _resTownController,
+          townManual: _resTownManualController,
           zip: _resZipController,
           city: _resCityController,
           country: _resCountryController,
         );
         updates['residentAddress'] = map;
         updates['address'] = _composeAddressStringFromMap(map);
-      } else if ((_userCategory ?? '').toUpperCase() == 'EMPLOYEE') {
+        // ensure other maps removed if category changed
+      } else if (newCat == 'EMPLOYEE') {
         final workMap = _collectAddressMap(
           house: TextEditingController(), // work has no house in register schema; keep empty
           street: _workStreetController,
           barangay: _workBarangayController,
-          town: _workTownController,
+          townMain: _workTownController,
+          townManual: _workTownManualController,
           zip: _workZipController,
           city: _workCityController,
           country: _workCountryController,
@@ -762,7 +819,8 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
           house: _homeHouseController,
           street: _homeStreetController,
           barangay: _homeBarangayController,
-          town: _homeTownController,
+          townMain: _homeTownController,
+          townManual: _homeTownManualController,
           zip: _homeZipController,
           city: _homeCityController,
           country: _homeCountryController,
@@ -770,12 +828,12 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
         updates['workAddress'] = workMap;
         updates['homeAddress'] = homeMap;
         updates['address'] = _composeAddressStringFromMap(homeMap);
-      } else if ((_userCategory ?? '').toUpperCase() == 'STUDENT') {
+      } else if (newCat == 'STUDENT') {
         final schoolMap = {
           'schoolName': _schoolNameController.text.trim(),
           'street': _schoolStreetController.text.trim(),
           'barangay': _schoolBarangayController.text.trim(),
-          'town': _schoolTownController.text.trim(),
+          'town': _getTownValue(_schoolTownController, _schoolTownManualController),
           'zip': _schoolZipController.text.trim(),
           'city': _schoolCityController.text.trim(),
           'country': _schoolCountryController.text.trim(),
@@ -784,7 +842,8 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
           house: _homeHouseController,
           street: _homeStreetController,
           barangay: _homeBarangayController,
-          town: _homeTownController,
+          townMain: _homeTownController,
+          townManual: _homeTownManualController,
           zip: _homeZipController,
           city: _homeCityController,
           country: _homeCountryController,
@@ -796,12 +855,37 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
         // no extra address maps for unknown category; keep legacy single address if present
       }
 
+      // ---------- NEW: Delete old category-specific maps when category changed ----------
+      if (oldCat != newCat) {
+        // If user changed category, remove maps that are NOT relevant to the new category
+        // This ensures old category data is deleted as requested.
+        if (newCat == 'RESIDENT') {
+          updates['workAddress'] = FieldValue.delete();
+          updates['homeAddress'] = FieldValue.delete();
+          updates['schoolAddress'] = FieldValue.delete();
+        } else if (newCat == 'EMPLOYEE') {
+          updates['residentAddress'] = FieldValue.delete();
+          updates['schoolAddress'] = FieldValue.delete();
+        } else if (newCat == 'STUDENT') {
+          updates['residentAddress'] = FieldValue.delete();
+          updates['workAddress'] = FieldValue.delete();
+        } else {
+          // unknown -> delete all specialized maps
+          updates['residentAddress'] = FieldValue.delete();
+          updates['workAddress'] = FieldValue.delete();
+          updates['schoolAddress'] = FieldValue.delete();
+          updates['homeAddress'] = FieldValue.delete();
+        }
+      }
+      // -------------------------------------------------------------------------------
+
       debugPrint('DEBUG: firestore updates prepared = $updates');
 
-      // Write to Firestore: use update when delete flags present so FieldValue.delete() works reliably,
+      // Write to Firestore: use update when delete flags present so FieldValue.delete() is applied,
       // otherwise use set(merge:true) to avoid overwriting unexpected fields.
       try {
-        if (_removeProfileImage || _removeIdImage) {
+        if (_removeProfileImage || _removeIdImage || (oldCat != newCat)) {
+          // use update so FieldValue.delete() is applied
           await docRef.update(updates);
         } else {
           await docRef.set(updates, SetOptions(merge: true));
@@ -826,6 +910,9 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
           await user.reload();
         } catch (_) {}
       }
+
+      // update initial category snapshot so further edits won't be considered a "change" unless user actually changes again
+      _initialUserCategory = _userCategory;
 
       // Clear local state so UI shows placeholder immediately (no stale URL)
       if (mounted) {
@@ -1241,6 +1328,47 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
           hint: 'MM/DD/YYYY',
           isDateField: true,
         ),
+
+        // === NEW: Editable Category Dropdown ===
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: DropdownButtonFormField<String>(
+            value: (_userCategory != null && _userCategory!.isNotEmpty) ? _userCategory!.toUpperCase() : null,
+            decoration: InputDecoration(
+              labelText: 'Category',
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+            ),
+            items: <Map<String, String>>[
+              {'value': 'RESIDENT', 'label': 'Resident'},
+              {'value': 'EMPLOYEE', 'label': 'Employee'},
+              {'value': 'STUDENT', 'label': 'Student'},
+            ].map((m) {
+              return DropdownMenuItem<String>(
+                value: m['value'],
+                child: Text(m['label'] ?? ''),
+              );
+            }).toList(),
+            onChanged: (val) {
+              setState(() {
+                _userCategory = (val ?? '').toString().toUpperCase();
+                _markFormDirty();
+                // Note: don't clear address fields automatically — keep user-provided data
+                // so they can re-use or edit as needed. Address logic on save will use the
+                // selected _userCategory to write the appropriate maps.
+              });
+            },
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Please select a category';
+              return null;
+            },
+          ),
+        ),
+        // === end category ===
+
         // legacy single Address left out visually; separate fields used instead
       ],
     );
@@ -1258,38 +1386,56 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
           const SizedBox(height: 12),
           _buildEditableField('Street/Building No.', _workStreetController, hint: 'Street / Building'),
           _buildEditableField('Barangay/Subdivision', _workBarangayController, hint: 'Barangay / Subdivision'),
-          // Town Dropdown for work
+          // Town Dropdown for work (optional + manual "Other")
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: DropdownButtonFormField<String>(
               value: _workTownController.text.isNotEmpty ? _workTownController.text : null,
-              items: _towns.map((town) => DropdownMenuItem(value: town, child: Text(town))).toList(),
+              items: [
+                ..._towns.map((town) => DropdownMenuItem(value: town, child: Text(town))),
+                const DropdownMenuItem(value: 'Other', child: Text('Other (type manually)')),
+              ],
               onChanged: (val) {
                 setState(() {
                   _workTownController.text = val ?? '';
+                  // if user selects an actual town, clear manual value
+                  if (val != 'Other') _workTownManualController.clear();
                   _markFormDirty();
                 });
               },
               decoration: InputDecoration(
-                labelText: 'Town',
+                labelText: 'Town (optional)',
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
               ),
-              validator: (val) {
-                if ((_workTownController.text ?? '').trim().isEmpty) return 'Select work town';
-                return null;
-              },
+              // town is optional now: no validation
             ),
           ),
+          // manual town input shown only when 'Other' is selected
+          if (_workTownController.text.toLowerCase() == 'other')
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: TextFormField(
+                controller: _workTownManualController,
+                decoration: InputDecoration(
+                  labelText: 'Type town name',
+                  hintText: 'Enter town',
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                ),
+              ),
+            ),
           _buildEditableField('ZIP Code', _workZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
             if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
             if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
             return null;
           }),
-          // City auto-filled & read-only
-          _buildEditableField('City/Municipality', _workCityController, hint: 'Manila', isReadOnly: true),
+          // City is editable for EMPLOYEE (per your request)
+          _buildEditableField('City/Municipality', _workCityController, hint: 'City', isReadOnly: false),
           // Country read-only
           _buildEditableField('Country', _workCountryController, hint: 'Philippines', isReadOnly: true),
           const SizedBox(height: 16),
@@ -1298,8 +1444,46 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
           _buildEditableField('House/Unit/Building No.', _homeHouseController, hint: 'House/Unit'),
           _buildEditableField('Street Name', _homeStreetController, hint: 'Street Name'),
           _buildEditableField('Barangay/Subdivision', _homeBarangayController, hint: 'Barangay Name'),
-          // Home town remains manual text input (per your register logic) — keep as textfield
-          _buildEditableField('Town (Optional)', _homeTownController, hint: 'Town Name'),
+          // Home town dropdown optional + manual
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: DropdownButtonFormField<String>(
+              value: _homeTownController.text.isNotEmpty ? _homeTownController.text : null,
+              items: [
+                ..._towns.map((town) => DropdownMenuItem(value: town, child: Text(town))),
+                const DropdownMenuItem(value: 'Other', child: Text('Other (type manually)')),
+              ],
+              onChanged: (val) {
+                setState(() {
+                  _homeTownController.text = val ?? '';
+                  if (val != 'Other') _homeTownManualController.clear();
+                  _markFormDirty();
+                });
+              },
+              decoration: InputDecoration(
+                labelText: 'Town (optional)',
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              ),
+            ),
+          ),
+          if (_homeTownController.text.toLowerCase() == 'other')
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: TextFormField(
+                controller: _homeTownManualController,
+                decoration: InputDecoration(
+                  labelText: 'Type town name',
+                  hintText: 'Enter town',
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                ),
+              ),
+            ),
           _buildEditableField('ZIP Code', _homeZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
             if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
             if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
@@ -1319,15 +1503,19 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
           _buildEditableField('Full School Name', _schoolNameController, hint: 'Full School Name'),
           _buildEditableField('Street Name', _schoolStreetController, hint: 'Street Name'),
           _buildEditableField('Barangay/Subdivision', _schoolBarangayController, hint: 'Barangay Name'),
-          // School town dropdown
+          // School town dropdown optional + manual
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: DropdownButtonFormField<String>(
               value: _schoolTownController.text.isNotEmpty ? _schoolTownController.text : null,
-              items: _towns.map((town) => DropdownMenuItem(value: town, child: Text(town))).toList(),
+              items: [
+                ..._towns.map((town) => DropdownMenuItem(value: town, child: Text(town))),
+                const DropdownMenuItem(value: 'Other', child: Text('Other (type manually)')),
+              ],
               onChanged: (val) {
                 setState(() {
                   _schoolTownController.text = val ?? '';
+                  if (val != 'Other') _schoolTownManualController.clear();
                   _markFormDirty();
                 });
               },
@@ -1338,18 +1526,30 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
                 fillColor: Colors.white,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
               ),
-              validator: (val) {
-                if ((_schoolTownController.text ?? '').trim().isEmpty) return 'Select school town';
-                return null;
-              },
             ),
           ),
+          if (_schoolTownController.text.toLowerCase() == 'other')
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: TextFormField(
+                controller: _schoolTownManualController,
+                decoration: InputDecoration(
+                  labelText: 'Type town name',
+                  hintText: 'Enter town',
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                ),
+              ),
+            ),
           _buildEditableField('ZIP Code', _schoolZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
             if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
             if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
             return null;
           }),
-          _buildEditableField('City/Municipality', _schoolCityController, hint: 'City', isReadOnly: true),
+          // City is editable for STUDENT (per your request)
+          _buildEditableField('City/Municipality', _schoolCityController, hint: 'City', isReadOnly: false),
           _buildEditableField('Country', _schoolCountryController, hint: 'Philippines', isReadOnly: true),
           const SizedBox(height: 16),
           const Text('Home Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
@@ -1358,6 +1558,22 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
           _buildEditableField('Street Name', _homeStreetController, hint: 'Street Name'),
           _buildEditableField('Barangay/Subdivision', _homeBarangayController, hint: 'Barangay Name'),
           _buildEditableField('Town (Optional)', _homeTownController, hint: 'Town Name', validator: (val) {return null;},),
+          // if homeTown is 'Other' show manual input
+          if (_homeTownController.text.toLowerCase() == 'other')
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: TextFormField(
+                controller: _homeTownManualController,
+                decoration: InputDecoration(
+                  labelText: 'Type town name',
+                  hintText: 'Enter town',
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                ),
+              ),
+            ),
           _buildEditableField('ZIP Code', _homeZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
             if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
             if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
@@ -1368,7 +1584,16 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
         ],
       );
     } else {
-      // RESIDENT or default — show resident address
+      // RESIDENT or default — show resident address (dropdown-only town)
+      // If the loaded resident town is not in _towns, include it dynamically so the dropdown can show it.
+      final List<DropdownMenuItem<String>> residentTownItems = [
+        ..._towns.map((town) => DropdownMenuItem(value: town, child: Text(town))),
+      ];
+      final currentResTown = _resTownController.text.trim();
+      if (currentResTown.isNotEmpty && !_towns.contains(currentResTown)) {
+        residentTownItems.add(DropdownMenuItem(value: currentResTown, child: Text(currentResTown)));
+      }
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1378,12 +1603,12 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
           _buildEditableField('House/Unit/Building No.', _resHouseController, hint: 'House/Unit'),
           _buildEditableField('Street Name', _resStreetController, hint: 'Street Name'),
           _buildEditableField('Barangay/Subdivision', _resBarangayController, hint: 'Barangay Name'),
-          // Resident town dropdown
+          // Resident town dropdown: dropdown-only (no Other/manual option)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: DropdownButtonFormField<String>(
               value: _resTownController.text.isNotEmpty ? _resTownController.text : null,
-              items: _towns.map((town) => DropdownMenuItem(value: town, child: Text(town))).toList(),
+              items: residentTownItems,
               onChanged: (val) {
                 setState(() {
                   _resTownController.text = val ?? '';
@@ -1397,10 +1622,7 @@ Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
                 fillColor: Colors.white,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
               ),
-              validator: (val) {
-                if ((_resTownController.text ?? '').trim().isEmpty) return 'Select town';
-                return null;
-              },
+              // town optional (no validation) — remains dropdown-only
             ),
           ),
           _buildEditableField('ZIP Code', _resZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {

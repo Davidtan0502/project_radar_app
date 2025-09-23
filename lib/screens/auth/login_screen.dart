@@ -69,11 +69,10 @@ class _LoginScreenState extends State<LoginScreen>
 
     // Check if the email is registered in Firestore
     try {
-      final userSnapshot =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .where('email', isEqualTo: email)
-              .get();
+      final userSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .get();
 
       if (userSnapshot.docs.isEmpty) {
         // If the email is not found, show an error message and don't move to the password step
@@ -101,13 +100,16 @@ class _LoginScreenState extends State<LoginScreen>
   // The error messages
   final String notFoundMsg = 'No account found. Please register first.';
   final String invalidEmailMsg = 'This email address is invalid.';
+  // Exact string requested
   final String notVerifiedMsg =
-      'Your email isn’t verified yet. Please check your inbox.';
+      'Your email isn’t verified yet. Open your Gmail (or email) app and tap the verification link.';
   final String wrongPassMsg = 'Incorrect password. Please try again.';
   final String userDisabledMsg = 'This account has been disabled.';
   final String tooManyReqMsg = 'Too many attempts. Please try again later.';
 
-    Future<void> _handleLogin() async {
+  Future<void> _handleLogin() async {
+    // Start loading
+    if (!mounted) return;
     setState(() {
       _emailError = null;
       _passwordError = null;
@@ -117,39 +119,63 @@ class _LoginScreenState extends State<LoginScreen>
     final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text.trim();
 
+    debugPrint('Login attempt for $email');
+
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      // Sign in
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      debugPrint('signInWithEmailAndPassword succeeded: ${credential.user?.uid}');
 
       // reload user to get latest info
       await _auth.currentUser!.reload();
       final user = _auth.currentUser;
 
+      debugPrint('after reload, emailVerified=${user?.emailVerified}');
+
       // block login if email not verified
       if (user == null || !user.emailVerified) {
-        await _auth.signOut(); // logout user
-
+        // Keep user signed in or sign out? We'll keep them signed in for now and show dialog,
+        // but return to the email step (your UX can sign them out if you prefer).
+        if (!mounted) return;
         setState(() {
           _isLoading = false;
           _showPasswordStep = false;
           _passwordController.clear();
-          _emailError = notVerifiedMsg; // <-- your custom message
+          _emailError = notVerifiedMsg;
         });
+
+        // Show dialog to instruct user to open their email app
+        if (mounted) {
+          _showDialog(notVerifiedMsg);
+        }
         _emailFocusNode.requestFocus();
         return;
       }
 
-      // mark verified in Firestore (optional)
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update(
-        {'emailVerified': true},
-      );
+      // If verified --> mark in Firestore (optional)
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({'emailVerified': true});
+      } catch (e) {
+        debugPrint('Warning: failed to update emailVerified in Firestore: $e');
+      }
 
-      // Go into the app
+      // Success: navigate into app immediately (avoid relying on external race)
       if (!mounted) return;
+      setState(() => _isLoading = false);
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (e) => const MainNavigation()),
+        MaterialPageRoute(builder: (ctx) => const MainNavigation()),
       );
     } on FirebaseAuthException catch (e) {
+      debugPrint('FirebaseAuthException during login: ${e.code} ${e.message}');
+      if (!mounted) return;
       setState(() => _isLoading = false);
 
       switch (e.code) {
@@ -182,11 +208,12 @@ class _LoginScreenState extends State<LoginScreen>
           _showErrorDialog('Login error: ${e.message}');
       }
     } catch (e) {
+      debugPrint('Unexpected error during login: $e');
+      if (!mounted) return;
       setState(() => _isLoading = false);
       _showErrorDialog('An unexpected error occurred. Please try again.');
     }
   }
-
 
   Future<void> _handlePasswordReset() async {
     try {
@@ -203,45 +230,39 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   void _showDialog(String message) {
+    if (!mounted) return;
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text(
-              'RADAR',
-              style: TextStyle(color: const Color(0xFF336699)),
-            ),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'OK',
-                  style: TextStyle(color: _colorAnimation.value),
-                ),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text(
+          'RADAR',
+          style: TextStyle(color: Color(0xFF336699)),
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK', style: TextStyle(color: _colorAnimation.value)),
           ),
+        ],
+      ),
     );
   }
 
   void _showErrorDialog(String message) {
+    if (!mounted) return;
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Error', style: TextStyle(color: Colors.red)),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'OK',
-                  style: TextStyle(color: _colorAnimation.value),
-                ),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('Error', style: TextStyle(color: Colors.red)),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK', style: TextStyle(color: _colorAnimation.value)),
           ),
+        ],
+      ),
     );
   }
 
@@ -317,23 +338,22 @@ class _LoginScreenState extends State<LoginScreen>
                 borderRadius: BorderRadius.circular(30),
               ),
             ),
-            child:
-                _isLoading
-                    ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                    : Text(
-                      'Continue',
-                      style: TextStyle(
-                        fontSize: isSmallScreen ? 14 : 16,
-                        color: Colors.white,
-                      ),
+            child: _isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
                     ),
+                  )
+                : Text(
+                    'Continue',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 14 : 16,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
         ),
       ],
@@ -350,12 +370,11 @@ class _LoginScreenState extends State<LoginScreen>
           children: [
             IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed:
-                  () => setState(() {
-                    _showPasswordStep = false;
-                    _passwordController.clear();
-                    _passwordError = null;
-                  }),
+              onPressed: () => setState(() {
+                _showPasswordStep = false;
+                _passwordController.clear();
+                _passwordError = null;
+              }),
             ),
             Text(
               'Welcome Back!',
@@ -400,9 +419,7 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
+                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
                             color: Colors.grey,
                           ),
                           onPressed: () {
@@ -449,23 +466,22 @@ class _LoginScreenState extends State<LoginScreen>
                 borderRadius: BorderRadius.circular(30),
               ),
             ),
-            child:
-                _isLoading
-                    ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                    : Text(
-                      'Login',
-                      style: TextStyle(
-                        fontSize: isSmallScreen ? 14 : 16,
-                        color: Colors.white,
-                      ),
+            child: _isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
                     ),
+                  )
+                : Text(
+                    'Login',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 14 : 16,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
         ),
       ],
@@ -560,23 +576,17 @@ class _LoginScreenState extends State<LoginScreen>
                                 child: Column(
                                   children: [
                                     Expanded(
-                                      child:
-                                          _showPasswordStep
-                                              ? _buildPasswordStep()
-                                              : _buildEmailStep(),
+                                      child: _showPasswordStep ? _buildPasswordStep() : _buildEmailStep(),
                                     ),
                                     if (!_showPasswordStep) ...[
                                       const SizedBox(height: 12),
                                       Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
+                                        mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
                                           const Text("Don't have an account? "),
                                           TextButton(
                                             onPressed: () {
-                                              TermsConditionScreen.show(
-                                                context,
-                                              );
+                                              TermsConditionScreen.show(context);
                                             },
                                             child: const Text("Register"),
                                           ),

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'verify_info_screen.dart';
 import 'package:another_flushbar/flushbar.dart';
+import 'dart:math'; // <-- added for selection clamping
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -37,11 +38,11 @@ class _RegisterScreenState extends State<RegisterScreen>
   final TextEditingController _houseController = TextEditingController(); // House/Unit
   final TextEditingController _streetController = TextEditingController(); // Street
   final TextEditingController _barangayController = TextEditingController(); // Barangay
-  final TextEditingController _residentTownController = TextEditingController(); // Resident town manual now (kept for storage)
-  String? _selectedTown; // now used for resident dropdown
+  final TextEditingController _residentTownController = TextEditingController(); // Resident town manual storage
+  String? _selectedTown; // used for resident dropdown
   final TextEditingController _zipController = TextEditingController(); // Resident ZIP
   final TextEditingController _cityController =
-      TextEditingController(text: "Manila City, Metro Manila"); // read-only for resident
+      TextEditingController(text: "Manila City"); // read-only for resident
   final TextEditingController _countryController =
       TextEditingController(text: "Philippines"); // read-only
 
@@ -51,11 +52,11 @@ class _RegisterScreenState extends State<RegisterScreen>
   final TextEditingController _workBarangayController =
       TextEditingController();
   final TextEditingController _workTownController =
-      TextEditingController(); // fallback/manual town for work (kept for backwards compat)
+      TextEditingController(); // manual town fallback if user types
   String? _selectedWorkTown; // dropdown selection for work
   final TextEditingController _workZipController = TextEditingController();
   final TextEditingController _workCityController =
-      TextEditingController(text: "Manila City, Metro Manila"); // INIT, now READ-ONLY
+      TextEditingController(); // now editable (manual)
   final TextEditingController _workCountryController =
       TextEditingController(text: "Philippines"); // read-only
 
@@ -65,11 +66,11 @@ class _RegisterScreenState extends State<RegisterScreen>
   final TextEditingController _homeBarangayController =
       TextEditingController();
   final TextEditingController _homeTownController =
-      TextEditingController(); // now manual town for home
-  String? _selectedHomeTown; // kept for backward-compat but UI uses manual controller
+      TextEditingController(); // manual town for home (optional)
+  String? _selectedHomeTown; // kept for compatibility but UI uses manual controller
   final TextEditingController _homeZipController = TextEditingController();
   final TextEditingController _homeCityController =
-      TextEditingController(); // now editable (manual)
+      TextEditingController(); // manual and required for Employee/Student
   final TextEditingController _homeCountryController =
       TextEditingController(text: "Philippines"); // read-only
 
@@ -80,11 +81,11 @@ class _RegisterScreenState extends State<RegisterScreen>
   final TextEditingController _schoolBarangayController =
       TextEditingController();
   final TextEditingController _schoolTownController =
-      TextEditingController(); // fallback/manual town for school
+      TextEditingController(); // manual town fallback if user types
   String? _selectedSchoolTown; // dropdown selection for school
   final TextEditingController _schoolZipController = TextEditingController();
   final TextEditingController _schoolCityController =
-      TextEditingController(text: "Manila City, Metro Manila"); // INIT, now READ-ONLY
+      TextEditingController(); // now editable (manual)
   final TextEditingController _schoolCountryController =
       TextEditingController(text: "Philippines"); // read-only
 
@@ -113,6 +114,10 @@ class _RegisterScreenState extends State<RegisterScreen>
     "Sampaloc",
   ];
 
+  // control flags for showing manual town input for employee/student
+  bool _showWorkTownManual = false;
+  bool _showSchoolTownManual = false;
+
   @override
   void initState() {
     super.initState();
@@ -125,6 +130,63 @@ class _RegisterScreenState extends State<RegisterScreen>
       begin: const Color(0xFF336699),
       end: const Color(0xFF5588CC),
     ).animate(_controller);
+
+    // Initialize work/school city defaults (keeps previous default but editable)
+    _workCityController.text = "Manila City";
+    _schoolCityController.text = "Manila City";
+
+    // -------------------------------
+    // New: listeners to auto Title-Case many manual text fields (EXCEPT email/phone/password/zip)
+    // Apply Title Case to: names, address text fields, town and city manual fields, school name, etc.
+    void addTitleListener(TextEditingController c) {
+      c.addListener(() {
+        final text = c.text;
+        final transformed = _toTitleCase(text);
+        if (text != transformed) {
+          final sel = c.selection;
+          c.value = TextEditingValue(
+            text: transformed,
+            selection: TextSelection(
+              baseOffset: min(max(sel.baseOffset, 0), transformed.length),
+              extentOffset: min(max(sel.extentOffset, 0), transformed.length),
+            ),
+          );
+        }
+      });
+    }
+
+    // Name fields
+    addTitleListener(_lastNameController);
+    addTitleListener(_firstNameController);
+    addTitleListener(_middleNameController);
+
+    // Resident address textual fields (not ZIP)
+    addTitleListener(_houseController);
+    addTitleListener(_streetController);
+    addTitleListener(_barangayController);
+    addTitleListener(_residentTownController);
+    addTitleListener(_cityController); // city readOnly by default but safe to have
+
+    // Work address textual fields
+    addTitleListener(_workStreetController);
+    addTitleListener(_workBarangayController);
+    addTitleListener(_workTownController);
+    addTitleListener(_workCityController);
+
+    // Home address textual fields
+    addTitleListener(_homeHouseController);
+    addTitleListener(_homeStreetController);
+    addTitleListener(_homeBarangayController);
+    addTitleListener(_homeTownController);
+    addTitleListener(_homeCityController);
+
+    // School address textual fields
+    addTitleListener(_schoolNameController);
+    addTitleListener(_schoolStreetController);
+    addTitleListener(_schoolBarangayController);
+    addTitleListener(_schoolTownController);
+    addTitleListener(_schoolCityController);
+    // -------------------------------
   }
 
   @override
@@ -174,6 +236,19 @@ class _RegisterScreenState extends State<RegisterScreen>
     super.dispose();
   }
 
+  // Helper: convert input to Title Case (each word first letter uppercase, rest lowercase)
+  String _toTitleCase(String input) {
+    if (input.trim().isEmpty) return input;
+    final parts = input.split(RegExp(r'\s+'));
+    final transformed = parts.map((word) {
+      if (word.isEmpty) return '';
+      final first = word.substring(0, 1).toUpperCase();
+      final rest = word.length > 1 ? word.substring(1).toLowerCase() : '';
+      return first + rest;
+    }).join(' ');
+    return transformed;
+  }
+
   // NEW: improved email validation (accepts subdomains like stamesa.sti.edu.ph)
   bool _isValidEmail(String email) {
     final regex = RegExp(
@@ -201,7 +276,10 @@ class _RegisterScreenState extends State<RegisterScreen>
     final workAddress = {
       'street': _workStreetController.text.trim(),
       'barangay': _workBarangayController.text.trim(),
-      'town': _selectedWorkTown ?? _workTownController.text.trim(),
+      // prefer dropdown unless 'Other' selected or dropdown null then fallback to manual controller
+      'town': (_selectedWorkTown != null && _selectedWorkTown != 'Other')
+          ? _selectedWorkTown
+          : _workTownController.text.trim(),
       'zip': _workZipController.text.trim(),
       'city': _workCityController.text.trim(),
       'country': _workCountryController.text.trim(),
@@ -221,7 +299,9 @@ class _RegisterScreenState extends State<RegisterScreen>
       'schoolName': _schoolNameController.text.trim(),
       'street': _schoolStreetController.text.trim(),
       'barangay': _schoolBarangayController.text.trim(),
-      'town': _selectedSchoolTown ?? _schoolTownController.text.trim(),
+      'town': (_selectedSchoolTown != null && _selectedSchoolTown != 'Other')
+          ? _selectedSchoolTown
+          : _schoolTownController.text.trim(),
       'zip': _schoolZipController.text.trim(),
       'city': _schoolCityController.text.trim(),
       'country': _schoolCountryController.text.trim(),
@@ -278,7 +358,14 @@ class _RegisterScreenState extends State<RegisterScreen>
         password: _passwordController.text.trim(),
       );
 
-      await userCredential.user!.sendEmailVerification();
+      // Send verification email, but don't let a failure stop the flow entirely.
+      try {
+        await userCredential.user!.sendEmailVerification();
+        debugPrint('Verification email sent to $email');
+      } catch (e) {
+        debugPrint('Error sending verification email: $e');
+        // still continue to create the Firestore record below
+      }
 
       // NEW: Build address maps to store in Firestore
       final residentAddress = {
@@ -293,9 +380,11 @@ class _RegisterScreenState extends State<RegisterScreen>
 
       final workAddress = {
         'street': _workStreetController.text.trim(),
-        'barangay': _workStreetController.text.trim(),
-        // prefer dropdown selection, fallback to text controller (keeps backward compatibility)
-        'town': _selectedWorkTown ?? _workTownController.text.trim(),
+        'barangay': _workBarangayController.text.trim(), // <-- FIXED: was using street controller before
+        // prefer dropdown selection (unless 'Other'), fallback to text controller
+        'town': (_selectedWorkTown != null && _selectedWorkTown != 'Other')
+            ? _selectedWorkTown
+            : _workTownController.text.trim(),
         'zip': _workZipController.text.trim(),
         'city': _workCityController.text.trim(),
         'country': _workCountryController.text.trim(),
@@ -315,7 +404,9 @@ class _RegisterScreenState extends State<RegisterScreen>
         'schoolName': _schoolNameController.text.trim(),
         'street': _schoolStreetController.text.trim(),
         'barangay': _schoolBarangayController.text.trim(),
-        'town': _selectedSchoolTown ?? _schoolTownController.text.trim(),
+        'town': (_selectedSchoolTown != null && _selectedSchoolTown != 'Other')
+            ? _selectedSchoolTown
+            : _schoolTownController.text.trim(),
         'zip': _schoolZipController.text.trim(),
         'city': _schoolCityController.text.trim(),
         'country': _schoolCountryController.text.trim(),
@@ -327,7 +418,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         'middleName': _hasMiddleName ? _middleNameController.text.trim() : "",
         'email': email,
         'phone': '+63${_phoneController.text.trim()}',
-        'password': _passwordController.text.trim(),
+        'password': _passwordController.text.trim(), // <-- NOTE: storing plaintext password is insecure
         'status': 'approved',
         'createdAt': FieldValue.serverTimestamp(),
         'userCategory': _selectedCategory,
@@ -339,10 +430,18 @@ class _RegisterScreenState extends State<RegisterScreen>
         if (_selectedCategory == "STUDENT") 'schoolAddress': schoolAddress,
       };
 
-      await _firestore
-          .collection('users')
-          .doc(userCredential.user!.uid)
-          .set(userData);
+      // store user record
+      final uid = userCredential.user!.uid;
+      await _firestore.collection('users').doc(uid).set(userData);
+
+      // IMPORTANT: sign out the newly-created user so auth-state listeners
+      // won't navigate to Home while the email is unverified.
+      try {
+        await _auth.signOut();
+        debugPrint('Signed out newly created user to prevent auto-navigation to Home.');
+      } catch (e) {
+        debugPrint('Error signing out after registration: $e');
+      }
 
       if (!mounted) return;
       Navigator.popUntil(context, (route) => route.isFirst);
@@ -709,7 +808,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         }),
                                         const SizedBox(height: 12),
 
-                                        // <-- FIXED: Resident Town as dropdown (keeps _residentTownController for storage) -->
+                                        // Resident Town as dropdown (required)
                                         DropdownButtonFormField<String>(
                                           value: _selectedTown ?? (_residentTownController.text.isNotEmpty ? _residentTownController.text : null),
                                           items: _towns.map((town) => DropdownMenuItem(value: town, child: Text(town))).toList(),
@@ -748,7 +847,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       ] else
                                         const SizedBox.shrink(),
 
-                                      // Employee: Work Address block (street/building, barangay, town dropdown, zip, city [READ-ONLY], country)
+                                      // Employee: Work Address block (street/building, barangay, town dropdown+optional manual, zip, city editable, country)
                                       if (_selectedCategory == "EMPLOYEE") ...[
                                         const Text("Work Address", style: TextStyle(fontWeight: FontWeight.bold)),
                                         const SizedBox(height: 8),
@@ -762,15 +861,20 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           return null;
                                         }),
                                         const SizedBox(height: 12),
-                                        // Work town dropdown (reuse _towns)
+
+                                        // Work town dropdown (optional). Includes "Other" to allow manual input.
                                         DropdownButtonFormField<String>(
                                           value: _selectedWorkTown ?? (_workTownController.text.isNotEmpty ? _workTownController.text : null),
-                                          items: _towns.map((town) => DropdownMenuItem(value: town, child: Text(town))).toList(),
+                                          items: [
+                                            ..._towns.map((town) => DropdownMenuItem(value: town, child: Text(town))),
+                                            const DropdownMenuItem(value: 'Other', child: Text('Other (type manually)')),
+                                          ],
                                           onChanged: (val) {
                                             setState(() {
                                               _selectedWorkTown = val;
-                                              // Keep fallback controller in sync (optional)
-                                              if (val != null) _workTownController.text = val;
+                                              // when Other chosen, show manual input; otherwise sync manual controller for convenience
+                                              _showWorkTownManual = val == 'Other';
+                                              if (val != null && val != 'Other') _workTownController.text = val;
                                             });
                                           },
                                           decoration: InputDecoration(
@@ -778,20 +882,31 @@ class _RegisterScreenState extends State<RegisterScreen>
                                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                             contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                                           ),
+                                          // optional: don't force selection
                                           validator: (val) {
-                                            if (val == null || val.trim().isEmpty) return 'Select work town';
                                             return null;
                                           },
                                         ),
                                         const SizedBox(height: 12),
+
+                                        // Manual town input shown only when user selects 'Other' or types directly
+                                        if (_showWorkTownManual || (_selectedWorkTown == null && _workTownController.text.isNotEmpty))
+                                          Column(
+                                            children: [
+                                              _buildTextField(_workTownController, "Type Town", Icons.edit, validator: (_) => null),
+                                              const SizedBox(height: 12),
+                                            ],
+                                          ),
+
                                         _buildTextField(_workZipController, "ZIP Code", Icons.local_post_office, keyboardType: TextInputType.number, validator: (val) {
                                           if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
                                           if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
                                           return null;
                                         }),
                                         const SizedBox(height: 12),
-                                        // <-- MINIMAL CHANGE: work city is now READ-ONLY and has no validator -->
-                                        _buildTextField(_workCityController, "City/Municipality", Icons.location_city, readOnly: true, validator: (_) => null),
+
+                                        // Work city: now editable (manual)
+                                        _buildTextField(_workCityController, "City/Municipality", Icons.location_city, validator: (_) => null),
                                         const SizedBox(height: 12),
                                         _buildTextField(_workCountryController, "Country", Icons.flag, readOnly: true, validator: (_) => null),
                                         const SizedBox(height: 16),
@@ -814,14 +929,13 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           return null;
                                         }),
                                         const SizedBox(height: 12),
-                                        // Home town is now manual text input (per your request) — **MADE OPTIONAL**
+                                        // Home town is manual text input (optional)
                                         _buildTextField(
                                           _homeTownController,
-                                          "Town",
+                                          "Town (Optional)",
                                           Icons.location_city,
                                           validator: (val) {
-                                            // Town is optional for Home Address (not all cities have 'town').
-                                            // Accept empty value (no error).
+                                            // Town optional
                                             return null;
                                           },
                                         ),
@@ -832,7 +946,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           return null;
                                         }),
                                         const SizedBox(height: 12),
-                                        // Home city remains MANUAL and REQUIRED (no change)
+                                        // Home city remains MANUAL and REQUIRED
                                         _buildTextField(_homeCityController, "City/Municipality", Icons.location_city, validator: (val) {
                                           if (val == null || val.trim().isEmpty) return 'Enter city/municipality';
                                           return null;
@@ -861,14 +975,19 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           return null;
                                         }),
                                         const SizedBox(height: 12),
-                                        // School town dropdown (keep as dropdown)
+
+                                        // School town dropdown (optional + "Other")
                                         DropdownButtonFormField<String>(
                                           value: _selectedSchoolTown ?? (_schoolTownController.text.isNotEmpty ? _schoolTownController.text : null),
-                                          items: _towns.map((town) => DropdownMenuItem(value: town, child: Text(town))).toList(),
+                                          items: [
+                                            ..._towns.map((town) => DropdownMenuItem(value: town, child: Text(town))),
+                                            const DropdownMenuItem(value: 'Other', child: Text('Other (type manually)')),
+                                          ],
                                           onChanged: (val) {
                                             setState(() {
                                               _selectedSchoolTown = val;
-                                              if (val != null) _schoolTownController.text = val;
+                                              _showSchoolTownManual = val == 'Other';
+                                              if (val != null && val != 'Other') _schoolTownController.text = val;
                                             });
                                           },
                                           decoration: InputDecoration(
@@ -877,19 +996,28 @@ class _RegisterScreenState extends State<RegisterScreen>
                                             contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                                           ),
                                           validator: (val) {
-                                            if (val == null || val.trim().isEmpty) return 'Select school town';
+                                            // optional
                                             return null;
                                           },
                                         ),
                                         const SizedBox(height: 12),
+
+                                        if (_showSchoolTownManual || (_selectedSchoolTown == null && _schoolTownController.text.isNotEmpty))
+                                          Column(
+                                            children: [
+                                              _buildTextField(_schoolTownController, "Type Town", Icons.edit, validator: (_) => null),
+                                              const SizedBox(height: 12),
+                                            ],
+                                          ),
+
                                         _buildTextField(_schoolZipController, "ZIP Code", Icons.local_post_office, keyboardType: TextInputType.number, validator: (val) {
                                           if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
                                           if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
                                           return null;
                                         }),
                                         const SizedBox(height: 12),
-                                        // <-- MINIMAL CHANGE: school city is now READ-ONLY and has no validator -->
-                                        _buildTextField(_schoolCityController, "City/Municipality", Icons.location_city, readOnly: true, validator: (_) => null),
+                                        // School city now editable (manual)
+                                        _buildTextField(_schoolCityController, "City/Municipality", Icons.location_city, validator: (_) => null),
                                         const SizedBox(height: 12),
                                         _buildTextField(_schoolCountryController, "Country", Icons.flag, readOnly: true, validator: (_) => null),
                                         const SizedBox(height: 16),
@@ -911,13 +1039,13 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           return null;
                                         }),
                                         const SizedBox(height: 12),
-                                        // Home town manual input for students as well — **MADE OPTIONAL**
+                                        // Home town manual input for students as well — optional
                                         _buildTextField(
                                           _homeTownController,
                                           "Town (Optional)",
                                           Icons.location_city,
                                           validator: (val) {
-                                            // Town is optional for Home Address (not all cities have 'town').
+                                            // Town is optional
                                             return null;
                                           },
                                         ),
