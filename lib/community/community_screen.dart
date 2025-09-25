@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/community/evacuation_screen.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CommunityScreen extends StatelessWidget {
   const CommunityScreen({super.key});
@@ -129,22 +131,22 @@ class CommunityScreen extends StatelessWidget {
                                     context,
                                     Icons.location_city,
                                     "Delpan Center",
-                                    "Tondo, Manila"),
+                                    "74 Delpan St, San Nicolas, Manila, 1006 Metro Manila"),
                                 _buildEvacuationCard(
                                     context,
                                     Icons.school,
                                     "Rosauro Almario School",
-                                    "Sta. Cruz"),
+                                    "Manila International Container Terminal, 1012 MICT S Access Rd, Tondo, Manila, Metro Manila"),
                                 _buildEvacuationCard(
                                     context,
                                     Icons.school,
                                     "Pedro Guevarra School",
-                                    "San Nicolas"),
+                                    "HXXC+5F7, 302 San Fernando St, Binondo, Manila, 1010 Metro Manila"),
                                 _buildEvacuationCard(
                                     context,
                                     Icons.school,
                                     "B.S. Aquino Elementary",
-                                    "Baseco"),
+                                    "HXR5+4M8, Port Area, Manila, Metro Manila"),
                               ],
                             ),
                           ),
@@ -183,12 +185,12 @@ class CommunityScreen extends StatelessWidget {
                               Colors.redAccent,
                               "Donation Drive",
                               "Support disaster relief efforts by donating goods or funds."),
-                          _buildServiceTile(Icons.health_and_safety, Colors.teal,
-                              "Medical Assistance", "Get aid for medical expenses."),
-                          _buildServiceTile(Icons.directions_bus, Colors.blue,
-                              "Transportation Help", "Request a ride for urgent needs."),
-                          _buildServiceTile(Icons.school, Colors.orange,
-                              "Training Request", "Apply for skills and livelihood training."),
+                          _buildServiceTile(Icons.settings, const Color.fromARGB(255, 0, 0, 0),
+                              "Comming Soon", "--"),
+                          _buildServiceTile(Icons.settings, const Color.fromARGB(255, 0, 0, 0),
+                              "Comming Soon", "--"),
+                          _buildServiceTile(Icons.settings, const Color.fromARGB(255, 0, 0, 0),
+                              "Comming Soon", "--"),
                         ],
                       ),
                     ),
@@ -204,15 +206,16 @@ class CommunityScreen extends StatelessWidget {
     );
   }
 
-  // Evacuation Center Card (clickable)
- static Widget _buildEvacuationCard(
+ // Evacuation Center Card (clickable)
+static Widget _buildEvacuationCard(
     BuildContext context, IconData icon, String name, String address) {
   return GestureDetector(
     onTap: () {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => EvacuationScreen(
+          // OPEN the detailed screen (shows description & amenities)
+          builder: (_) => EvacuationDetailScreen(
             name: name,
             address: address,
           ),
@@ -220,6 +223,8 @@ class CommunityScreen extends StatelessWidget {
       );
     },
     child: Container(
+      // <- FIX: give the card the same height as the ListView row
+      height: 200,
       width: 160,
       margin: const EdgeInsets.only(right: 16),
       constraints: const BoxConstraints(maxWidth: 160),
@@ -234,8 +239,9 @@ class CommunityScreen extends StatelessWidget {
           ),
         ],
       ),
+      clipBehavior: Clip.hardEdge,
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             height: 100,
@@ -250,26 +256,31 @@ class CommunityScreen extends StatelessWidget {
               child: Icon(icon, size: 36, color: const Color(0xFF3F73A3)),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                Text(
-                  name,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  address,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+          Flexible(
+            fit: FlexFit.loose,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    name,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 14),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    address,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -341,6 +352,50 @@ class EvacuationDetailScreen extends StatelessWidget {
     required this.name,
     required this.address,
   });
+
+  // Helper: try to get current location and open Google Maps with origin (if available) and destination = address
+  Future<void> _openMapsWithOrigin(BuildContext context, String destinationAddress) async {
+    String destination = Uri.encodeComponent(destinationAddress);
+
+    Position? position;
+    try {
+      // check if location services are enabled
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (serviceEnabled) {
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        if (permission != LocationPermission.denied && permission != LocationPermission.deniedForever) {
+          position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+        }
+      }
+    } catch (e) {
+      debugPrint('Location error: $e');
+      position = null;
+    }
+
+    String url;
+    if (position != null) {
+      final origin = '${position.latitude},${position.longitude}';
+      url = 'https://www.google.com/maps/dir/?api=1&origin=$origin&destination=$destination&travelmode=driving';
+    } else {
+      // fallback: open maps showing the destination only
+      url = 'https://www.google.com/maps/search/?api=1&query=$destination';
+    }
+
+    final uri = Uri.parse(url);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open Google Maps')));
+      }
+    } catch (e) {
+      debugPrint('Error launching maps: $e');
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open Google Maps')));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -419,7 +474,7 @@ class EvacuationDetailScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: () => _openMapsWithOrigin(context, address),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF3F73A3),
                   padding: const EdgeInsets.symmetric(vertical: 16),

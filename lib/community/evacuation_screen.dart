@@ -26,40 +26,91 @@ class _EvacuationScreenState extends State<EvacuationScreen> {
     bool serviceEnabled;
     LocationPermission permission;
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return;
+    try {
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        // Location service disabled; stop loading so UI shows details.
+        setState(() {
+          _currentPosition = null;
+          _loading = false;
+        });
+        return;
+      }
+
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          // Permission denied; stop loading and continue without location.
+          setState(() {
+            _currentPosition = null;
+            _loading = false;
+          });
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        // Permissions are permanently denied; stop loading and continue without location.
+        setState(() {
+          _currentPosition = null;
+          _loading = false;
+        });
+        return;
+      }
+
+      // If everything ok, get current position
+      Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+      setState(() {
+        _currentPosition = position;
+        _loading = false;
+      });
+    } catch (e) {
+      // Any error: log and show content without location.
+      debugPrint('Error obtaining location: $e');
+      if (mounted) {
+        setState(() {
+          _currentPosition = null;
+          _loading = false;
+        });
+      }
     }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return;
-    }
-
-    if (permission == LocationPermission.deniedForever) return;
-
-    Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high);
-    setState(() {
-      _currentPosition = position;
-      _loading = false;
-    });
   }
 
   Future<void> _openGoogleMaps() async {
-    if (_currentPosition == null) return;
-
+    // Destination encoded
     final destination = Uri.encodeComponent(widget.address);
-    final origin = '${_currentPosition!.latitude},${_currentPosition!.longitude}';
-    final googleMapsUrl = 'https://www.google.com/maps/dir/?api=1&origin=$origin&destination=$destination&travelmode=driving';
 
-    if (await canLaunchUrl(Uri.parse(googleMapsUrl))) {
-      await launchUrl(Uri.parse(googleMapsUrl));
+    String urlString;
+    if (_currentPosition != null) {
+      final origin = '${_currentPosition!.latitude},${_currentPosition!.longitude}';
+      urlString =
+          'https://www.google.com/maps/dir/?api=1&origin=$origin&destination=$destination&travelmode=driving';
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open Google Maps')),
-      );
+      // No origin available — open Maps with destination only.
+      urlString =
+          'https://www.google.com/maps/search/?api=1&query=$destination';
+    }
+
+    final uri = Uri.parse(urlString);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open Google Maps')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error launching maps: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open Google Maps')),
+        );
+      }
     }
   }
 
@@ -80,7 +131,19 @@ class _EvacuationScreenState extends State<EvacuationScreen> {
                   Text(widget.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Text(widget.address, style: const TextStyle(fontSize: 16, color: Colors.black54)),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
+
+                  // If location unavailable, show brief hint (non-intrusive).
+                  if (_currentPosition == null)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        'Location unavailable. "Get Directions" will open maps with the destination only.',
+                        style: TextStyle(fontSize: 13, color: Colors.black54),
+                      ),
+                    ),
+
+                  const SizedBox(height: 8),
                   ElevatedButton.icon(
                     onPressed: _openGoogleMaps,
                     icon: const Icon(Icons.directions),

@@ -33,11 +33,17 @@ class NotificationService {
   String? _currentUserId;
   GlobalKey<NavigatorState>? _navigatorKey;
 
+  // Keep per-user listener subscription
+  StreamSubscription<QuerySnapshot>? _incidentSubscription;
+
   // Configuration
   static const String _androidChannelId = 'incident_updates_channel';
   static const String _androidChannelName = 'Incident Updates';
   static const String _fcmTokensCollection = 'fcm_tokens';
   static const String _usersCollection = 'users';
+
+  // Duplicate prevention
+  final Map<String, DateTime> _serverNotificationTimestamps = {};
 
   /// Initialize the notification service
   Future<void> initialize({GlobalKey<NavigatorState>? navigatorKey}) async {
@@ -46,23 +52,23 @@ class NotificationService {
     try {
       // Request permissions
       await _requestPermissions();
-      
+
       // Initialize local notifications
       await _initializeLocalNotifications();
-      
+
       // Create notification channels
       await _createNotificationChannels();
-      
+
       // Set up message handlers
       _setupMessageHandlers();
-      
+
       // Handle token refresh
       _setupTokenRefreshHandler();
-      
-      // Start Firestore listeners
-      _startIncidentListener();
-      
-      // Log token for testing (remove in production)
+
+      // Register background handler
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+      // Log token for testing
       await _logTokenForTesting();
 
       debugPrint('Notification service initialized successfully');
@@ -75,9 +81,10 @@ class NotificationService {
   Future<void> setCurrentUser(String? userId) async {
     if (userId == _currentUserId) return;
 
-    // Remove old user's token if they were logged in
+    // Remove old user's token and stop their listener
     if (_currentUserId != null) {
       await _removeTokenFromFirestore(_currentUserId!);
+      _stopIncidentListener();
     }
 
     _currentUserId = userId;
@@ -87,6 +94,8 @@ class NotificationService {
       await _saveTokenToFirestore(userId);
       // Load unread count
       await _loadUnreadCount(userId);
+      // Start listener for this user's incidents (UI updates only)
+      _startIncidentListenerForUser(userId);
     } else {
       unreadCount.value = 0;
     }
@@ -122,13 +131,10 @@ class NotificationService {
 
   Future<void> _initializeLocalNotifications() async {
     const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    
-    // Corrected iOS settings - removed onDidReceiveLocalNotification
     const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
-      // onDidReceiveLocalNotification parameter has been removed in newer versions
     );
 
     const InitializationSettings initSettings = InitializationSettings(
@@ -177,41 +183,53 @@ class NotificationService {
     _firebaseMessaging.onTokenRefresh.listen((String newToken) async {
       debugPrint('FCM token refreshed: $newToken');
       if (_currentUserId != null) {
-        await _saveTokenToFirestore(_currentUserId!);
+        await _saveTokenToFirestore(_currentUserId!, token: newToken);
       }
     });
   }
 
-  void _startIncidentListener() {
-    _firestore.collection('incidents').snapshots().listen((snapshot) {
-      for (final change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.modified) {
-          _handleIncidentUpdate(change.doc);
+  void _startIncidentListenerForUser(String userId) {
+    _stopIncidentListener();
+
+    try {
+      _incidentSubscription = _firestore
+          .collection('incidents')
+          .where('userId', isEqualTo: userId)
+          .snapshots()
+          .listen((QuerySnapshot snapshot) {
+        for (final change in snapshot.docChanges) {
+          if (change.type == DocumentChangeType.modified) {
+            _handleIncidentUpdate(change.doc);
+          }
         }
-      }
-    }, onError: (e) => debugPrint('Incident listener error: $e'));
+      }, onError: (e) => debugPrint('Incident listener error: $e'));
+    } catch (e) {
+      debugPrint('Error starting incident listener for user $userId: $e');
+    }
+  }
+
+  void _stopIncidentListener() {
+    _incidentSubscription?.cancel();
+    _incidentSubscription = null;
   }
 
   // MARK: - FCM Token Management
 
-  Future<void> _saveTokenToFirestore(String userId) async {
+  Future<void> _saveTokenToFirestore(String userId, {String? token}) async {
     try {
-      final String? token = await _firebaseMessaging.getToken();
-      if (token == null || token.isEmpty) {
-        debugPrint('No FCM token available for user: $userId');
-        return;
-      }
+      final String? resolvedToken = token ?? await _firebaseMessaging.getToken();
+      if (resolvedToken == null || resolvedToken.isEmpty) return;
 
       // Store token in users collection
       await _firestore.collection(_usersCollection).doc(userId).set({
-        'fcmTokens': FieldValue.arrayUnion([token]),
+        'fcmTokens': FieldValue.arrayUnion([resolvedToken]),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      // Also store in separate tokens collection for easier management
-      await _firestore.collection(_fcmTokensCollection).doc(token).set({
+      // Store in separate tokens collection
+      await _firestore.collection(_fcmTokensCollection).doc(resolvedToken).set({
         'userId': userId,
-        'token': token,
+        'token': resolvedToken,
         'platform': Platform.operatingSystem,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -228,11 +246,21 @@ class NotificationService {
       final String? token = await _firebaseMessaging.getToken();
       if (token == null) return;
 
-      await _firestore.collection(_usersCollection).doc(userId).update({
-        'fcmTokens': FieldValue.arrayRemove([token]),
-      });
+      // Remove from users collection
+      try {
+        await _firestore.collection(_usersCollection).doc(userId).update({
+          'fcmTokens': FieldValue.arrayRemove([token]),
+        });
+      } catch (e) {
+        debugPrint('Could not remove token from users/$userId: $e');
+      }
 
-      await _firestore.collection(_fcmTokensCollection).doc(token).delete();
+      // Remove from tokens collection
+      try {
+        await _firestore.collection(_fcmTokensCollection).doc(token).delete();
+      } catch (e) {
+        debugPrint('Could not delete fcm_tokens/$token: $e');
+      }
 
       debugPrint('FCM token removed for user: $userId');
     } catch (e) {
@@ -243,15 +271,8 @@ class NotificationService {
   Future<void> _logTokenForTesting() async {
     try {
       final String? token = await _firebaseMessaging.getToken();
-      debugPrint('=== FCM TOKEN FOR FIREBASE CONSOLE ===');
-      debugPrint('Token: $token');
-      debugPrint('=====================================');
-      
-      // You can also print it to console for easy copying
       if (token != null) {
-        print('\n\nCOPY THIS TOKEN FOR FIREBASE CONSOLE TESTING:');
-        print('🔑 $token');
-        print('\n\n');
+        debugPrint('FCM Token: $token');
       }
     } catch (e) {
       debugPrint('Error getting FCM token: $e');
@@ -277,6 +298,18 @@ class NotificationService {
 
   void _handleForegroundMessage(RemoteMessage message) {
     debugPrint('Foreground message: ${message.messageId}');
+    
+    // Check if this is from server (Cloud Function)
+    final isFromServer = message.data['source'] == 'server';
+    
+    if (isFromServer) {
+      // Server notification - track it to avoid duplicates
+      final incidentId = message.data['incidentId'];
+      if (incidentId != null) {
+        _serverNotificationTimestamps[incidentId] = DateTime.now();
+      }
+    }
+    
     _showNotificationFromRemote(message);
   }
 
@@ -295,8 +328,21 @@ class NotificationService {
       // Avoid processing duplicates
       if (_processedUpdateKeys.contains(updateKey)) return;
       _processedUpdateKeys.add(updateKey);
+      
+      // Clean up old keys
       if (_processedUpdateKeys.length > 200) {
         _processedUpdateKeys.remove(_processedUpdateKeys.first);
+      }
+
+      // Check if server already sent a notification for this incident
+      final serverNotificationTime = _serverNotificationTimestamps[incidentId];
+      final now = DateTime.now();
+      
+      // If server sent a notification in the last 5 seconds, skip local notification
+      if (serverNotificationTime != null && 
+          now.difference(serverNotificationTime).inSeconds < 5) {
+        debugPrint('Skipping local notification - server notification already received for incident $incidentId');
+        return;
       }
 
       // Handle status changes
@@ -314,7 +360,7 @@ class NotificationService {
       // Handle recent admin notes
       if (adminNote != null && adminNote.isNotEmpty) {
         final lastUpdated = data['lastUpdated'] as Timestamp?;
-        if (lastUpdated != null && 
+        if (lastUpdated != null &&
             DateTime.now().difference(lastUpdated.toDate()).inMinutes < 10) {
           _sendAdminNoteNotification(
             incidentId: incidentId,
@@ -406,7 +452,7 @@ class NotificationService {
 
   Future<void> markAsRead(String incidentId) async {
     if (_currentUserId == null) return;
-    
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final key = 'unread_incidents_$_currentUserId';
@@ -421,7 +467,7 @@ class NotificationService {
 
   Future<void> markAllAsRead() async {
     if (_currentUserId == null) return;
-    
+
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('unread_incidents_$_currentUserId');
@@ -435,7 +481,7 @@ class NotificationService {
 
   void _handleNotificationTap(String? payload) {
     if (payload == null) return;
-    
+
     try {
       final data = json.decode(payload) as Map<String, dynamic>;
       _handleNotificationData(data);
@@ -444,29 +490,25 @@ class NotificationService {
     }
   }
 
- // Replace the _handleNotificationData method with this:
+  void _handleNotificationData(Map<String, dynamic> data) {
+    final incidentId = data['incidentId']?.toString();
+    if (incidentId == null) return;
 
-void _handleNotificationData(Map<String, dynamic> data) {
-  final incidentId = data['incidentId']?.toString();
-  if (incidentId == null) return;
+    // Mark as read when notification is tapped
+    if (_currentUserId != null) {
+      markAsRead(incidentId);
+    }
 
-  // Mark as read when notification is tapped
-  if (_currentUserId != null) {
-    markAsRead(incidentId);
+    // Navigate to ReportTrackerScreen
+    _navigateToReportTracker(incidentId);
   }
 
-  // Navigate to ReportTrackerScreen and highlight the specific incident
-  _navigateToReportTracker(incidentId);
-}
-
-void _navigateToReportTracker(String incidentId) {
-  if (_navigatorKey?.currentState != null) {
-    _navigatorKey!.currentState!.pushNamed(
-      '/report-tracker',
+  void _navigateToReportTracker(String incidentId) {
+    _navigatorKey?.currentState?.pushNamed(
+      '/reportTracker',
       arguments: {'highlightIncidentId': incidentId},
     );
   }
-}
 
   // MARK: - Helper Methods
 
@@ -569,6 +611,68 @@ void _navigateToReportTracker(String incidentId) {
   
   Future<void> unsubscribeFromTopic(String topic) => _firebaseMessaging.unsubscribeFromTopic(topic);
 
+  /// Cleanup on account delete
+  Future<void> cleanupOnAccountDelete({required String userId}) async {
+    try {
+      // Remove tokens from Firestore
+      List<String> tokens = [];
+      try {
+        final userDoc = await _firestore.collection(_usersCollection).doc(userId).get();
+        final data = userDoc.data();
+        if (data != null && data['fcmTokens'] is List) {
+          tokens = (data['fcmTokens'] as List).whereType<String>().toList();
+        }
+      } catch (e) {
+        debugPrint('Failed to read stored tokens for $userId: $e');
+      }
+
+      if (tokens.isNotEmpty) {
+        try {
+          final batch = _firestore.batch();
+          final userRef = _firestore.collection(_usersCollection).doc(userId);
+
+          for (final token in tokens) {
+            if (token.trim().isEmpty) continue;
+            final tokenRef = _firestore.collection(_fcmTokensCollection).doc(token);
+            batch.delete(tokenRef);
+            batch.update(userRef, {
+              'fcmTokens': FieldValue.arrayRemove([token])
+            });
+          }
+          await batch.commit();
+        } catch (e) {
+          debugPrint('Failed to batch remove token docs for $userId: $e');
+        }
+      }
+
+      // Remove current device token
+      try {
+        await _removeTokenFromFirestore(userId);
+      } catch (e) {
+        debugPrint('Best-effort _removeTokenFromFirestore failed: $e');
+      }
+
+      // Clear local state
+      _stopIncidentListener();
+      _processedUpdateKeys.clear();
+      _serverNotificationTimestamps.clear();
+      _currentUserId = null;
+      unreadCount.value = 0;
+
+      // Clear local preferences
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('unread_incidents_$userId');
+      } catch (e) {
+        debugPrint('Failed to clear local unread prefs for $userId: $e');
+      }
+
+      debugPrint('NotificationService: cleanupOnAccountDelete completed for $userId');
+    } catch (e, st) {
+      debugPrint('NotificationService: cleanupOnAccountDelete error: $e\n$st');
+    }
+  }
+
   Future<void> sendTestNotification() async {
     await _showLocalNotification(
       id: 9999,
@@ -580,6 +684,8 @@ void _navigateToReportTracker(String incidentId) {
 
   void dispose() {
     _processedUpdateKeys.clear();
+    _serverNotificationTimestamps.clear();
     unreadCount.dispose();
+    _stopIncidentListener();
   }
 }

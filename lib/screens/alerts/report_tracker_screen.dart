@@ -22,10 +22,23 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
   final ReportTrackerController _controller = ReportTrackerController();
   final ScrollController _scrollController = ScrollController();
 
+  // Keys for each list item so we can scroll to / ensureVisible
+  final Map<String, GlobalKey> _itemKeys = {};
+  bool _scrolledToHighlight = false;
+
   @override
   void initState() {
     super.initState();
-    _controller.setHighlightIncidentId(widget.highlightIncidentId);
+
+    // If a highlight id was passed directly in the widget constructor, use it;
+    // otherwise read runtime arguments (ModalRoute) after the first frame so
+    // pushNamed(..., arguments: {'highlightIncidentId': id}) will work.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      final argId = args?['highlightIncidentId'] as String?;
+      final initialId = widget.highlightIncidentId ?? argId;
+      _controller.setHighlightIncidentId(initialId);
+    });
   }
 
   @override
@@ -166,6 +179,14 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
 
         if (incidents.isEmpty) return _buildEmptyState(filterResolved);
 
+        // Reset scrolled flag if highlight changes
+        if (_controller.highlightIncidentId == null) _scrolledToHighlight = false;
+
+        // Try to scroll to highlight after build
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _maybeScrollToHighlight();
+        });
+
         return ListView.builder(
           controller: _scrollController,
           padding: EdgeInsets.fromLTRB(
@@ -178,19 +199,61 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
           itemBuilder: (context, index) {
             final incident = incidents[index];
             final isHighlighted = incident.id == _controller.highlightIncidentId;
-            
-            return IncidentCard(
-              incident: incident,
-              isHighlighted: isHighlighted,
-              showDelete: !filterResolved,
-              onTap: () => _navigateToDetail(incident),
-              onDelete: () => _showDeleteConfirmation(incident.id),
-              onHighlightRemoved: () => _controller.clearHighlight(),
+
+            // create / reuse a key for the item so we can find its context later
+            final key = _itemKeys.putIfAbsent(incident.id, () => GlobalKey());
+
+            return Container(
+              key: key,
+              child: IncidentCard(
+                incident: incident,
+                isHighlighted: isHighlighted,
+                showDelete: !filterResolved,
+                onTap: () {
+                  _navigateToDetail(incident);
+                  if (isHighlighted) {
+                    _controller.clearHighlight();
+                    // allow next highlight to scroll again
+                    _scrolledToHighlight = false;
+                  }
+                },
+                onDelete: () => _showDeleteConfirmation(incident.id),
+                onHighlightRemoved: () {
+                  _controller.clearHighlight();
+                  _scrolledToHighlight = false;
+                },
+              ),
             );
           },
         );
       },
     );
+  }
+
+  /// Scroll to highlighted item if present and not yet scrolled to.
+  void _maybeScrollToHighlight() {
+    final id = _controller.highlightIncidentId;
+    if (id == null) return;
+    if (_scrolledToHighlight) return;
+
+    final key = _itemKeys[id];
+    if (key == null) return;
+    final ctx = key.currentContext;
+    if (ctx == null) {
+      // Item not yet laid out; skip. The post frame callback from the builder will retry next build.
+      return;
+    }
+
+    // Ensure the widget is visible in the viewport
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 400),
+      alignment: 0.5,
+      curve: Curves.easeInOut,
+    );
+
+    // mark done so we don't repeatedly scroll
+    _scrolledToHighlight = true;
   }
 
   Widget _buildFilteredResolvedReports() {

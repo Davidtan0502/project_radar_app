@@ -36,8 +36,14 @@ class TermsConditionScreen {
                   height: 250,
                   child: SingleChildScrollView(
                     child: Text(
-                      'By registering, you agree to our Terms and Conditions, including the collection and use of your personal and location data to provide emergency services.\n\n'
-                      'You also agree to use the application responsibly and understand that it does not replace professional emergency responders.\n',
+                      'By registering, you agree to our Terms and Conditions and acknowledge our compliance with the Data Privacy Act of 2012 (RA 10173).\n\n'
+                      'We collect and process the following personal data: name, age, home address, current location, and profile image. These will be used only for:\n\n'
+                      '• Account creation and verification\n'
+                      '• Providing emergency services for response\n'
+                      '• Maintaining system security and functionality\n\n'
+                      'Your data will be kept secure, accessed only by authorized personnel, and will not be shared with third parties without your consent, except when required by law or for emergency purposes.\n\n'
+                      'You have the right to access of deletion of your personal information.\n\n'
+                      'By proceeding, you agree to use this application responsibly and understand that it supports emergency response but does not replace professional responders.\n\n',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.black87,

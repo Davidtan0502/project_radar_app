@@ -7,6 +7,7 @@ import 'package:project_radar_app/screens/profile/settings&privacy_screen.dart';
 import 'package:project_radar_app/services/navigation.dart';
 import 'package:project_radar_app/screens/auth/login_screen.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:project_radar_app/notification/notification_service.dart'; // <-- added
 
 class AccountManagementScreen extends StatelessWidget {
   const AccountManagementScreen({super.key});
@@ -138,6 +139,16 @@ class AccountManagementScreen extends StatelessWidget {
                     debugPrint('Failed to delete users/$uid doc: $e');
                   }
 
+                  // ---------- 4.5) Clean up notification tokens & local prefs (best-effort) ----------
+                  try {
+                    // This method should be implemented in your NotificationService.
+                    // It will remove tokens from Firestore (users/{uid}.fcmTokens and fcm_tokens/{token}),
+                    // stop listeners, clear unread prefs, etc.
+                    await NotificationService().cleanupOnAccountDelete(userId: uid);
+                  } catch (e) {
+                    debugPrint('Notification cleanup failed (best-effort): $e');
+                  }
+
                   // ---------- 5) Delete Auth account ----------
                   try {
                     await user.delete();
@@ -146,8 +157,28 @@ class AccountManagementScreen extends StatelessWidget {
                     rethrow;
                   }
 
-                  //  Step 6: Ensure sign out
-                  await FirebaseAuth.instance.signOut();
+                  // --- NEW: ensure auth state is refreshed before final signOut/navigation ---
+                  try {
+                    // Force refresh the local user from server so auth state is accurate.
+                    await FirebaseAuth.instance.currentUser?.reload();
+                  } catch (e) {
+                    debugPrint('Auth reload failed after delete: $e');
+                  }
+
+                  //  Step 6: Ensure sign out and navigate to Login (clear stack)
+                  try {
+                    // If currentUser is null, delete succeeded and signOut is a no-op but still safe.
+                    if (FirebaseAuth.instance.currentUser == null) {
+                      await FirebaseAuth.instance.signOut();
+                    } else {
+                      // Unexpected — force sign out to clear any stale state
+                      debugPrint('Warning: user still present after delete; forcing signOut.');
+                      await FirebaseAuth.instance.signOut();
+                    }
+                  } catch (e) {
+                    debugPrint('SignOut after delete failed: $e');
+                    // continue to navigation anyway
+                  }
 
                   // Step 7: show success and navigate to Login, clearing backstack
                   if (context.mounted) {
