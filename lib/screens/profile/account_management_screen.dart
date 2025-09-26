@@ -157,36 +157,36 @@ class AccountManagementScreen extends StatelessWidget {
                     rethrow;
                   }
 
-                  // --- NEW: ensure auth state is refreshed before final signOut/navigation ---
+                  // --- Ensure auth state is refreshed and sign out is completed before navigation ---
                   try {
-                    // Force refresh the local user from server so auth state is accurate.
-                    await FirebaseAuth.instance.currentUser?.reload();
-                  } catch (e) {
-                    debugPrint('Auth reload failed after delete: $e');
-                  }
-
-                  //  Step 6: Ensure sign out and navigate to Login (clear stack)
-                  try {
-                    // If currentUser is null, delete succeeded and signOut is a no-op but still safe.
-                    if (FirebaseAuth.instance.currentUser == null) {
-                      await FirebaseAuth.instance.signOut();
-                    } else {
-                      // Unexpected — force sign out to clear any stale state
-                      debugPrint('Warning: user still present after delete; forcing signOut.');
-                      await FirebaseAuth.instance.signOut();
+                    // Force reload (best-effort)
+                    try {
+                      await FirebaseAuth.instance.currentUser?.reload();
+                    } catch (e) {
+                      debugPrint('Auth reload failed after delete: $e');
                     }
+
+                    // Sign out to ensure auth state is cleared locally
+                    await FirebaseAuth.instance.signOut();
                   } catch (e) {
                     debugPrint('SignOut after delete failed: $e');
                     // continue to navigation anyway
                   }
 
-                  // Step 7: show success and navigate to Login, clearing backstack
+                  // --- Clear NotificationService internal state (best-effort) ---
+                  try {
+                    await NotificationService().setCurrentUser(null);
+                  } catch (e) {
+                    debugPrint('Failed to clear NotificationService current user: $e');
+                  }
+
+                  // Final navigation: clear entire navigator stack and show LoginScreen
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text("Your account was deleted.")),
                     );
 
-                    // Replace stack with LoginScreen instance (passes empty onTap to match constructor)
+                    // IMPORTANT: remove everything from navigation stack so no previous routes (e.g. main navigation) remain
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(builder: (_) => LoginScreen(onTap: () {})),
                       (route) => false,
@@ -198,10 +198,16 @@ class AccountManagementScreen extends StatelessWidget {
                   );
                 }
               } catch (e) {
-                if (e is FirebaseAuthException &&
-                    e.code == 'requires-recent-login') {
+                if (e is FirebaseAuthException && e.code == 'requires-recent-login') {
                   //  Session is too old → force logout + redirect
                   await FirebaseAuth.instance.signOut();
+
+                  // Clear NotificationService state as well (best-effort)
+                  try {
+                    await NotificationService().setCurrentUser(null);
+                  } catch (err) {
+                    debugPrint('Failed to clear NotificationService current user after signOut: $err');
+                  }
 
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(

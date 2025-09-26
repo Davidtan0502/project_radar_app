@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/community/community_screen.dart';
 import 'package:project_radar_app/screens/alerts/alert_screen.dart';
@@ -5,6 +8,7 @@ import 'package:project_radar_app/screens/home/home_screen.dart';
 import 'package:project_radar_app/screens/hotlines/hotline_screen.dart';
 import 'package:project_radar_app/screens/map/map_screen.dart';
 import 'package:project_radar_app/screens/profile/profile_screen.dart';
+import 'package:project_radar_app/screens/auth/login_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -20,6 +24,32 @@ class _MainNavigationState extends State<MainNavigation> {
   // Keep a GlobalKey<NavigatorState> per tab so we can reset individual tab navigators.
   final List<GlobalKey<NavigatorState>> _navigatorKeys =
       List.generate(5, (_) => GlobalKey<NavigatorState>());
+
+  StreamSubscription<User?>? _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Listen for auth state changes: if user becomes null, navigate to Login and clear stack.
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user == null) {
+        // If user signed out (or was deleted), make sure we clear everything and show login screen.
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => LoginScreen(onTap: () {})),
+            (route) => false,
+          );
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
 
   void _onTabTapped(int index) {
     if (index == _currentIndex) {
@@ -140,12 +170,12 @@ class _BottomNavigationBar extends StatelessWidget {
                 isActive: currentIndex == 0,
                 onTap: () => onTap(0),
               ),
-                _NavItem(
-                  icon: Icons.people_outline, // Changed from map_outlined
-                  activeIcon: Icons.people,    // Changed from map
-                  label: "Community",          // Changed from "Maps"
-                  isActive: currentIndex == 1,
-                  onTap: () => onTap(1),
+              _NavItem(
+                icon: Icons.people_outline,
+                activeIcon: Icons.people,
+                label: "Community",
+                isActive: currentIndex == 1,
+                onTap: () => onTap(1),
               ),
               _AlertButton(
                 isActive: currentIndex == 2,
