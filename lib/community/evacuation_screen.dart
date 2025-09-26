@@ -78,22 +78,37 @@ class _EvacuationScreenState extends State<EvacuationScreen> {
     }
   }
 
+  // <-- Updated function: uses Uri.https with queryParameters for safe encoding -->
   Future<void> _openGoogleMaps() async {
-    // Destination encoded
-    final destination = Uri.encodeComponent(widget.address);
+    final destinationAddress = widget.address;
 
-    String urlString;
+    Uri uri;
     if (_currentPosition != null) {
       final origin = '${_currentPosition!.latitude},${_currentPosition!.longitude}';
-      urlString =
-          'https://www.google.com/maps/dir/?api=1&origin=$origin&destination=$destination&travelmode=driving';
+      uri = Uri.https(
+        'www.google.com',
+        '/maps/dir/',
+        {
+          'api': '1',
+          'origin': origin,
+          'destination': destinationAddress,
+          'travelmode': 'driving',
+        },
+      );
     } else {
       // No origin available — open Maps with destination only.
-      urlString =
-          'https://www.google.com/maps/search/?api=1&query=$destination';
+      uri = Uri.https(
+        'www.google.com',
+        '/maps/search/',
+        {
+          'api': '1',
+          'query': destinationAddress,
+        },
+      );
     }
 
-    final uri = Uri.parse(urlString);
+    debugPrint('Opening maps URL: ${uri.toString()}');
+
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);

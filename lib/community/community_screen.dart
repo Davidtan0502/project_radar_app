@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/community/evacuation_screen.dart';
+import 'package:project_radar_app/community/donation_info_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -180,17 +181,25 @@ class CommunityScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 16),
                           
+                          // Donation Drive: navigates to DonationInfoScreen
                           _buildServiceTile(
                               Icons.volunteer_activism,
                               Colors.redAccent,
-                              "Donation Drive",
-                              "Support disaster relief efforts by donating goods or funds."),
+                              "How to donate?",
+                              "Support disaster relief efforts by donating goods or funds.",
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const DonationInfoScreen()),
+                                );
+                              }),
+
                           _buildServiceTile(Icons.settings, const Color.fromARGB(255, 0, 0, 0),
-                              "Comming Soon", "--"),
+                              "Coming Soon", "--"),
                           _buildServiceTile(Icons.settings, const Color.fromARGB(255, 0, 0, 0),
-                              "Comming Soon", "--"),
+                              "Coming Soon", "--"),
                           _buildServiceTile(Icons.settings, const Color.fromARGB(255, 0, 0, 0),
-                              "Comming Soon", "--"),
+                              "Coming Soon", "--"),
                         ],
                       ),
                     ),
@@ -206,92 +215,90 @@ class CommunityScreen extends StatelessWidget {
     );
   }
 
- // Evacuation Center Card (clickable)
-static Widget _buildEvacuationCard(
-    BuildContext context, IconData icon, String name, String address) {
-  return GestureDetector(
-    onTap: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          // OPEN the detailed screen (shows description & amenities)
-          builder: (_) => EvacuationDetailScreen(
-            name: name,
-            address: address,
+  static Widget _buildEvacuationCard(
+      BuildContext context, IconData icon, String name, String address) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EvacuationDetailScreen(
+              name: name,
+              address: address,
+            ),
           ),
+        );
+      },
+      child: Container(
+        height: 200,
+        width: 160,
+        margin: const EdgeInsets.only(right: 16),
+        constraints: const BoxConstraints(maxWidth: 160),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-      );
-    },
-    child: Container(
-      // <- FIX: give the card the same height as the ListView row
-      height: 200,
-      width: 160,
-      margin: const EdgeInsets.only(right: 16),
-      constraints: const BoxConstraints(maxWidth: 160),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            height: 100,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8F1FF),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 100,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F1FF),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Center(
+                child: Icon(icon, size: 36, color: const Color(0xFF3F73A3)),
               ),
             ),
-            child: Center(
-              child: Icon(icon, size: 36, color: const Color(0xFF3F73A3)),
-            ),
-          ),
-          Flexible(
-            fit: FlexFit.loose,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    name,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 14),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    address,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 12, color: Colors.black54),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+            Flexible(
+              fit: FlexFit.loose,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      name,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 14),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      address,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 12, color: Colors.black54),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   // Service Tile (Community Support)
   Widget _buildServiceTile(
-      IconData icon, Color color, String title, String subtitle) {
+      IconData icon, Color color, String title, String subtitle,
+      {VoidCallback? onTap}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       constraints: const BoxConstraints(
@@ -336,7 +343,7 @@ static Widget _buildEvacuationCard(
           size: 16,
           color: Colors.grey,
         ),
-        onTap: () {},
+        onTap: onTap,
       ),
     );
   }
@@ -353,7 +360,6 @@ class EvacuationDetailScreen extends StatelessWidget {
     required this.address,
   });
 
-  // Helper: try to get current location and open Google Maps with origin (if available) and destination = address
   Future<void> _openMapsWithOrigin(BuildContext context, String destinationAddress) async {
     String destination = Uri.encodeComponent(destinationAddress);
 

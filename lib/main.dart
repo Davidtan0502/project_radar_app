@@ -1,16 +1,12 @@
-// lib/main.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-
 import 'package:project_radar_app/notification/incident_details_screen.dart';
 import 'package:project_radar_app/notification/notification_service.dart';
 import 'package:project_radar_app/screens/alerts/report_tracker_screen.dart';
 import 'package:project_radar_app/screens/auth/login_screen.dart';
 import 'package:project_radar_app/screens/home/main_navigation.dart';
-
-
 import 'firebase_options.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -73,9 +69,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// AuthWrapper:
-/// - If no signed-in user -> LoginScreen.
-/// - If signed-in user -> show MainNavigation only when verified.
+
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 

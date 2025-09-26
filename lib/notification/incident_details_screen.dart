@@ -1,4 +1,3 @@
-// lib/screens/incidents/incident_details_screen.dart
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/notification/notification_service.dart';
 
