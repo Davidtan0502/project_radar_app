@@ -132,7 +132,7 @@ class _FireDepartmentPageState extends State<FireDepartmentPage> {
       'number': '+63 995 987 0248',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/trese.161',
+      'facebookUrl': 'https://www.facebook.com/profile.php?id=100064616057050',
       'phoneUri': 'tel:09959870248',
       'color': Colors.redAccent,
     },

@@ -50,14 +50,17 @@ class _IncidentReportPageState extends State<IncidentReportPage>
   bool _isLoadingLocation = true;
   Timer? _addressTypingTimer;
 
-  final CollectionReference _incidentsCollection = 
+  final CollectionReference _incidentsCollection =
       FirebaseFirestore.instance.collection('incidents');
   List<File> _selectedImages = [];
-  
+
   GoogleMapController? _mapController;
   LatLng? _currentLocation;
   final Set<Marker> _markers = {};
   bool _isMapInitialized = false;
+
+  // NEW: suppression flag to avoid loops when setting address programmatically
+  bool _suppressAddressController = false;
 
   @override
   void initState() {
@@ -78,18 +81,21 @@ class _IncidentReportPageState extends State<IncidentReportPage>
         curve: const Interval(0.3, 1, curve: Curves.easeOut),
       ),
     );
-    
-    _loadUserInfo().then((_) {
-      _getCurrentLocation().then((_) {
-        _animationController.forward();
-        setState(() => _isLoadingLocation = false);
+
+    // Only add listener once and respect suppression flag
+    _addressController.addListener(() {
+      if (_suppressAddressController) return; // don't react to programmatic sets
+      _addressTypingTimer?.cancel();
+      _addressTypingTimer = Timer(const Duration(milliseconds: 1000), () {
+        // If address is readOnly (it is in UI), user won't type; but keep this safe
+        _updateLatLongFromAddress(_addressController.text);
       });
     });
 
-    _addressController.addListener(() {
-      _addressTypingTimer?.cancel();
-      _addressTypingTimer = Timer(const Duration(milliseconds: 1000), () {
-        _updateLatLongFromAddress(_addressController.text);
+    _loadUserInfo().then((_) {
+      _getCurrentLocation().then((_) {
+        _animationController.forward();
+        if (mounted) setState(() => _isLoadingLocation = false);
       });
     });
 
@@ -138,14 +144,18 @@ class _IncidentReportPageState extends State<IncidentReportPage>
       final locations = await locationFromAddress(address);
       if (locations.isNotEmpty) {
         final loc = locations.first;
+        final newLoc = LatLng(loc.latitude, loc.longitude);
+
         setState(() {
           _latitudeController.text = loc.latitude.toStringAsFixed(6);
           _longitudeController.text = loc.longitude.toStringAsFixed(6);
-          _currentLocation = LatLng(loc.latitude, loc.longitude);
+          _currentLocation = newLoc;
           _updateMarker(_currentLocation!);
-          _mapController?.animateCamera(CameraUpdate.newLatLng(_currentLocation!));
         });
-        _updateAddressDetailsFromLatLng(_currentLocation!);
+
+        // safe animate (await so camera moves before further updates)
+        await _safeAnimateCamera(CameraUpdate.newLatLng(_currentLocation!));
+        await _updateAddressDetailsFromLatLng(_currentLocation!);
       }
     } catch (e) {
       print('Error updating lat/long from address: $e');
@@ -162,6 +172,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
           .get();
       if (!doc.exists) return;
       final data = doc.data()!;
+      if (!mounted) return;
       setState(() {
         final first = data['firstName'] as String? ?? '';
         final last = data['lastName'] as String? ?? '';
@@ -181,14 +192,17 @@ class _IncidentReportPageState extends State<IncidentReportPage>
   Future<void> _getCurrentLocation() async {
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Location services are disabled. Please enable them.'),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  const Text('Location services are disabled. Please enable them.'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          );
+        }
         return;
       }
 
@@ -196,35 +210,43 @@ class _IncidentReportPageState extends State<IncidentReportPage>
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Location permission denied'),
-              backgroundColor: Colors.orange,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Location permission denied'),
+                backgroundColor: Colors.orange,
+                behavior: SnackBarBehavior.floating,
+                shape:
+                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            );
+          }
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Location permission permanently denied'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Location permission permanently denied'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape:
+                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          );
+        }
         return;
       }
 
-      setState(() => _isLoadingLocation = true);
+      if (mounted) setState(() => _isLoadingLocation = true);
 
       final pos = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+
+      if (!mounted) return;
 
       setState(() {
         _currentLocation = LatLng(pos.latitude, pos.longitude);
@@ -234,7 +256,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
       });
 
       if (_isMapInitialized) {
-        _mapController?.animateCamera(
+        await _safeAnimateCamera(
           CameraUpdate.newCameraPosition(
             CameraPosition(target: _currentLocation!, zoom: 18),
           ),
@@ -243,22 +265,23 @@ class _IncidentReportPageState extends State<IncidentReportPage>
 
       await _updateAddressDetailsFromLatLng(_currentLocation!);
     } catch (e) {
-      setState(() {
-        _currentLocation = null;
-        _latitudeController.clear();
-        _longitudeController.clear();
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error fetching location: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      if (mounted) {
+        setState(() {
+          _currentLocation = null;
+          _latitudeController.clear();
+          _longitudeController.clear();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error fetching location: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
     } finally {
-      setState(() => _isLoadingLocation = false);
+      if (mounted) setState(() => _isLoadingLocation = false);
     }
   }
 
@@ -268,7 +291,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
         position.latitude,
         position.longitude,
       );
-      
+
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
         final addr = [
@@ -279,11 +302,15 @@ class _IncidentReportPageState extends State<IncidentReportPage>
           place.administrativeArea,
           place.postalCode
         ].where((part) => part != null && part.isNotEmpty).join(', ');
-        
-        setState(() {
-          _addressController.text = addr;
-          _barangayController.text = place.locality ?? '';
-          _streetController.text = place.street ?? '';
+
+        // Use suppression to avoid re-triggering the address listener
+        _suppressAddressController = true;
+        _addressController.text = addr;
+        _barangayController.text = place.locality ?? '';
+        _streetController.text = place.street ?? '';
+        // Reset suppression shortly after programmatic change
+        Future.delayed(const Duration(milliseconds: 150), () {
+          _suppressAddressController = false;
         });
       }
     } catch (e) {
@@ -305,6 +332,42 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     });
   }
 
+  // Helper to check if lat/lng look valid
+  bool _looksLikeValidLatLng(double lat, double lng) {
+    return lat.abs() <= 90 && lng.abs() <= 180 && !(lat == 0.0 && lng == 0.0);
+  }
+
+  // Helper to parse dynamic values into double safely
+  double _toDouble(dynamic v) {
+    if (v == null) return 0.0;
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? 0.0;
+    if (v is num) return v.toDouble();
+    return 0.0;
+  }
+
+  /// Safe animate helper: avoids calling animateCamera when the platform view isn't connected
+  Future<void> _safeAnimateCamera(CameraUpdate cu) async {
+    if (!mounted) return;
+    if (_mapController == null) {
+      // Map controller not ready yet
+      print('safeAnimateCamera skipped: map controller is null');
+      return;
+    }
+    if (!_isMapInitialized) {
+      print('safeAnimateCamera skipped: map not initialized');
+      return;
+    }
+
+    try {
+      await _mapController!.animateCamera(cu);
+    } catch (e, st) {
+      // Log and swallow - prevents platform channel exception from bubbling up
+      print('safeAnimateCamera failed: $e\n$st');
+    }
+  }
+
   @override
   void dispose() {
     _animationController.dispose();
@@ -318,7 +381,12 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     _longitudeController.dispose();
     _barangayController.dispose();
     _streetController.dispose();
-    _mapController?.dispose();
+    try {
+      _mapController?.dispose();
+    } catch (e) {
+      // ignore errors disposing controller
+    }
+    _isMapInitialized = false;
     _addressTypingTimer?.cancel();
     super.dispose();
   }
@@ -412,32 +480,38 @@ class _IncidentReportPageState extends State<IncidentReportPage>
         }
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isSuspicious
-              ? 'Report submitted and flagged for review'
-              : 'Incident report submitted successfully!'),
-          backgroundColor: isSuspicious ? Colors.orange : Colors.green,
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isSuspicious
+                ? 'Report submitted and flagged for review'
+                : 'Incident report submitted successfully!'),
+            backgroundColor: isSuspicious ? Colors.orange : Colors.green,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
 
       _resetForm();
       await Future.delayed(const Duration(seconds: 2));
       if (mounted) Navigator.pop(context);
     } catch (e) {
       print('Error submitting form: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to submit report: ${e.toString()}'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit report: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -456,7 +530,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     try {
       final config = await ConfigLoader.loadConfig();
       final patterns = ConfigLoader.getAllSuspiciousPatterns();
-      
+
       final model = GenerativeModel(
         model: 'gemini-pro',
         apiKey: IncidentReportPage._apiKey,
@@ -491,7 +565,7 @@ Response must be valid JSON only, no additional text.
         if (jsonMatch != null) {
           final jsonString = jsonMatch.group(0);
           final parsed = json.decode(jsonString!);
-          
+
           return {
             'isSuspicious': parsed['isSuspicious'] ?? false,
             'score': (parsed['score'] ?? 0.0).toDouble(),
@@ -524,7 +598,7 @@ Response must be valid JSON only, no additional text.
     final lowerText = text.toLowerCase();
     int matchCount = 0;
     List<String> matchedPatterns = [];
-    
+
     for (final pattern in patterns) {
       if (lowerText.contains(pattern.toLowerCase())) {
         matchCount++;
@@ -532,14 +606,14 @@ Response must be valid JSON only, no additional text.
         if (matchCount >= 3) break;
       }
     }
-    
+
     final score = matchCount / 10 > 1.0 ? 1.0 : matchCount / 10;
-    
+
     return {
       'isSuspicious': matchCount >= 1,
       'score': score,
       'matchedPatterns': matchedPatterns,
-      'explanation': matchCount > 0 
+      'explanation': matchCount > 0
           ? 'Found ${matchCount} suspicious pattern(s): ${matchedPatterns.join(', ')}'
           : 'No suspicious patterns detected',
     };
@@ -597,15 +671,30 @@ Response must be valid JSON only, no additional text.
                       zoom: 18,
                     ),
                     markers: _markers,
-                    onMapCreated: (GoogleMapController controller) {
+                    onMapCreated: (GoogleMapController controller) async {
                       _mapController = controller;
                       setState(() => _isMapInitialized = true);
+
+                      // Ensure the map recenters to the current location when the controller is ready
+                      if (_currentLocation != null) {
+                        try {
+                          await _safeAnimateCamera(
+                            CameraUpdate.newCameraPosition(
+                              CameraPosition(target: _currentLocation!, zoom: 18),
+                            ),
+                          );
+                        } catch (e) {
+                          print('Error animating camera onMapCreated: $e');
+                        }
+                      }
                     },
                     onTap: (LatLng position) {
                       setState(() {
                         _currentLocation = position;
-                        _latitudeController.text = position.latitude.toStringAsFixed(6);
-                        _longitudeController.text = position.longitude.toStringAsFixed(6);
+                        _latitudeController.text =
+                            position.latitude.toStringAsFixed(6);
+                        _longitudeController.text =
+                            position.longitude.toStringAsFixed(6);
                         _updateMarker(position);
                       });
                       _updateAddressDetailsFromLatLng(position);
@@ -627,8 +716,10 @@ Response must be valid JSON only, no additional text.
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.black87,
                   side: BorderSide(color: Colors.grey.shade400),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                 ),
               ),
             ),
@@ -650,20 +741,82 @@ Response must be valid JSON only, no additional text.
                   );
 
                   if (result != null && mounted) {
+                    // Robust parsing of returned values
+                    double lat = _toDouble(result["lat"]);
+                    double lng = _toDouble(result["lng"]);
+
+                    bool isValid(double a, double b) =>
+                        _looksLikeValidLatLng(a, b);
+
+                    // If lat/lng look invalid but swapped values look valid, swap them.
+                    if (!isValid(lat, lng) && isValid(lng, lat)) {
+                      final tmp = lat;
+                      lat = lng;
+                      lng = tmp;
+                      print(
+                          'Detected swapped lat/lng from picker — swapped them.');
+                    }
+
+                    // If still invalid (e.g., 0,0) fall back to current device location if available
+                    if (!isValid(lat, lng)) {
+                      if (_currentLocation != null) {
+                        lat = _currentLocation!.latitude;
+                        lng = _currentLocation!.longitude;
+                        print(
+                            'Picker returned invalid coords; falling back to device location.');
+                      } else {
+                        print(
+                            'Picker returned invalid coords and no device location available.');
+                      }
+                    }
+
+                    // Optional: log if the returned location is extremely far from device location
+                    if (_currentLocation != null) {
+                      try {
+                        final distance = Geolocator.distanceBetween(
+                            _currentLocation!.latitude,
+                            _currentLocation!.longitude,
+                            lat,
+                            lng);
+                        if (distance > 50000) {
+                          // 50 km threshold
+                          print(
+                              'Picker returned coordinates far from user location: ${distance.toStringAsFixed(0)} meters');
+                        }
+                      } catch (e) {
+                        print('Error computing distance: $e');
+                      }
+                    }
+
+                    // Update UI / map — suppress address listener while setting address
                     setState(() {
-                      _latitudeController.text = result["lat"].toStringAsFixed(6);
-                      _longitudeController.text = result["lng"].toStringAsFixed(6);
-                      _addressController.text = result["address"] ?? '';
-                      _barangayController.text = result["barangay"] ?? '';
-                      _streetController.text = result["street"] ?? '';
-                      _currentLocation = LatLng(result["lat"], result["lng"]);
+                      _latitudeController.text = lat.toStringAsFixed(6);
+                      _longitudeController.text = lng.toStringAsFixed(6);
+                      _currentLocation = LatLng(lat, lng);
                       _updateMarker(_currentLocation!);
-                      _mapController?.animateCamera(
+                    });
+
+                    // When setting address fields from picker result, suppress listener
+                    _suppressAddressController = true;
+                    final pickAddr = result["address"];
+                    if (pickAddr != null) {
+                      _addressController.text = pickAddr;
+                    }
+                    _barangayController.text =
+                        result["barangay"] ?? _barangayController.text;
+                    _streetController.text =
+                        result["street"] ?? _streetController.text;
+                    Future.delayed(const Duration(milliseconds: 150), () {
+                      _suppressAddressController = false;
+                    });
+
+                    if (_mapController != null && _isMapInitialized) {
+                      await _safeAnimateCamera(
                         CameraUpdate.newCameraPosition(
                           CameraPosition(target: _currentLocation!, zoom: 18),
                         ),
                       );
-                    });
+                    }
                   }
                 },
                 icon: const Icon(Icons.location_pin, size: 18),
@@ -671,8 +824,10 @@ Response must be valid JSON only, no additional text.
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _primaryColor,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                 ),
               ),
             ),
@@ -694,15 +849,31 @@ Response must be valid JSON only, no additional text.
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: _primaryColor, width: 2),
             ),
-            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             labelStyle: TextStyle(color: Colors.grey.shade600),
           ),
           validator: (v) => v == null || v.isEmpty ? 'Address is required' : null,
         ),
-        SizedBox(height: 0, width: 0, child: TextFormField(controller: _barangayController, enabled: false)),
-        SizedBox(height: 0, width: 0, child: TextFormField(controller: _streetController, enabled: false)),
-        SizedBox(height: 0, width: 0, child: TextFormField(controller: _latitudeController, enabled: false)),
-        SizedBox(height: 0, width: 0, child: TextFormField(controller: _longitudeController, enabled: false)),
+        SizedBox(
+            height: 0,
+            width: 0,
+            child:
+                TextFormField(controller: _barangayController, enabled: false)),
+        SizedBox(
+            height: 0,
+            width: 0,
+            child: TextFormField(controller: _streetController, enabled: false)),
+        SizedBox(
+            height: 0,
+            width: 0,
+            child:
+                TextFormField(controller: _latitudeController, enabled: false)),
+        SizedBox(
+            height: 0,
+            width: 0,
+            child:
+                TextFormField(controller: _longitudeController, enabled: false)),
       ],
     );
   }

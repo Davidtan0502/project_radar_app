@@ -54,6 +54,7 @@
     <queries>
 
     <!-- allow the DIAL intent -->
+    <package android:name="com.google.android.apps.maps"/>
     <intent>
         <action android:name="android.intent.action.DIAL" />
         <data android:scheme="tel"/>

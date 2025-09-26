@@ -20,7 +20,7 @@ class _HotlinesPageState extends State<HotlinesPage> {
       'number': '+63 932 662 2322',
       'description':
           'Handles disaster preparedness, response, and mitigation in Manila.',
-      'facebookUrl': 'https://www.facebook.com/sagipmanila',
+      'facebookUrl': 'https://www.facebook.com/MnlCDRRMO/',
       'phoneUri': 'tel:0932 662 2322',
       'color': Colors.blue,
     },

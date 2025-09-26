@@ -112,7 +112,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   final _resTownController = TextEditingController(); // this holds the dropdown value (dropdown-only)
   final _resTownManualController = TextEditingController(); // kept but NOT used for resident (kept for compatibility)
   final _resZipController = TextEditingController();
-  final _resCityController = TextEditingController(text: "Manila City, Metro Manila"); // always autofilled & read-only
+  final _resCityController = TextEditingController(text: "Manila City"); // always autofilled & read-only
   final _resCountryController = TextEditingController(text: "Philippines"); // read-only
 
   // New: Work address controllers
@@ -121,7 +121,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   final _workTownController = TextEditingController();
   final _workTownManualController = TextEditingController();
   final _workZipController = TextEditingController();
-  final _workCityController = TextEditingController(text: "Manila City, Metro Manila"); // editable for EMPLOYEE
+  final _workCityController = TextEditingController(text: "Manila City"); // editable for EMPLOYEE
   final _workCountryController = TextEditingController(text: "Philippines"); // read-only
 
   // New: Home address controllers (used by EMPLOYEE and STUDENT)
@@ -141,7 +141,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   final _schoolTownController = TextEditingController();
   final _schoolTownManualController = TextEditingController();
   final _schoolZipController = TextEditingController();
-  final _schoolCityController = TextEditingController(text: "Manila City, Metro Manila"); // editable for STUDENT
+  final _schoolCityController = TextEditingController(text: "Manila City"); // editable for STUDENT
   final _schoolCountryController = TextEditingController(text: "Philippines"); // read-only
 
   // track user category from firestore (RESIDENT / EMPLOYEE / STUDENT)

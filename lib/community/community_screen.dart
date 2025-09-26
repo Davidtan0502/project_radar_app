@@ -216,86 +216,100 @@ class CommunityScreen extends StatelessWidget {
   }
 
   static Widget _buildEvacuationCard(
-      BuildContext context, IconData icon, String name, String address) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => EvacuationDetailScreen(
-              name: name,
-              address: address,
+    BuildContext context, IconData icon, String name, String address) {
+  return GestureDetector(
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => EvacuationDetailScreen(
+            name: name,
+            address: address,
+          ),
+        ),
+      );
+    },
+    child: Container(
+      height: 200,
+      width: 160,
+      margin: const EdgeInsets.only(right: 16),
+      constraints: const BoxConstraints(maxWidth: 160),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // top image/icon area (fixed)
+          Container(
+            height: 100,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F1FF),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Center(
+              child: Icon(icon, size: 36, color: const Color(0xFF3F73A3)),
             ),
           ),
-        );
-      },
-      child: Container(
-        height: 200,
-        width: 160,
-        margin: const EdgeInsets.only(right: 16),
-        constraints: const BoxConstraints(maxWidth: 160),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.hardEdge,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              height: 100,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F1FF),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                ),
-              ),
-              child: Center(
-                child: Icon(icon, size: 36, color: const Color(0xFF3F73A3)),
-              ),
-            ),
-            Flexible(
-              fit: FlexFit.loose,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
+
+          // bottom content takes remaining space and prevents overflow
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Title — constrained so it won't push layout beyond available space
+                  Flexible(
+                    child: Text(
                       name,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 14),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
+                      softWrap: true,
                     ),
-                    const SizedBox(height: 6),
-                    Text(
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  // Address — also constrained
+                  Flexible(
+                    child: Text(
                       address,
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 12, color: Colors.black54),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
+                      softWrap: true,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
-  // Service Tile (Community Support)
+  // (Community Support)
   Widget _buildServiceTile(
       IconData icon, Color color, String title, String subtitle,
       {VoidCallback? onTap}) {
@@ -361,11 +375,9 @@ class EvacuationDetailScreen extends StatelessWidget {
   });
 
   Future<void> _openMapsWithOrigin(BuildContext context, String destinationAddress) async {
-    String destination = Uri.encodeComponent(destinationAddress);
-
+    // Try to get current location; returns null on failure/denied.
     Position? position;
     try {
-      // check if location services are enabled
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (serviceEnabled) {
         LocationPermission permission = await Geolocator.checkPermission();
@@ -381,24 +393,87 @@ class EvacuationDetailScreen extends StatelessWidget {
       position = null;
     }
 
-    String url;
+    // origin string if available
+    String? origin;
     if (position != null) {
-      final origin = '${position.latitude},${position.longitude}';
-      url = 'https://www.google.com/maps/dir/?api=1&origin=$origin&destination=$destination&travelmode=driving';
-    } else {
-      // fallback: open maps showing the destination only
-      url = 'https://www.google.com/maps/search/?api=1&query=$destination';
+      origin = '${position.latitude},${position.longitude}';
     }
 
-    final uri = Uri.parse(url);
+    // Encode components
+    final String encodedDestination = Uri.encodeComponent(destinationAddress);
+    final String? encodedOrigin = origin != null ? Uri.encodeComponent(origin) : null;
+
+    // 1) Try Android native navigation intent (google.navigation) — most reliable for driving directions on Android.
+    //    Example: google.navigation:q=lat,lng OR q=place+name
+    final Uri androidNavUri = Uri.parse('google.navigation:q=$encodedDestination&mode=d');
+
+    // 2) Try comgooglemaps scheme (iOS/Android if Google Maps app installed) with saddr/daddr
+    final String appOriginParam = encodedOrigin != null ? 'saddr=$encodedOrigin&' : '';
+    final Uri gmapsAppUri = Uri.parse('comgooglemaps://?${appOriginParam}daddr=$encodedDestination&directionsmode=driving');
+
+    // 3) Web fallback (Google Maps directions)
+    // Use /maps/dir/?api=1&origin=...&destination=...
+    final Map<String, String> webParams = origin != null
+        ? {'api': '1', 'origin': origin, 'destination': destinationAddress, 'travelmode': 'driving'}
+        : {'api': '1', 'destination': destinationAddress};
+    final Uri webUri = Uri.https('www.google.com', '/maps/dir/', webParams);
+
+    debugPrint('Trying androidNavUri: $androidNavUri');
+    debugPrint('Trying gmapsAppUri: $gmapsAppUri');
+    debugPrint('Trying webUri: $webUri');
+
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      // Try android navigation intent first
+      if (await canLaunchUrl(androidNavUri)) {
+        final launched = await launchUrl(androidNavUri, mode: LaunchMode.externalApplication);
+        if (launched) return;
+        debugPrint('androidNavUri launch returned false, continuing to other options.');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open Google Maps')));
+        debugPrint('androidNavUri not available');
       }
     } catch (e) {
-      debugPrint('Error launching maps: $e');
+      debugPrint('Error launching androidNavUri: $e');
+    }
+
+    try {
+      // Try comgooglemaps scheme
+      if (await canLaunchUrl(gmapsAppUri)) {
+        final launched = await launchUrl(gmapsAppUri, mode: LaunchMode.externalApplication);
+        if (launched) return;
+        debugPrint('gmapsAppUri launch returned false, continuing to web fallback.');
+      } else {
+        debugPrint('gmapsAppUri not available on device.');
+      }
+    } catch (e) {
+      debugPrint('Error launching gmapsAppUri: $e');
+    }
+
+    try {
+      // Try web fallback
+      if (await canLaunchUrl(webUri)) {
+        final launched = await launchUrl(webUri, mode: LaunchMode.externalApplication);
+        if (launched) return;
+        debugPrint('webUri launch returned false as well.');
+      } else {
+        debugPrint('webUri cannot be launched.');
+      }
+    } catch (e) {
+      debugPrint('Error launching webUri: $e');
+    }
+
+    // Final fallback: search the address in maps
+    final Uri fallbackSearch = Uri.https('www.google.com', '/maps/search/', {'api': '1', 'query': destinationAddress});
+    try {
+      if (await canLaunchUrl(fallbackSearch)) {
+        await launchUrl(fallbackSearch, mode: LaunchMode.externalApplication);
+        return;
+      }
+    } catch (e) {
+      debugPrint('Error launching fallbackSearch: $e');
+    }
+
+    // If all failed, notify user
+    if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open Google Maps')));
     }
   }

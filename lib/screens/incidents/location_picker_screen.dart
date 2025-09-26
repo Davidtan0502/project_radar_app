@@ -37,18 +37,53 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   // For handling the draggable sheet position
   double _sheetHeight = 0.45;
 
+  // Fallback location if initial or device location not available (Manila)
+  static const LatLng _fallbackLatLng = LatLng(14.5995, 120.9842);
+
+  // Guard that indicates map controller is ready for channel calls
+  bool _mapReady = false;
+
+  // NEW: suppression flag to avoid loops when setting address programmatically
+  bool _suppressAddressController = false;
+
   @override
   void initState() {
     super.initState();
-    _selectedLatLng = LatLng(widget.initialLat, widget.initialLng);
-    _setMarker(_selectedLatLng!);
-    _updateAddressFromLatLng(_selectedLatLng!);
-    
+
+    // Initialize selected location safely (don't assume initial values are valid)
+    _initSelectedLocation();
+
     // Add listener for manual address input
     _addressController.addListener(_handleAddressInput);
   }
 
+  Future<void> _initSelectedLocation() async {
+    // Try to use the provided initial coords if they look valid; otherwise try device location
+    if (_looksLikeValidLatLng(widget.initialLat, widget.initialLng)) {
+      _selectedLatLng = LatLng(widget.initialLat, widget.initialLng);
+    } else {
+      try {
+        final pos = await Geolocator.getCurrentPosition();
+        _selectedLatLng = LatLng(pos.latitude, pos.longitude);
+      } catch (e) {
+        // fallback
+        _selectedLatLng = _fallbackLatLng;
+      }
+    }
+
+    // Make sure marker and address are in sync
+    if (mounted) {
+      _setMarker(_selectedLatLng!);
+      // ensure address is set without triggering the listener loop
+      await _updateAddressFromLatLng(_selectedLatLng!);
+      if (mounted) setState(() {});
+    }
+  }
+
   void _handleAddressInput() {
+    // Prevent reacting to programmatic updates
+    if (_suppressAddressController) return;
+
     // Only trigger if user is manually editing (has focus)
     if (_addressFocusNode.hasFocus && !_isLoading) {
       _addressTypingTimer?.cancel();
@@ -79,14 +114,15 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
   Future<void> _updateAddressFromLatLng(LatLng pos) async {
     if (_isManualAddressEdit) return; // Don't update if user is manually editing
-    
+
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final placemarks = await placemarkFromCoordinates(
         pos.latitude,
         pos.longitude,
       );
-      if (placemarks.isNotEmpty) {
+      if (placemarks.isNotEmpty && mounted) {
         final place = placemarks.first;
         final address = [
           place.street,
@@ -96,16 +132,16 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           place.postalCode,
         ].where((e) => e != null && e.isNotEmpty).join(", ");
 
-        // Temporarily remove listener to prevent loop
-        _addressController.removeListener(_handleAddressInput);
-        
+        // Suppress listener while we update the controllers programmatically
+        _suppressAddressController = true;
+
         _addressController.text = address;
         _barangayController.text = place.locality ?? '';
         _streetController.text = place.street ?? '';
-        
-        // Re-add listener after a delay
-        Future.delayed(const Duration(milliseconds: 100), () {
-          _addressController.addListener(_handleAddressInput);
+
+        // Release suppression after a short delay to avoid immediate re-trigger
+        Future.delayed(const Duration(milliseconds: 150), () {
+          _suppressAddressController = false;
         });
       }
     } catch (e) {
@@ -121,32 +157,30 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _updateLatLongFromAddress(String address) async {
     if (address.trim().isEmpty) return;
-    
+
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final locations = await locationFromAddress(address);
       if (locations.isNotEmpty) {
         final loc = locations.first;
         final newLatLng = LatLng(loc.latitude, loc.longitude);
-        
-        await _mapController?.animateCamera(
-          CameraUpdate.newLatLng(newLatLng),
-        );
-        
+
+        // Use safe animate wrapper (checks controller state and catches errors)
+        await _safeAnimateCamera(CameraUpdate.newLatLng(newLatLng));
+
         setState(() {
           _selectedLatLng = newLatLng;
           _setMarker(newLatLng);
         });
-        
-        // Update address details from new coordinates
+
+        // Update address details from new coordinates (this will suppress listener internally)
         await _updateAddressFromLatLng(newLatLng);
       }
     } catch (e) {
@@ -163,29 +197,31 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       }
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
-        _isManualAddressEdit = false;
+        setState(() {
+          _isLoading = false;
+          _isManualAddressEdit = false;
+        });
       }
     }
   }
 
   Future<void> _goToCurrentLocation() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final pos = await Geolocator.getCurrentPosition();
       final newLatLng = LatLng(pos.latitude, pos.longitude);
-      
-      await _mapController?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(target: newLatLng, zoom: 16),
-        ),
-      );
-      
+
+      await _safeAnimateCamera(CameraUpdate.newCameraPosition(
+        CameraPosition(target: newLatLng, zoom: 16),
+      ));
+
+      if (!mounted) return;
       setState(() {
         _selectedLatLng = newLatLng;
         _setMarker(newLatLng);
       });
-      
+
       await _updateAddressFromLatLng(newLatLng);
     } catch (e) {
       debugPrint("Error getting current location: $e");
@@ -200,9 +236,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -219,15 +253,44 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   }
 
   // Adjust map padding when sheet is dragged
+  // NOTE: older google_maps_flutter versions don't expose setPadding on the controller.
+  // We keep this method as a no-op to avoid plugin errors — the GoogleMap widget already
+  // sets bottom padding using the `padding` parameter during build.
   void _adjustMapPadding(double sheetHeight) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final sheetPixelHeight = screenHeight * sheetHeight;
-    
-    if (_mapController != null) {
-      // Adjust map padding to ensure marker remains visible
-      final padding = EdgeInsets.only(bottom: sheetPixelHeight + 20);
-      _mapController!.setMapStyle('[]');
+    // Intentionally left empty to avoid calling APIs that may not be available
+    // (e.g., GoogleMapController.setPadding). The map's padding is handled
+    // directly in the GoogleMap widget build below.
+  }
+
+  // Safe wrapper for animateCamera: checks controller readiness and catches exceptions.
+  // Includes a small retry to handle cases where the platform view isn't fully ready.
+  Future<void> _safeAnimateCamera(CameraUpdate update) async {
+    if (!mounted) return;
+    if (_mapController == null || !_mapReady) {
+      debugPrint('safeAnimateCamera skipped: controller null or map not ready');
+      return;
     }
+
+    const int maxAttempts = 2;
+    int attempt = 0;
+    while (attempt < maxAttempts && mounted) {
+      try {
+        attempt++;
+        await _mapController!.animateCamera(update);
+        // success, return
+        return;
+      } catch (e, st) {
+        debugPrint('safeAnimateCamera attempt $attempt failed: $e\n$st');
+        // If last attempt, swallow and return; otherwise wait briefly and retry.
+        if (attempt >= maxAttempts) return;
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+    }
+  }
+
+  // Helper to validate lat/lng
+  bool _looksLikeValidLatLng(double lat, double lng) {
+    return lat.abs() <= 90 && lng.abs() <= 180 && !(lat == 0.0 && lng == 0.0);
   }
 
   @override
@@ -236,13 +299,27 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     _addressController.removeListener(_handleAddressInput);
     _addressController.dispose();
     _addressFocusNode.dispose();
+
+    // mark map not ready before disposing controller
+    _mapReady = false;
+    try {
+      _mapController?.dispose();
+    } catch (e) {
+      // ignore controller dispose errors
+      debugPrint('Error disposing map controller: $e');
+    }
+    _mapController = null;
+
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Guard: ensure we have a lat/lng to avoid build-time null errors.
+    final startLatLng = _selectedLatLng ?? _fallbackLatLng;
+
     final initialCameraPos = CameraPosition(
-      target: _selectedLatLng!,
+      target: startLatLng,
       zoom: 16,
     );
 
@@ -252,8 +329,19 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           // Google Map
           GoogleMap(
             initialCameraPosition: initialCameraPos,
-            onMapCreated: (controller) {
+            onMapCreated: (controller) async {
               _mapController = controller;
+              _mapReady = true;
+
+              // Ensure the camera centers to the selected location (if available)
+              if (_selectedLatLng != null) {
+                // use safe animate; don't await too long during map init
+                _safeAnimateCamera(
+                  CameraUpdate.newCameraPosition(
+                    CameraPosition(target: _selectedLatLng!, zoom: 16),
+                  ),
+                );
+              }
             },
             markers: _marker != null ? {_marker!} : {},
             onTap: (pos) {
@@ -267,6 +355,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
+            // Keep padding here — we adjust sheetHeight so the bottom UI doesn't hide the marker.
             padding: EdgeInsets.only(
               top: MediaQuery.of(context).padding.top + 60,
               bottom: MediaQuery.of(context).size.height * _sheetHeight + 20,
@@ -321,7 +410,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 onNotification: (notification) {
                   setState(() {
                     _sheetHeight = notification.extent;
-                    _adjustMapPadding(_sheetHeight);
+                    _adjustMapPadding(_sheetHeight); // no-op intentionally
                   });
                   return true;
                 },
@@ -493,7 +582,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         child: FloatingActionButton(
           backgroundColor: Colors.white,
           onPressed: _isLoading ? null : _goToCurrentLocation,
-          child: Icon(Icons.my_location, 
+          child: Icon(Icons.my_location,
               color: _isLoading ? Colors.grey : _primaryColor),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),

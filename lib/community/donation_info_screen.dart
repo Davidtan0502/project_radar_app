@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
+import 'dart:io';
+import 'package:flutter/services.dart'; // for Clipboard
 
 class DonationInfoScreen extends StatelessWidget {
   const DonationInfoScreen({super.key});
@@ -15,21 +17,93 @@ class DonationInfoScreen extends StatelessWidget {
   // Destination query / name for maps
   static const String _dlswMapsQuery = 'DSWD Field Office NCR Manila';
 
-  Future<void> _launchPhone() async {
+  Future<void> _launchPhone(BuildContext context) async {
     final uri = Uri.parse('tel:$_dlswPhone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+    try {
+      if (await canLaunchUrl(uri)) {
+        final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (!launched && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open phone dialer')),
+          );
+        }
+      } else if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Phone not available on this device')),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error launching phone: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open phone dialer')),
+        );
+      }
     }
   }
 
-  Future<void> _launchEmail() async {
-    final uri = Uri(
+  /// TRY GMAIL APP FIRST -> FALLBACK TO mailto: -> FINAL: copy email to clipboard + snackbar
+  Future<void> _launchEmail(BuildContext context) async {
+    // 1) Try Gmail app compose URI (best-effort)
+    try {
+      // Use encoded email inside the URI
+      final Uri gmailUri = Uri.parse('googlegmail://co?to=${Uri.encodeComponent(_dlswEmail)}');
+      debugPrint('Attempting to open Gmail app: $gmailUri');
+
+      if (await canLaunchUrl(gmailUri)) {
+        final launched = await launchUrl(gmailUri, mode: LaunchMode.externalApplication);
+        if (launched) return;
+        debugPrint('Gmail app launch returned false; falling back to mailto.');
+      } else {
+        debugPrint('Gmail URI not available on this device.');
+      }
+    } catch (e) {
+      debugPrint('Error trying Gmail URI: $e');
+      // fall through to mailto fallback
+    }
+
+    // 2) Fallback: open default mail client using mailto:
+    final Uri mailtoUri = Uri(
       scheme: 'mailto',
       path: _dlswEmail,
+      // optionally add queryParameters: {'subject': 'Donation Inquiry', 'body': 'Hello...'}
     );
-    final url = Uri.parse(uri.toString());
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
+
+    debugPrint('Falling back to mailto: $mailtoUri');
+
+    try {
+      if (await canLaunchUrl(mailtoUri)) {
+        final launched = await launchUrl(mailtoUri, mode: LaunchMode.externalApplication);
+        if (launched) return;
+        debugPrint('launchUrl(mailto) returned false.');
+      } else {
+        debugPrint('No mail client available to handle mailto:');
+      }
+    } catch (e) {
+      debugPrint('Error launching mailto: $e');
+    }
+
+    // 3) Final fallback: copy email to clipboard and inform the user
+    try {
+      await Clipboard.setData(const ClipboardData(text: _dlswEmail));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'No email app found. Email address copied to clipboard: $_dlswEmail\n'
+              'Please paste it into your email app.',
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error copying email to clipboard: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No email client available')),
+        );
+      }
     }
   }
 
@@ -62,57 +136,124 @@ class DonationInfoScreen extends StatelessWidget {
           desiredAccuracy: LocationAccuracy.best);
     } catch (e) {
       // If anything fails, return null to fall back to default behavior.
+      debugPrint('Error getting current position: $e');
       return null;
     }
   }
 
-  /// Launch Google Maps. Prefer opening the Google Maps app with directions.
-  /// Falls back to web if app is not installed or unavailable.
-  Future<void> _launchMaps() async {
+  /// Launch Google Maps. Prefer a scheme that starts navigation; fall back to app scheme, then web.
+  Future<void> _launchMaps(BuildContext context) async {
     try {
       final Position? pos = await _getCurrentPosition();
 
-      final encodedDestination = Uri.encodeComponent(_dlswMapsQuery);
-
-      // If we have a position, include it as the origin.
+      // origin if available
       String? originLatLng;
       if (pos != null) {
         originLatLng = '${pos.latitude},${pos.longitude}';
       }
 
-      // 1) Try to open Google Maps app (comgooglemaps://). Use saddr/daddr for directions.
-      // If origin is available, pass saddr=lat,lng; otherwise omit saddr and just use daddr.
-      final Uri googleMapsAppUri = originLatLng != null
-          ? Uri.parse('comgooglemaps://?saddr=$originLatLng&daddr=$encodedDestination&directionsmode=driving')
-          : Uri.parse('comgooglemaps://?daddr=$encodedDestination&directionsmode=driving');
+      // Destination encoding
+      final String encodedDestinationForSchemes = _dlswMapsQuery.replaceAll(' ', '+'); // good for comgooglemaps / google.navigation
+      final String encodedDestinationForUri = Uri.encodeComponent(_dlswMapsQuery);
 
-      if (await canLaunchUrl(googleMapsAppUri)) {
-        await launchUrl(googleMapsAppUri, mode: LaunchMode.externalApplication);
-        return;
+      // Platform-aware ordering:
+      // Android: try google.navigation:  -> comgooglemaps:// -> web
+      // iOS: try comgooglemaps:// -> web
+      // Fallback -> web search
+
+      // 1) Android native navigation intent (google.navigation:) — best for Android navigation
+      final Uri androidNavigationUri = Uri.parse('google.navigation:q=$encodedDestinationForSchemes&mode=d');
+
+      // 2) comgooglemaps scheme (if Google Maps app installed)
+      final Uri comGoogleMapsUri = originLatLng != null
+          ? Uri.parse('comgooglemaps://?saddr=$originLatLng&daddr=$encodedDestinationForSchemes&directionsmode=driving')
+          : Uri.parse('comgooglemaps://?daddr=$encodedDestinationForSchemes&directionsmode=driving');
+
+      // 3) Web fallback using https with proper query parameters
+      final Map<String, String> webParams = originLatLng != null
+          ? {
+              'api': '1',
+              'origin': originLatLng,
+              'destination': _dlswMapsQuery,
+              'travelmode': 'driving',
+            }
+          : {
+              'api': '1',
+              'destination': _dlswMapsQuery,
+              'travelmode': 'driving',
+            };
+      final Uri googleMapsWebUri = Uri.https('www.google.com', '/maps/dir/', webParams);
+
+      debugPrint('Computed URIs for maps:');
+      debugPrint('androidNavigationUri: $androidNavigationUri');
+      debugPrint('comGoogleMapsUri: $comGoogleMapsUri');
+      debugPrint('googleMapsWebUri: $googleMapsWebUri');
+
+      // Helper to attempt a URI and return true when it launched
+      Future<bool> tryLaunch(Uri uri) async {
+        try {
+          if (await canLaunchUrl(uri)) {
+            final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+            debugPrint('launchUrl($uri) returned $launched');
+            return launched;
+          } else {
+            debugPrint('canLaunchUrl returned false for $uri');
+            return false;
+          }
+        } catch (e) {
+          debugPrint('Error launching $uri : $e');
+          return false;
+        }
       }
 
-      // 2) If app not available, use web directions URL. If origin present include it.
-      final Uri googleMapsWebUri = originLatLng != null
-          ? Uri.parse('https://www.google.com/maps/dir/?api=1&origin=$originLatLng&destination=$encodedDestination&travelmode=driving')
-          : Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$encodedDestination&travelmode=driving');
+      bool launched = false;
 
-      if (await canLaunchUrl(googleMapsWebUri)) {
-        await launchUrl(googleMapsWebUri, mode: LaunchMode.externalApplication);
-        return;
+      if (Platform.isAndroid) {
+        // Try google.navigation first on Android
+        launched = await tryLaunch(androidNavigationUri);
+        if (launched) return;
+
+        // Then try comgooglemaps scheme
+        launched = await tryLaunch(comGoogleMapsUri);
+        if (launched) return;
+      } else if (Platform.isIOS) {
+        // Prefer comgooglemaps on iOS if present
+        launched = await tryLaunch(comGoogleMapsUri);
+        if (launched) return;
+      } else {
+        // Other platforms: try comgooglemaps then web
+        launched = await tryLaunch(comGoogleMapsUri);
+        if (launched) return;
       }
 
-      // 3) Final fallback: open a simple search for the destination.
-      final fallbackQuery = Uri.encodeComponent(_dlswMapsQuery);
-      final fallbackUrl = Uri.parse('https://www.google.com/maps/search/?api=1&query=$fallbackQuery');
-      if (await canLaunchUrl(fallbackUrl)) {
-        await launchUrl(fallbackUrl, mode: LaunchMode.externalApplication);
+      // Web fallback
+      launched = await tryLaunch(googleMapsWebUri);
+      if (launched) return;
+
+      // Final fallback: search
+      final Uri fallbackSearch =
+          Uri.https('www.google.com', '/maps/search/', {'api': '1', 'query': _dlswMapsQuery});
+      debugPrint('Trying fallback search URI: $fallbackSearch');
+      launched = await tryLaunch(fallbackSearch);
+      if (launched) return;
+
+      // Nothing worked
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open Google Maps')));
       }
     } catch (e) {
-      // On any unexpected error, try the simple search fallback.
-      final fallbackQuery = Uri.encodeComponent(_dlswMapsQuery);
-      final fallbackUrl = Uri.parse('https://www.google.com/maps/search/?api=1&query=$fallbackQuery');
-      if (await canLaunchUrl(fallbackUrl)) {
-        await launchUrl(fallbackUrl, mode: LaunchMode.externalApplication);
+      debugPrint('Unexpected error in _launchMaps: $e');
+      // Try a final web search fallback
+      final Uri fallbackSearch =
+          Uri.https('www.google.com', '/maps/search/', {'api': '1', 'query': _dlswMapsQuery});
+      try {
+        if (await canLaunchUrl(fallbackSearch)) {
+          await launchUrl(fallbackSearch, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } catch (_) {}
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open Google Maps')));
       }
     }
   }
@@ -171,7 +312,7 @@ class DonationInfoScreen extends StatelessWidget {
           ]),
           const SizedBox(height: 8),
           ...children,
-        ]),
+        ]), 
       ),
     );
   }
@@ -196,7 +337,7 @@ class DonationInfoScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top banner/header — removed Call/Open map buttons here per your request
+                    // Top banner/header
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
@@ -231,7 +372,7 @@ class DonationInfoScreen extends StatelessWidget {
 
                     const SizedBox(height: 16),
 
-                    // Contact card (address, phone, email, map) - this is the only place that has Call/Map now
+                    // Contact card (address, phone, email, map)
                     Card(
                       elevation: 2,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -257,7 +398,7 @@ class DonationInfoScreen extends StatelessWidget {
                                 Text(_dlswPhone, style: const TextStyle(fontSize: 14)),
                                 const Spacer(),
                                 TextButton(
-                                  onPressed: _launchPhone,
+                                  onPressed: () => _launchPhone(context),
                                   child: const Text('Call'),
                                 ),
                               ],
@@ -268,9 +409,26 @@ class DonationInfoScreen extends StatelessWidget {
                                 const Icon(Icons.email, size: 18, color: Colors.black54),
                                 const SizedBox(width: 8),
                                 Expanded(child: Text(_dlswEmail, style: const TextStyle(fontSize: 14))),
+                                // CHANGED: Email button now shows an icon only (copy)
                                 TextButton(
-                                  onPressed: _launchEmail,
-                                  child: const Text('Email'),
+                                  onPressed: () async {
+                                    try {
+                                      await Clipboard.setData(const ClipboardData(text: _dlswEmail));
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Email address copied to clipboard')),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      debugPrint('Error copying email to clipboard: $e');
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Could not copy email')),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  child: const Icon(Icons.copy, size: 20),
                                 ),
                               ],
                             ),
@@ -281,7 +439,7 @@ class DonationInfoScreen extends StatelessWidget {
                                 const SizedBox(width: 8),
                                 const Expanded(child: Text('DSWD Field Office NCR — Manila', style: TextStyle(fontSize: 14))),
                                 TextButton(
-                                  onPressed: _launchMaps,
+                                  onPressed: () => _launchMaps(context),
                                   child: const Text('Open map'),
                                 ),
                               ],

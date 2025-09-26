@@ -78,54 +78,93 @@ class _EvacuationScreenState extends State<EvacuationScreen> {
     }
   }
 
-  // <-- Updated function: uses Uri.https with queryParameters for safe encoding -->
+  /// Opens directions in the most appropriate handler available:
+  /// 1) Android native navigation intent (google.navigation:) — best for Android navigation
+  /// 2) comgooglemaps:// scheme (Google Maps app) if installed
+  /// 3) Web fallback -> https://www.google.com/maps/dir/
   Future<void> _openGoogleMaps() async {
     final destinationAddress = widget.address;
 
-    Uri uri;
+    // Encode destination for scheme URIs
+    final String encodedDestination = Uri.encodeComponent(destinationAddress);
+    String? origin;
     if (_currentPosition != null) {
-      final origin = '${_currentPosition!.latitude},${_currentPosition!.longitude}';
-      uri = Uri.https(
-        'www.google.com',
-        '/maps/dir/',
-        {
-          'api': '1',
-          'origin': origin,
-          'destination': destinationAddress,
-          'travelmode': 'driving',
-        },
-      );
-    } else {
-      // No origin available — open Maps with destination only.
-      uri = Uri.https(
-        'www.google.com',
-        '/maps/search/',
-        {
-          'api': '1',
-          'query': destinationAddress,
-        },
-      );
+      origin = '${_currentPosition!.latitude},${_currentPosition!.longitude}';
     }
 
-    debugPrint('Opening maps URL: ${uri.toString()}');
+    // 1) Android native navigation intent (google.navigation:)
+    //    Example: google.navigation:q=place+name OR q=lat,lng
+    //    This is typically handled by Google Maps on Android and starts navigation directly.
+    final Uri androidNavUri = Uri.parse('google.navigation:q=$encodedDestination&mode=d');
+
+    // 2) comgooglemaps scheme — tries Google Maps app (iOS/Android if available)
+    final String appOriginParam = origin != null ? 'saddr=${Uri.encodeComponent(origin)}&' : '';
+    final Uri gmapsAppUri = Uri.parse('comgooglemaps://?$appOriginParam' 'daddr=$encodedDestination&directionsmode=driving');
+
+    // 3) Web fallback (Google Maps directions)
+    //    Using queryParameters ensures proper encoding.
+    final Map<String, String> webParams = origin != null
+        ? {'api': '1', 'origin': origin, 'destination': destinationAddress, 'travelmode': 'driving'}
+        : {'api': '1', 'destination': destinationAddress};
+    final Uri webUri = Uri.https('www.google.com', '/maps/dir/', webParams);
+
+    debugPrint('Attempting androidNavUri: $androidNavUri');
+    debugPrint('Attempting gmapsAppUri: $gmapsAppUri');
+    debugPrint('Attempting webUri: $webUri');
 
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      // Try android navigation intent first (Android devices handle this best).
+      if (await canLaunchUrl(androidNavUri)) {
+        final launched = await launchUrl(androidNavUri, mode: LaunchMode.externalApplication);
+        if (launched) return;
+        debugPrint('androidNavUri launch returned false; continuing to other options.');
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not open Google Maps')),
-          );
-        }
+        debugPrint('androidNavUri not available on this device.');
       }
     } catch (e) {
-      debugPrint('Error launching maps: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open Google Maps')),
-        );
+      debugPrint('Error launching androidNavUri: $e');
+    }
+
+    try {
+      // Try Google Maps app scheme (comgooglemaps://)
+      if (await canLaunchUrl(gmapsAppUri)) {
+        final launched = await launchUrl(gmapsAppUri, mode: LaunchMode.externalApplication);
+        if (launched) return;
+        debugPrint('gmapsAppUri launch returned false; continuing to web fallback.');
+      } else {
+        debugPrint('gmapsAppUri not available on this device.');
       }
+    } catch (e) {
+      debugPrint('Error launching gmapsAppUri: $e');
+    }
+
+    try {
+      // Web fallback: /maps/dir/
+      if (await canLaunchUrl(webUri)) {
+        final launched = await launchUrl(webUri, mode: LaunchMode.externalApplication);
+        if (launched) return;
+        debugPrint('webUri launch returned false.');
+      } else {
+        debugPrint('webUri cannot be launched.');
+      }
+    } catch (e) {
+      debugPrint('Error launching webUri: $e');
+    }
+
+    // Final fallback: search the address
+    final Uri fallbackSearch = Uri.https('www.google.com', '/maps/search/', {'api': '1', 'query': destinationAddress});
+    try {
+      if (await canLaunchUrl(fallbackSearch)) {
+        await launchUrl(fallbackSearch, mode: LaunchMode.externalApplication);
+        return;
+      }
+    } catch (e) {
+      debugPrint('Error launching fallbackSearch: $e');
+    }
+
+    // If all failed, notify user
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open Google Maps')));
     }
   }
 
