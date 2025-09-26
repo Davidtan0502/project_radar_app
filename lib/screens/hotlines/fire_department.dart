@@ -96,7 +96,7 @@ class _FireDepartmentPageState extends State<FireDepartmentPage> {
       'number': '+63 905 692 3584',
       'description':
           'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/RaxabagoTondo',
+      'facebookUrl': 'https://www.facebook.com/fs.sampaloc.3?rdid=IA0PV9I5hAhGO72l&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1A7YFxeGVE#',
       'phoneUri': 'tel:09056923584',
       'color': Colors.redAccent,
     },
