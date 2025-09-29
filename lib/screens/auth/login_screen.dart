@@ -97,6 +97,20 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  // Update radar user's last active timestamp
+  Future<void> _updateUserLastActive(String userId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .update({
+        'lastActive': Timestamp.now(),
+      });
+    } catch (e) {
+      debugPrint('Error updating last active: $e');
+    }
+  }
+
   // The error messages
   final String notFoundMsg = 'No account found. Please register first.';
   final String invalidEmailMsg = 'This email address is invalid.';
@@ -166,9 +180,13 @@ class _LoginScreenState extends State<LoginScreen>
         debugPrint('Warning: failed to update emailVerified in Firestore: $e');
       }
 
-      // Success: navigate into app immediately (avoid relying on external race)
+      // Success: update lastActive then navigate into app
       if (!mounted) return;
       setState(() => _isLoading = false);
+
+      // Fire-and-forget update of lastActive (do not block navigation)
+      _updateUserLastActive(user.uid);
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (ctx) => const MainNavigation()),
