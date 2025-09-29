@@ -385,39 +385,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          // Header (now matches Community header style/size)
-          Container(
-            height: headerHeight,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: const Color(0xFF3F73A3),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-              ),
-            ),
-            padding: EdgeInsets.symmetric(
-              vertical: headerHeight * 0.3,
-              horizontal: sidePadding,
-            ),
-            child: Row(
-              children: const [
-                Text(
-                  'Profile',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
+          // Header (now matches Community header style/size) — wrapped in SafeArea to match Community's SafeArea behavior
+          SafeArea(
+            top: true,
+            child: Container(
+              height: headerHeight,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFF3F73A3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
+                ],
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
                 ),
-              ],
+              ),
+              padding: EdgeInsets.symmetric(
+                vertical: headerHeight * 0.3,
+                horizontal: sidePadding,
+              ),
+              child: Row(
+                children: const [
+                  Text(
+                    'Profile',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -592,7 +595,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           // Options List
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 15),
               child: ListView(
                 children: [
                   _buildOptionTile(
