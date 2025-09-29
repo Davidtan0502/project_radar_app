@@ -382,7 +382,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final sidePadding = screenWidth * 0.05;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor:  const Color(0xFFF5F8FC),
       body: Column(
         children: [
           // Header (now matches Community header style/size) — wrapped in SafeArea to match Community's SafeArea behavior
