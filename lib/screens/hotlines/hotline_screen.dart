@@ -61,32 +61,36 @@ class _HotlinesPageState extends State<HotlinesPage> {
           );
     }).toList();
 
+    // --- Header sizing that matches CommunityScreen
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final headerHeight = screenHeight * 0.08;
+    final sidePadding = screenWidth * 0.05;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F8FC),
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(80),
+        preferredSize: Size.fromHeight(headerHeight),
         child: Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF336699),
-            borderRadius: BorderRadius.only(
+          height: headerHeight,
+          decoration: BoxDecoration(
+            color: const Color(0xFF3F73A3),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+            borderRadius: const BorderRadius.only(
               bottomLeft: Radius.circular(16),
               bottomRight: Radius.circular(16),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black26,
-                blurRadius: 4,
-                offset: Offset(0, 2),
-              ),
-            ],
           ),
-          padding: const EdgeInsets.only(
-            top: 36,
-            left: 16,
-            right: 16,
-            bottom: 12,
+          padding: EdgeInsets.symmetric(
+            vertical: headerHeight * 0.3,
+            horizontal: sidePadding,
           ),
-          alignment: Alignment.centerLeft,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: const [
@@ -115,7 +119,7 @@ class _HotlinesPageState extends State<HotlinesPage> {
                   if (i == 0) {
                     // Title for the emergency hotlines
                     return const Padding(
-                      padding: const EdgeInsets.only(top: 5, bottom: 20),
+                      padding: EdgeInsets.only(top: 5, bottom: 20),
                       child: Text(
                         "Emergency Hotlines",
                         style: TextStyle(

@@ -366,7 +366,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final fullName = '$_firstName $_lastName'.trim();
 
-
     // Determine whether we should show the verified icon:
     final dbIsVerified = (_userDataMap != null) ? (_userDataMap!['isVerified'] ?? false) : _isVerified;
     final profileIsComplete = _isProfileCompleteForCategory(_userDataMap);
@@ -376,34 +375,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final dobRaw = (_userDataMap != null) ? (_userDataMap!['dob'] ?? '') : '';
     final dobDisplay = (dobRaw != null && dobRaw.toString().trim().isNotEmpty) ? dobRaw.toString() : '-';
 
+    // --- Header sizing that matches CommunityScreen
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final headerHeight = screenHeight * 0.08;
+    final sidePadding = screenWidth * 0.05;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          // Header with gradient background
+          // Header (now matches Community header style/size)
           Container(
-            padding: const EdgeInsets.only(top: 50, bottom: 20),
+            height: headerHeight,
             width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF3F73A3), Color(0xFF28588B)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(20),
-                bottomRight: Radius.circular(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF3F73A3),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16),
               ),
             ),
+            padding: EdgeInsets.symmetric(
+              vertical: headerHeight * 0.3,
+              horizontal: sidePadding,
+            ),
             child: Row(
-              children: [
-                const SizedBox(width: 15),
-                const Text(
+              children: const [
+                Text(
                   'Profile',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
