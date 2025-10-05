@@ -9,17 +9,14 @@ import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
 
 import 'package:project_radar_app/screens/incidents/config_loader.dart';
 import 'package:project_radar_app/screens/incidents/suspicious_content_screen.dart';
 import '../../services/config.dart';
 import 'location_picker_screen.dart';
 
-
 class IncidentReportPage extends StatefulWidget {
   const IncidentReportPage({super.key});
-  static const String _apiKey = Config.googleAIApiKey;
 
   @override
   State<IncidentReportPage> createState() => _IncidentReportPageState();
@@ -416,13 +413,24 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     try {
       final description = _concernController.text.trim();
 
-      final aiAnalysis = await _analyzeContentWithAI(description);
+      print('=== DEBUG: Starting content analysis ===');
+      print('Description: "$description"');
+
+      final aiAnalysis = await _analyzeContent(description);
       final isSuspicious = aiAnalysis['isSuspicious'] ?? false;
       final suspicionScore = aiAnalysis['score'] ?? 0.0;
       final matchedPatterns = aiAnalysis['matchedPatterns'] ?? [];
       final aiExplanation = aiAnalysis['explanation'] ?? '';
 
+      print('=== DEBUG: Analysis Results ===');
+      print('Suspicious: $isSuspicious');
+      print('Score: $suspicionScore');
+      print('Matched Patterns: $matchedPatterns');
+      print('Explanation: $aiExplanation');
+      print('==============================');
+
       if (isSuspicious) {
+        print('DEBUG: Navigating to suspicious content screen');
         final shouldProceed = await Navigator.push(
           context,
           MaterialPageRoute(
@@ -431,16 +439,26 @@ class _IncidentReportPageState extends State<IncidentReportPage>
               suspicionScore: suspicionScore,
               matchedPatterns: matchedPatterns,
               explanation: aiExplanation,
-              onConfirm: () => Navigator.pop(context, true),
-              onCancel: () => Navigator.pop(context, false),
+              onConfirm: () {
+                print('DEBUG: User confirmed submission');
+                Navigator.pop(context, true);
+              },
+              onCancel: () {
+                print('DEBUG: User canceled submission');
+                Navigator.pop(context, false);
+              },
             ),
           ),
         );
 
         if (shouldProceed != true) {
+          print('DEBUG: User canceled, stopping submission');
           setState(() => _isSubmitting = false);
           return;
         }
+        print('DEBUG: User confirmed, proceeding with submission');
+      } else {
+        print('DEBUG: Content not suspicious, proceeding directly');
       }
 
       final docRef = await _incidentsCollection.add({
@@ -517,7 +535,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     }
   }
 
-  Future<Map<String, dynamic>> _analyzeContentWithAI(String text) async {
+  Future<Map<String, dynamic>> _analyzeContent(String text) async {
     if (text.isEmpty) {
       return {
         'isSuspicious': false,
@@ -528,95 +546,100 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     }
 
     try {
-      final config = await ConfigLoader.loadConfig();
-      final patterns = ConfigLoader.getAllSuspiciousPatterns();
+      // Load all suspicious patterns from config
+      final suspiciousPatterns = await ConfigLoader.getAllSuspiciousPatterns();
+      final inappropriateLanguage = await ConfigLoader.getAllInappropriateLanguage();
+      final disrespectfulContent = await ConfigLoader.getAllDisrespectfulContent();
+      final lustfulContent = await ConfigLoader.getAllLustfulContent();
+      final implausibleScenarios = await ConfigLoader.getAllImplausibleScenarios();
+      final vagueDescriptions = await ConfigLoader.getAllVagueDescriptions();
 
-      final model = GenerativeModel(
-        model: 'gemini-pro',
-        apiKey: IncidentReportPage._apiKey,
-      );
+      // Combine all patterns for analysis
+      final allPatterns = [
+        ...suspiciousPatterns,
+        ...inappropriateLanguage,
+        ...disrespectfulContent,
+        ...lustfulContent,
+        ...implausibleScenarios,
+        ...vagueDescriptions,
+      ];
 
-      final prompt = '''
-Analyze this incident report for potential false or malicious content using these suspicious patterns: ${patterns.join(', ')}.
+      print('DEBUG: Loaded ${allPatterns.length} total patterns');
 
-Text to analyze: "$text"
+      final lowerText = text.toLowerCase();
+      List<String> matchedPatterns = [];
+      double score = 0.0;
 
-Provide a JSON response with:
-- isSuspicious: boolean
-- score: number between 0 and 1 (0 = not suspicious, 1 = highly suspicious)
-- explanation: brief explanation of why it might be suspicious
-- matchedPatterns: array of suspicious patterns found
-
-Focus on identifying:
-1. Explicit statements about being fake, test, joke, prank, etc.
-2. Inappropriate or offensive language
-3. Contradictory or implausible information
-4. Lack of specific details when expected
-5. Any other indicators of false reporting
-
-Response must be valid JSON only, no additional text.
-''';
-
-      final response = await model.generateContent([Content.text(prompt)]);
-      final responseText = response.text ?? '';
-
-      try {
-        final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(responseText);
-        if (jsonMatch != null) {
-          final jsonString = jsonMatch.group(0);
-          final parsed = json.decode(jsonString!);
-
-          return {
-            'isSuspicious': parsed['isSuspicious'] ?? false,
-            'score': (parsed['score'] ?? 0.0).toDouble(),
-            'matchedPatterns': List<String>.from(parsed['matchedPatterns'] ?? []),
-            'explanation': parsed['explanation'] ?? 'No explanation provided',
-          };
+      // SIMPLE AND AGGRESSIVE PATTERN MATCHING
+      for (final pattern in allPatterns) {
+        final lowerPattern = pattern.toLowerCase();
+        
+        // Direct contains check - most aggressive
+        if (lowerText.contains(lowerPattern)) {
+          matchedPatterns.add(pattern);
+          print('DEBUG: MATCHED PATTERN: "$pattern" in text: "$lowerText"');
         }
-      } catch (e) {
-        print('Error parsing AI response: $e');
       }
 
-      return _analyzeText(text);
-    } catch (e) {
-      print('AI analysis error: $e');
-      return _analyzeText(text);
-    }
-  }
+      print('DEBUG: Found ${matchedPatterns.length} matched patterns');
 
-  Future<Map<String, dynamic>> _analyzeText(String text) async {
-    if (text.isEmpty) {
+      // VERY SENSITIVE SCORING - ANY MATCH TRIGGERS SUSPICION
+      if (matchedPatterns.isNotEmpty) {
+        // Base score - any match gives at least 0.5
+        score = 0.5 + (matchedPatterns.length * 0.1);
+        score = score.clamp(0.0, 1.0);
+        
+        // Extra points for high severity patterns
+        final highSeverityPatterns = [
+          ...inappropriateLanguage,
+          ...disrespectfulContent,
+          ...lustfulContent,
+        ];
+        
+        final highSeverityMatches = matchedPatterns.where((pattern) => 
+          highSeverityPatterns.contains(pattern)).length;
+        
+        if (highSeverityMatches > 0) {
+          score = (score + (highSeverityMatches * 0.2)).clamp(0.0, 1.0);
+        }
+      }
+
+      // FORCE SUSPICIOUS IF ANY PATTERNS MATCHED
+      final isSuspicious = matchedPatterns.isNotEmpty;
+
+      String explanation;
+      if (matchedPatterns.isEmpty) {
+        explanation = 'No suspicious patterns detected';
+      } else {
+        final topPatterns = matchedPatterns.take(5).join(', ');
+        explanation = 'Detected ${matchedPatterns.length} suspicious pattern(s): $topPatterns${matchedPatterns.length > 5 ? '...' : ''}';
+        
+        if (score >= 0.7) {
+          explanation += ' - High suspicion level';
+        } else if (score >= 0.4) {
+          explanation += ' - Medium suspicion level';
+        } else {
+          explanation += ' - Low suspicion level';
+        }
+      }
+
+      print('DEBUG: Final decision - suspicious: $isSuspicious, score: $score');
+
+      return {
+        'isSuspicious': isSuspicious,
+        'score': score,
+        'matchedPatterns': matchedPatterns,
+        'explanation': explanation,
+      };
+    } catch (e) {
+      print('Error in content analysis: $e');
       return {
         'isSuspicious': false,
         'score': 0.0,
         'matchedPatterns': [],
-        'explanation': 'No content to analyze',
+        'explanation': 'Analysis failed: $e',
       };
     }
-
-    final patterns = await ConfigLoader.getAllSuspiciousPatterns();
-    final lowerText = text.toLowerCase();
-    int matchCount = 0;
-    List<String> matchedPatterns = [];
-
-    for (final pattern in patterns) {
-      if (lowerText.contains(pattern.toLowerCase())) {
-        matchCount++;
-        matchedPatterns.add(pattern);
-        if (matchCount >= 3) break;
-      }
-    }
-
-    final score = matchCount / 10 > 1.0 ? 1.0 : matchCount / 10;
-
-    return {
-      'isSuspicious': matchCount >= 1,
-      'score': score,
-      'matchedPatterns': matchedPatterns,
-      'explanation': matchCount > 0
-          ? 'Found ${matchCount} suspicious pattern(s): ${matchedPatterns.join(', ')}'
-          : 'No suspicious patterns detected',
-    };
   }
 
   String? _validatePhone(String? v) {
