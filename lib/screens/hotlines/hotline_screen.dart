@@ -42,15 +42,6 @@ class _HotlinesPageState extends State<HotlinesPage> {
       'phoneUri': 'tel:0917 899 2092',
       'color': Colors.indigo,
     },
-    {
-      'name': 'Manila District Fire and Rescue Volunteer',
-      'number': '+63 2 527-6951',
-      'description':
-          'Responds to fire emergencies and promotes fire safety and prevention.',
-      'facebookUrl': 'https://www.facebook.com/MDFRVI',
-      'phoneUri': 'tel:0 252 769 51',
-      'color': Colors.redAccent,
-    },
   ];
 
   @override
