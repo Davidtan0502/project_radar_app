@@ -385,7 +385,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor:  const Color(0xFFF5F8FC),
       body: Column(
         children: [
-          // Header (now matches Community header style/size) — wrapped in SafeArea to match Community's SafeArea behavior
+
           SafeArea(
             top: true,
             child: Container(
@@ -426,13 +426,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           // Profile Section (Messenger-style)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
             child: Column(
               children: [
                 // Profile Picture
                 // <-- SAFER: prefer resolved http(s) URLs, avoid Image.network on raw storage paths,
                 // clear placeholder immediately when photo is removed
-                Container(
+                
+              Transform.translate(
+                offset: const Offset(0, -35),
+                child: Container(
                   width: 120,
                   height: 120,
                   decoration: BoxDecoration(
@@ -509,11 +512,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           return const Icon(Icons.account_circle, size: 120, color: Colors.grey);
                         })(),
                 ),
+              ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 0),
 
                 // Name with verification badge
-                Row(
+              Transform.translate(
+                offset: const Offset(0, -18), // move name up by 12px; reduce magnitude if it overlaps
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     if (_isLoading)
@@ -547,12 +553,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                   ],
                 ),
+              ),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 0),
 
                 // Email
-                if (_isLoading)
-                  Shimmer.fromColors(
+                Transform.translate(
+                offset: const Offset(0, -12),
+                child: _isLoading
+                  ? Shimmer.fromColors(
                     baseColor: Colors.grey[300]!,
                     highlightColor: Colors.grey[100]!,
                     child: Container(
@@ -562,14 +571,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       margin: const EdgeInsets.only(top: 4),
                     ),
                   )
-                else
-                  Column(
+                  : Column(
                     children: [
                       Text(
                         _email,
                         style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 6),
+                      
                       // NEW: Birthday line
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -584,8 +593,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ],
                   ),
+                ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 2),
               ],
             ),
           ),
@@ -660,7 +670,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     bool isLogout = false,
   }) {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: const BoxDecoration(
