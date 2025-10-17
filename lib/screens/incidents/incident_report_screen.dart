@@ -7,8 +7,6 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import 'package:project_radar_app/screens/incidents/config_loader.dart';
-import 'package:project_radar_app/screens/incidents/suspicious_content_screen.dart';
 import 'location_picker_screen.dart';
 
 class IncidentReportPage extends StatefulWidget {
@@ -91,8 +89,6 @@ class _IncidentReportPageState extends State<IncidentReportPage>
         if (mounted) setState(() => _isLoadingLocation = false);
       });
     });
-
-    ConfigLoader.loadConfig();
   }
 
   Future<void> _pickImage() async {
@@ -426,65 +422,24 @@ class _IncidentReportPageState extends State<IncidentReportPage>
 
     try {
       final description = _concernController.text.trim();
+      final user = supabase.auth.currentUser;
 
-      print('=== DEBUG: Starting content analysis ===');
-      print('Description: "$description"');
-
-      final aiAnalysis = await _analyzeContent(description);
-      final isSuspicious = aiAnalysis['isSuspicious'] ?? false;
-      final suspicionScore = aiAnalysis['score'] ?? 0.0;
-      final matchedPatterns = aiAnalysis['matchedPatterns'] ?? [];
-      final aiExplanation = aiAnalysis['explanation'] ?? '';
-
-      print('=== DEBUG: Analysis Results ===');
-      print('Suspicious: $isSuspicious');
-      print('Score: $suspicionScore');
-      print('Matched Patterns: $matchedPatterns');
-      print('Explanation: $aiExplanation');
-      print('==============================');
-
-      if (isSuspicious) {
-        print('DEBUG: Navigating to suspicious content screen');
-        final shouldProceed = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SuspiciousContentScreen(
-              description: description,
-              suspicionScore: suspicionScore,
-              matchedPatterns: matchedPatterns,
-              explanation: aiExplanation,
-              onConfirm: () {
-                print('DEBUG: User confirmed submission');
-                Navigator.pop(context, true);
-              },
-              onCancel: () {
-                print('DEBUG: User canceled submission');
-                Navigator.pop(context, false);
-              },
-            ),
-          ),
-        );
-
-        if (shouldProceed != true) {
-          print('DEBUG: User canceled, stopping submission');
-          setState(() => _isSubmitting = false);
-          return;
-        }
-        print('DEBUG: User confirmed, proceeding with submission');
-      } else {
-        print('DEBUG: Content not suspicious, proceeding directly');
+      if (user == null) {
+        throw Exception('User not authenticated');
       }
 
-      // ✅ FIXED: Generate a proper incident ID FIRST
-      final incidentId = 'incident_${DateTime.now().millisecondsSinceEpoch}_${supabase.auth.currentUser?.id ?? 'anonymous'}';
+      print('=== DEBUG: Submitting incident report ===');
+      print('Description: "$description"');
 
       // Upload images first to get URLs
       List<String> imageUrls = [];
+      final incidentId = 'incident_${DateTime.now().millisecondsSinceEpoch}_${user.id}';
+      
       if (_selectedImages.isNotEmpty) {
         imageUrls = await _uploadImages(incidentId);
       }
 
-      // Insert incident record
+      // Insert incident record - All incidents start as "Pending"
       final response = await supabase
           .from('incidents')
           .insert({
@@ -497,24 +452,17 @@ class _IncidentReportPageState extends State<IncidentReportPage>
                 : _incidentType,
             'description': description,
             'timestamp': DateTime.now().toIso8601String(),
-            'status': isSuspicious ? 'Under Review' : 'Pending',
+            'status': 'Pending', // Always start as Pending
             'latitude': double.tryParse(_latitudeController.text) ?? 0.0,
             'longitude': double.tryParse(_longitudeController.text) ?? 0.0,
             'barangay': _barangayController.text.trim(),
             'street': _streetController.text.trim(),
-            'suspicion_score': suspicionScore,
-            'requires_review': isSuspicious,
-            'user_id': supabase.auth.currentUser?.id,
-            'ai_analysis': aiExplanation,
-            if (matchedPatterns.isNotEmpty) 'matched_patterns': matchedPatterns,
+            'suspicion_score': 0.0, // No longer using AI analysis
+            'requires_review': false, // No longer using AI analysis
+            'user_id': user.id,
+            'ai_analysis': 'No AI analysis - manual admin review', // Simplified
+            'matched_patterns': [], // No longer using pattern matching
             'image_urls': imageUrls,
-            'incident_status_updates': [
-              {
-                'status': isSuspicious ? 'Under Review' : 'Pending',
-                'timestamp': DateTime.now().toIso8601String(),
-                'note': 'Report submitted',
-              }
-            ],
           })
           .select();
 
@@ -525,13 +473,28 @@ class _IncidentReportPageState extends State<IncidentReportPage>
       final createdIncident = response.first;
       print('✅ Incident created with ID: ${createdIncident['id']}');
 
+      // Create initial status update in the separate table
+      try {
+        await supabase
+            .from('incident_status_updates')
+            .insert({
+              'incident_id': createdIncident['id'],
+              'status': 'Pending',
+              'timestamp': DateTime.now().toIso8601String(),
+              'note': 'Initial report submitted',
+              'user_id': user.id,
+            });
+        print('✅ Status update created');
+      } catch (e) {
+        print('⚠️ Could not create status update: $e');
+        // Continue anyway - this is optional
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isSuspicious
-                ? 'Report submitted and flagged for review'
-                : 'Incident report submitted successfully!'),
-            backgroundColor: isSuspicious ? Colors.orange : Colors.green,
+            content: const Text('Incident report submitted successfully! Admin will review it shortly.'),
+            backgroundColor: Colors.green,
             duration: const Duration(seconds: 3),
             behavior: SnackBarBehavior.floating,
             shape:
@@ -559,113 +522,6 @@ class _IncidentReportPageState extends State<IncidentReportPage>
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
-
-  Future<Map<String, dynamic>> _analyzeContent(String text) async {
-    if (text.isEmpty) {
-      return {
-        'isSuspicious': false,
-        'score': 0.0,
-        'matchedPatterns': [],
-        'explanation': 'No content to analyze',
-      };
-    }
-
-    try {
-      // Load all suspicious patterns from config
-      final suspiciousPatterns = await ConfigLoader.getAllSuspiciousPatterns();
-      final inappropriateLanguage = await ConfigLoader.getAllInappropriateLanguage();
-      final disrespectfulContent = await ConfigLoader.getAllDisrespectfulContent();
-      final lustfulContent = await ConfigLoader.getAllLustfulContent();
-      final implausibleScenarios = await ConfigLoader.getAllImplausibleScenarios();
-      final vagueDescriptions = await ConfigLoader.getAllVagueDescriptions();
-
-      // Combine all patterns for analysis
-      final allPatterns = [
-        ...suspiciousPatterns,
-        ...inappropriateLanguage,
-        ...disrespectfulContent,
-        ...lustfulContent,
-        ...implausibleScenarios,
-        ...vagueDescriptions,
-      ];
-
-      print('DEBUG: Loaded ${allPatterns.length} total patterns');
-
-      final lowerText = text.toLowerCase();
-      List<String> matchedPatterns = [];
-      double score = 0.0;
-
-      // SIMPLE AND AGGRESSIVE PATTERN MATCHING
-      for (final pattern in allPatterns) {
-        final lowerPattern = pattern.toLowerCase();
-        
-        // Direct contains check - most aggressive
-        if (lowerText.contains(lowerPattern)) {
-          matchedPatterns.add(pattern);
-          print('DEBUG: MATCHED PATTERN: "$pattern" in text: "$lowerText"');
-        }
-      }
-
-      print('DEBUG: Found ${matchedPatterns.length} matched patterns');
-
-      // VERY SENSITIVE SCORING - ANY MATCH TRIGGERS SUSPICION
-      if (matchedPatterns.isNotEmpty) {
-        // Base score - any match gives at least 0.5
-        score = 0.5 + (matchedPatterns.length * 0.1);
-        score = score.clamp(0.0, 1.0);
-        
-        // Extra points for high severity patterns
-        final highSeverityPatterns = [
-          ...inappropriateLanguage,
-          ...disrespectfulContent,
-          ...lustfulContent,
-        ];
-        
-        final highSeverityMatches = matchedPatterns.where((pattern) => 
-          highSeverityPatterns.contains(pattern)).length;
-        
-        if (highSeverityMatches > 0) {
-          score = (score + (highSeverityMatches * 0.2)).clamp(0.0, 1.0);
-        }
-      }
-
-      // FORCE SUSPICIOUS IF ANY PATTERNS MATCHED
-      final isSuspicious = matchedPatterns.isNotEmpty;
-
-      String explanation;
-      if (matchedPatterns.isEmpty) {
-        explanation = 'No suspicious patterns detected';
-      } else {
-        final topPatterns = matchedPatterns.take(5).join(', ');
-        explanation = 'Detected ${matchedPatterns.length} suspicious pattern(s): $topPatterns${matchedPatterns.length > 5 ? '...' : ''}';
-        
-        if (score >= 0.7) {
-          explanation += ' - High suspicion level';
-        } else if (score >= 0.4) {
-          explanation += ' - Medium suspicion level';
-        } else {
-          explanation += ' - Low suspicion level';
-        }
-      }
-
-      print('DEBUG: Final decision - suspicious: $isSuspicious, score: $score');
-
-      return {
-        'isSuspicious': isSuspicious,
-        'score': score,
-        'matchedPatterns': matchedPatterns,
-        'explanation': explanation,
-      };
-    } catch (e) {
-      print('Error in content analysis: $e');
-      return {
-        'isSuspicious': false,
-        'score': 0.0,
-        'matchedPatterns': [],
-        'explanation': 'Analysis failed: $e',
-      };
     }
   }
 

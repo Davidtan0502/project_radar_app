@@ -82,9 +82,10 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
   }
 
   void _handleEdit() {
-    widget.onEdit();
-    Navigator.pop(context, false);
-  }
+  widget.onEdit();
+  Navigator.pushReplacementNamed(context, '/register');
+}
+
 
   Future<void> _handleConfirm() async {
     setState(() => _isLoading = true);

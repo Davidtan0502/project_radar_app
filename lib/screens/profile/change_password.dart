@@ -282,9 +282,9 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                         }
 
                         // At least one letter, one number, one special char
-                        final regex = RegExp(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}$');
+                        final regex = RegExp(r'^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$');
                         if (!regex.hasMatch(val)) {
-                          return 'Must include letters, numbers & special characters';
+                          return 'Must Contains 1 Uppercase letter, numbers & special characters';
                         }
 
                         if (_newPasswordError != null) return _newPasswordError;

@@ -358,7 +358,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // Require DOB present
     final dob = (data['dob'] ?? '').toString().trim();
-    if (dob.isEmpty) return false;
+    final hasDob = dob.isNotEmpty;
+    if (!hasDob) return false;
 
     final category = (data['user_category'] ?? '').toString().toUpperCase();
 
@@ -397,7 +398,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // Determine whether we should show the verified icon:
     final dbIsVerified = (_userDataMap != null) ? (_userDataMap!['is_verified'] ?? false) : _isVerified;
     final profileIsComplete = _isProfileCompleteForCategory(_userDataMap);
-    final shouldShowVerified = dbIsVerified && profileIsComplete;
+    final shouldShowVerified = profileIsComplete || dbIsVerified;
 
     // Fetch DOB from stored user map if available
     final dobRaw = (_userDataMap != null) ? (_userDataMap!['dob'] ?? '') : '';
@@ -577,7 +578,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     if (!_isLoading && shouldShowVerified)
                       const Padding(
-                        padding: EdgeInsets.only(left: 8.0),
+                        padding: EdgeInsets.only(left: 3.0),
                         child: Icon(
                           Icons.verified,
                           color: Colors.blue,
@@ -587,7 +588,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
 
                 // Email and Birthday
                 if (_isLoading)

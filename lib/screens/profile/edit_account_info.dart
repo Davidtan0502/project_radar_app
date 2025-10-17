@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -66,7 +67,6 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   final _phoneController = TextEditingController();
   final _dobController = TextEditingController();
 
-  // Keep legacy single address too (for backward compatibility)
   final _addressController = TextEditingController();
 
   // Health / other
@@ -74,7 +74,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   final _heightController = TextEditingController();
   final _weightController = TextEditingController();
 
-  // Town options (same as register)
+  // Town options
   final List<String> _towns = [
     "Tondo",
     "Binondo",
@@ -431,36 +431,156 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     return sizeInMB <= maxSizeMB;
   }
 
-  Future<String?> _uploadImageToStorage(dynamic image, String path) async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return null;
+  /// Uploads [image] to the `profiles` bucket under the given [folder] (e.g. 'profile_images' or 'id_uploads').
+  /// Returns the public URL string on success, otherwise null.
+  Future<String?> _uploadImageToStorage(dynamic image, String folder) async {
+  final user = _supabase.auth.currentUser;
+  if (user == null) return null;
 
+  final fileName = '${user.id}.jpg';
+  final fullPath = '$folder/$fileName';
+
+  try {
+    // Try to remove existing file first (ignore errors)
     try {
-      String fileName = '${user.id}.jpg';
-      String fullPath = '$path/$fileName';
-
-      if (image is File) {
-        await _supabase.storage
-            .from('avatars')
-            .upload(fullPath, image);
-      } else if (image is Uint8List) {
-        await _supabase.storage
-            .from('avatars')
-            .uploadBinary(fullPath, image);
-      } else {
-        throw ArgumentError('Unsupported image type for upload');
-      }
-
-      final publicUrl = _supabase.storage
-          .from('avatars')
-          .getPublicUrl(fullPath);
-
-      debugPrint('Uploaded to: $publicUrl');
-      return publicUrl;
-
+      await _supabase.storage.from('profiles').remove([fullPath]);
     } catch (e) {
-      debugPrint('Upload failed: $e');
-      return null;
+      debugPrint('Notice: could not remove existing file (may not exist): $e');
+    }
+
+    // Upload (mobile File vs web Uint8List)
+    if (image is File) {
+      // upsert: true ensures re-uploads succeed even if file previously existed
+      await _supabase.storage.from('profiles').upload(
+        fullPath,
+        image,
+        fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+      );
+    } else if (image is Uint8List) {
+      // uploadBinary exists in many supabase_flutter versions for web
+      try {
+        await _supabase.storage.from('profiles').uploadBinary(fullPath, image);
+      } catch (e) {
+        // if uploadBinary isn't available or fails, rethrow to be handled below
+        debugPrint('uploadBinary failed: $e');
+        rethrow;
+      }
+    } else {
+      throw ArgumentError('Unsupported image type for upload');
+    }
+
+    // Get public URL (SDK versions differ on return shape)
+    final publicUrl = _supabase.storage.from('profiles').getPublicUrl(fullPath);
+    if (publicUrl is String) return publicUrl;
+    try {
+      // some SDKs return an object with a data/publicUrl field or similar
+      final candidate = (publicUrl as dynamic);
+      if (candidate != null) {
+        // Try common fields
+        if (candidate is Map && candidate['publicUrl'] != null) return candidate['publicUrl'] as String;
+        if (candidate?.data != null && candidate.data['publicUrl'] != null) return candidate.data['publicUrl'] as String;
+      }
+    } catch (_) {}
+    return publicUrl?.toString();
+  } catch (e, st) {
+    debugPrint('uploadToProfilesBucket failed: $e\n$st');
+    return null;
+  }
+}
+
+  /// Delete a file from the 'profiles' storage bucket.
+  /// Returns true if remove succeeded (or file didn't exist), false on error.
+  Future<bool> _deleteFileFromStorage(String folder, String userId) async {
+    final path = '$folder/$userId.jpg';
+    try {
+      await _supabase.storage.from('profiles').remove([path]);
+      debugPrint('Storage.remove succeeded: $path');
+      return true;
+    } catch (e, st) {
+      debugPrint('Storage.remove failed for $path: $e\n$st');
+      return false;
+    }
+  }
+
+  /// Clear the URL/path fields in your app_users row.
+  Future<bool> _clearUserImageField(String userId, {required bool isProfile}) async {
+    try {
+      final columnUrl = isProfile ? 'photo_url' : 'id_url';
+      final columnPath = isProfile ? 'photo_path' : 'id_path';
+      final updates = <String, dynamic>{columnUrl: null, columnPath: null, 'updated_at': DateTime.now().toIso8601String()};
+      // Use select().single() to get response shape consistent with your save flow
+      final resp = await _supabase.from('app_users').update(updates).eq('id', userId).select().single();
+      debugPrint('DB cleared ${isProfile ? 'profile' : 'id'} fields for $userId -> $resp');
+      return true;
+    } catch (e, st) {
+      debugPrint('DB update exception clearing image fields: $e\n$st');
+      return false;
+    }
+  }
+
+  /// Combined flow: delete from storage first, then clear DB, then update UI state.
+  Future<void> deleteProfileOrId({required bool isProfile}) async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      setState(() => _isSaving = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Not authenticated'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
+    final folder = isProfile ? 'profile_images' : 'id_uploads';
+    final userId = user.id;
+
+    final removed = await _deleteFileFromStorage(folder, userId);
+    if (!removed) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not delete image from storage. Check permissions or network.'), backgroundColor: Colors.red),
+        );
+      }
+      setState(() => _isSaving = false);
+      return;
+    }
+
+    final cleared = await _clearUserImageField(userId, isProfile: isProfile);
+    if (!cleared) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File removed but failed to update profile record.'), backgroundColor: Colors.orange),
+        );
+      }
+      setState(() => _isSaving = false);
+      return;
+    }
+
+    setState(() {
+      if (isProfile) {
+        _profileImage = null;
+        _profileImageBytes = null;
+        _profileImageUrl = null;
+        _removeProfileImage = false;
+        _profileUploadProgress = null;
+      } else {
+        _idImage = null;
+        _idImageBytes = null;
+        _idImageUrl = null;
+        _removeIdImage = false;
+        _idUploadProgress = null;
+      }
+      _isFormDirty = false;
+      _isSaving = false;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Image deleted successfully.')),
+      );
     }
   }
 
@@ -641,6 +761,49 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     return null;
   }
 
+ Future<void> _deleteFileByPath(String? path) async {
+  if (path == null || path.isEmpty) {
+    debugPrint('Skip delete — no path provided');
+    return;
+  }
+
+  try {
+    // Normalize: handle full URLs or wrong prefixes
+    String normalizedPath = path.trim();
+
+    // Case 1: full URL (convert to internal path)
+    if (normalizedPath.startsWith('http')) {
+      final uri = Uri.parse(normalizedPath);
+      final segments = uri.pathSegments;
+      final idx = segments.indexOf('profiles');
+      if (idx != -1 && idx + 1 < segments.length) {
+        normalizedPath = segments.sublist(idx + 1).join('/');
+      }
+    }
+
+    // Case 2: accidental leading slashes or "public/" prefix
+    if (normalizedPath.startsWith('public/')) {
+      normalizedPath = normalizedPath.replaceFirst('public/', '');
+    }
+    if (normalizedPath.startsWith('/')) {
+      normalizedPath = normalizedPath.substring(1);
+    }
+
+    debugPrint('Attempting to delete storage object: $normalizedPath');
+
+    final response = await _supabase.storage.from('profiles').remove([normalizedPath]);
+    debugPrint('Storage.remove response: $response');
+
+    // Double-check: list objects to confirm delete
+    final listAfter = await _supabase.storage.from('profiles').list(
+      path: normalizedPath.split('/').first,
+    );
+    debugPrint('Files still present in folder after delete: ${listAfter.map((e) => e.name).toList()}');
+  } catch (e, st) {
+    debugPrint('deleteFileByPath failed: $e\n$st');
+  }
+}
+
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate() || _isSaving) return;
     setState(() => _isSaving = true);
@@ -650,28 +813,56 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       if (user == null) return;
 
       String? profileUrl;
-      if (_removeProfileImage) {
-        try {
-          await _supabase.storage
-              .from('avatars')
-              .remove(['profile_images/${user.id}.jpg']);
-        } catch (_) {}
-      } else if (_profileImage != null || _profileImageBytes != null) {
-        final img = _profileImage ?? _profileImageBytes!;
-        profileUrl = await _uploadImageToStorage(img, 'profile_images');
-      }
+if (_removeProfileImage) {
+  try {
+    await _supabase.storage
+        .from('profiles')
+        .remove(['profile_images/${user.id}.jpg']);
+  } catch (_) {}
+} else if (_profileImage != null || _profileImageBytes != null) {
+  final img = _profileImage ?? _profileImageBytes!;
+  profileUrl = await _uploadImageToStorage(img, 'profile_images');
 
-      String? idUrl;
-      if (_removeIdImage) {
-        try {
-          await _supabase.storage
-              .from('avatars')
-              .remove(['id_uploads/${user.id}.jpg']);
-        } catch (_) {}
-      } else if (_idImage != null || _idImageBytes != null) {
-        final img = _idImage ?? _idImageBytes!;
-        idUrl = await _uploadImageToStorage(img, 'id_uploads');
-      }
+  // If upload returned null but we expected an upload, stop and show error
+  if (profileUrl == null && (img != null)) {
+    debugPrint('Profile upload failed; aborting save.');
+    if (mounted) {
+      Flushbar(
+        message: 'Failed to upload profile photo. Check storage permissions or network.',
+        duration: const Duration(seconds: 3),
+        backgroundColor: Colors.red,
+      ).show(context);
+    }
+    setState(() => _isSaving = false);
+    return;
+  }
+}
+
+// same pattern for ID
+String? idUrl;
+if (_removeIdImage) {
+  try {
+    await _supabase.storage
+        .from('profiles')
+        .remove(['id_uploads/${user.id}.jpg']);
+  } catch (_) {}
+} else if (_idImage != null || _idImageBytes != null) {
+  final img = _idImage ?? _idImageBytes!;
+  idUrl = await _uploadImageToStorage(img, 'id_uploads');
+
+  if (idUrl == null && (img != null)) {
+    debugPrint('ID upload failed; aborting save.');
+    if (mounted) {
+      Flushbar(
+        message: 'Failed to upload ID image. Check storage permissions or network.',
+        duration: const Duration(seconds: 3),
+        backgroundColor: Colors.red,
+      ).show(context);
+    }
+    setState(() => _isSaving = false);
+    return;
+  }
+}
 
       final updates = <String, dynamic>{
         'first_name': _firstNameController.text.trim(),
@@ -688,16 +879,20 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
 
       if (profileUrl != null) {
         updates['photo_url'] = profileUrl;
+        updates['photo_path'] = 'profile_images/${user.id}.jpg';
       }
       if (idUrl != null) {
         updates['id_url'] = idUrl;
+        updates['id_path'] = 'id_uploads/${user.id}.jpg';
       }
 
       if (_removeProfileImage) {
         updates['photo_url'] = null;
+        updates['photo_path'] = null;
       }
       if (_removeIdImage) {
         updates['id_url'] = null;
+        updates['id_path'] = null;
       }
 
       if ((_userCategory ?? '').isNotEmpty) {
@@ -790,19 +985,53 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
 
       debugPrint('DEBUG: database updates prepared = $updates');
 
-      final response = await _supabase
-          .from('app_users')
-          .update(updates)
-          .eq('id', user.id);
+      Map<String, dynamic>? returnedRow;
 
-      if (response.error != null) {
-        throw Exception('Failed to update profile: ${response.error!.message}');
-      }
+try {
+  final resp = await _supabase
+      .from('app_users')
+      .update(updates)
+      .eq('id', user.id)
+      .select() // ask Supabase to return the updated row
+      .single();
 
-      debugPrint('DEBUG: Database update completed for user ${user.id}');
+  debugPrint('DB update returned: $resp');
 
-      _initialUserCategory = _userCategory;
+  // Handle possible shapes of the response
+  if (resp is Map<String, dynamic>) {
+    returnedRow = resp;
+  } else {
+    try {
+      returnedRow = (resp as dynamic)?['data'] as Map<String, dynamic>?;
+    } catch (_) {
+      returnedRow = null;
+    }
+  }
 
+  debugPrint('Returned row: $returnedRow');
+  debugPrint('DEBUG: Database update completed for user ${user.id}');
+
+  // Update category after a successful save
+  _initialUserCategory = _userCategory;
+} catch (e, st) {
+  debugPrint('======== UPDATE ERROR ========');
+  debugPrint('Error type: ${e.runtimeType}');
+  debugPrint('Error: $e');
+  debugPrint('Stack: $st');
+  if (kIsWeb) {
+    debugPrint('Check browser DevTools Network/Console for CORS errors.');
+  }
+
+  // Optional: show an error flushbar
+  if (mounted) {
+    Flushbar(
+      message: 'Failed to update profile: $e',
+      duration: const Duration(seconds: 3),
+    ).show(context);
+  }
+
+  rethrow;
+}
       if (mounted) {
         setState(() {
           _profileImage = null;
@@ -821,7 +1050,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
       if (!mounted) return;
       await Flushbar(
         message: 'Profile saved successfully!',
-        backgroundColor: const Color(0xFF28588B),
+        backgroundColor: const Color.fromARGB(255, 14, 151, 7),
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         borderRadius: BorderRadius.circular(12),
         flushbarPosition: FlushbarPosition.TOP,
@@ -988,14 +1217,8 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
           const SizedBox(height: 16),
           if (_profileImage != null || _profileImageBytes != null || (_profileImageUrl != null && !_removeProfileImage))
             TextButton.icon(
-              onPressed: () {
-                setState(() {
-                  _removeProfileImage = true;
-                  _profileImage = null;
-                  _profileImageBytes = null;
-                  _profileImageUrl = null;
-                  _markFormDirty();
-                });
+              onPressed: () async {
+                await deleteProfileOrId(isProfile: true);
               },
               icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
               label: const Text(
@@ -1087,15 +1310,9 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
                   ListTile(
                     leading: const Icon(Icons.delete, color: Colors.red),
                     title: const Text('Remove Photo', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(context);
-                      setState(() {
-                        _removeProfileImage = true;
-                        _profileImage = null;
-                        _profileImageBytes = null;
-                        _profileImageUrl = null;
-                        _markFormDirty();
-                      });
+                      await deleteProfileOrId(isProfile: true);
                     },
                   ),
                 ListTile(
@@ -1498,14 +1715,8 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
                         ),
                         child: IconButton(
                           icon: const Icon(Icons.close, color: Colors.red, size: 18),
-                          onPressed: () {
-                            setState(() {
-                              _removeIdImage = true;
-                              _idImage = null;
-                              _idImageBytes = null;
-                              _idImageUrl = null;
-                              _markFormDirty();
-                            });
+                          onPressed: () async {
+                            await deleteProfileOrId(isProfile: false);
                           },
                         ),
                       ),

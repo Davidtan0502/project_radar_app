@@ -116,7 +116,7 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
       ]);
     }
 
-    final schoolName = (m['schoolName'] ?? '').toString().trim();
+    final schoolName = (m['school_name'] ?? '').toString().trim();
     if (schoolName.isNotEmpty) parts.add(schoolName);
 
     final house = (m['house'] ?? '').toString().trim();

@@ -209,13 +209,25 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   String _toTitleCase(String input) {
     if (input.trim().isEmpty) return input;
+
+    // Split on whitespace to preserve words
     final parts = input.split(RegExp(r'\s+'));
+
     final transformed = parts.map((word) {
       if (word.isEmpty) return '';
-      final first = word.substring(0, 1).toUpperCase();
-      final rest = word.length > 1 ? word.substring(1).toLowerCase() : '';
-      return first + rest;
+
+      // Handle hyphenated subwords (e.g. "jay-anne" -> "Jay-Anne")
+      final hyphenParts = word.split('-');
+      final hyphenTransformed = hyphenParts.map((sub) {
+        if (sub.isEmpty) return '';
+        final first = sub.substring(0, 1).toUpperCase();
+        final rest = sub.length > 1 ? sub.substring(1).toLowerCase() : '';
+        return first + rest;
+      }).join('-');
+
+      return hyphenTransformed;
     }).join(' ');
+
     return transformed;
   }
 
@@ -1173,9 +1185,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           if (val.length < 6) {
                                             return 'At least 6 characters';
                                           }
-                                          final regex = RegExp(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$');
+                                          final regex = RegExp(r'^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$');
                                           if (!regex.hasMatch(val)) {
-                                            return 'Include letters, numbers, and special characters';
+                                            return 'Must Contains 1 Uppercase letters, numbers, and special characters';
                                           }
                                           return null;
                                         },

@@ -41,7 +41,6 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription<Position>? _positionStreamSubscription;
   Timer? _weatherTimer;
 
-  // Add Supabase client
   final SupabaseClient supabase = Supabase.instance.client;
 
   @override
@@ -89,52 +88,48 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // UPDATED: _getUserProfile for Supabase
+  // ✅ UPDATED _getUserProfile (fixed verified + photo fetch)
   Future<Map<String, dynamic>?> _getUserProfile() async {
     final user = supabase.auth.currentUser;
-    if (user != null) {
-      try {
-        final response = await supabase
-            .from('app_users')
-            .select()
-            .eq('id', user.id)
-            .maybeSingle();
+    if (user == null) return null;
 
-        if (response == null) return null;
+    try {
+      final response = await supabase
+          .from('app_users')
+          .select(
+              'id, first_name, last_name, email, phone, user_category, address, resident_address, school_address, work_address, home_address, dob, is_verified, photo_url')
+          .eq('id', user.id)
+          .maybeSingle();
 
-        // Supabase handles photo URLs differently - if you store photo URLs in your users table
-        final rawPhoto = (response['photo_url'] ?? '').toString().trim();
-        String finalPhoto = '';
+      if (response == null) return null;
 
-        if (rawPhoto.isEmpty) {
-          finalPhoto = '';
-        } else {
-          // If it's already a full URL, use it directly
-          if (rawPhoto.startsWith('http://') || rawPhoto.startsWith('https://')) {
-            finalPhoto = rawPhoto;
-          } else {
-            // For Supabase Storage, you might need to construct the URL
-            // This depends on how you've set up your storage
-            finalPhoto = ''; // Set to empty if not a full URL
-          }
-        }
+      final rawPhoto = (response['photo_url'] ?? '').toString().trim();
+      String finalPhoto = '';
 
-        // Add cache-busting suffix
-        if (finalPhoto.startsWith('http')) {
-          final ts = DateTime.now().millisecondsSinceEpoch;
-          finalPhoto = finalPhoto.contains('?') ? '$finalPhoto&v=$ts' : '$finalPhoto?v=$ts';
-        }
-
-        // Return data with resolved photo URL
-        final Map<String, dynamic> out = Map<String, dynamic>.from(response);
-        out['photoURL'] = finalPhoto;
-        return out;
-      } catch (e) {
-        debugPrint('DEBUG: _getUserProfile error -> $e');
-        return null;
+      if (rawPhoto.isEmpty) {
+        finalPhoto = '';
+      } else if (rawPhoto.startsWith('http://') ||
+          rawPhoto.startsWith('https://')) {
+        finalPhoto = rawPhoto;
+      } else {
+        // Build from Supabase storage (profiles bucket)
+        finalPhoto = supabase.storage.from('profiles').getPublicUrl(rawPhoto);
       }
+
+      if (finalPhoto.startsWith('http')) {
+        final ts = DateTime.now().millisecondsSinceEpoch;
+        finalPhoto = finalPhoto.contains('?')
+            ? '$finalPhoto&v=$ts'
+            : '$finalPhoto?v=$ts';
+      }
+
+      final Map<String, dynamic> out = Map<String, dynamic>.from(response);
+      out['photoURL'] = finalPhoto;
+      return out;
+    } catch (e) {
+      debugPrint('DEBUG: _getUserProfile error -> $e');
+      return null;
     }
-    return null;
   }
 
   void _startListeningToLocation() async {
@@ -171,7 +166,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // ------------ label detection helpers ------------
   bool _containsLabel(String value, List<String> labels) {
     if (value.trim().isEmpty) return false;
     final escaped = labels.map(RegExp.escape).join('|');
@@ -248,21 +242,16 @@ class _HomeScreenState extends State<HomeScreen> {
       'town\\.'
     ]);
   }
-  // ------------ end helpers ------------
 
   Future<void> _updatePosition(Position position) async {
-    final placemarks = await placemarkFromCoordinates(
-      position.latitude,
-      position.longitude,
-    );
+    final placemarks =
+        await placemarkFromCoordinates(position.latitude, position.longitude);
     if (!mounted) return;
 
     final place = placemarks.isNotEmpty ? placemarks.first : null;
-    final rawStreet =
-        (place?.street?.isNotEmpty ?? false) ? place!.street : (place?.name ?? '');
-
     final trimmed = ((place?.street ?? place?.name) ?? '').trim();
-    final streetDisplay = trimmed.isNotEmpty ? (_hasStreetLabel(trimmed) ? trimmed : '$trimmed Street') : '';
+    final streetDisplay =
+        trimmed.isNotEmpty ? (_hasStreetLabel(trimmed) ? trimmed : '$trimmed Street') : '';
 
     final locality = place?.locality ?? '';
     final adminArea = place?.administrativeArea ?? '';
@@ -371,7 +360,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Helper: compose a short address summary from an address map (used on Home card)
   String _composeShortAddress(Map<String, dynamic>? m, {String fallback = ''}) {
     if (m == null || m.isEmpty) return fallback;
-    final schoolName = (m['schoolName'] ?? '').toString().trim();
+    final schoolName = (m['school_name'] ?? '').toString().trim();
     final house = (m['house'] ?? '').toString().trim();
     final street = (m['street'] ?? '').toString().trim();
     final barangay = (m['barangay'] ?? '').toString().trim();
@@ -419,6 +408,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // Helper: check whether required fields are present for the given category
   bool _isProfileCompleteForCategory(Map<String, dynamic> data) {
     final category = (data['user_category'] ?? '').toString().toUpperCase();
+    final dob = (data['dob'] ?? '').toString().trim();
+    if (dob.isEmpty) return false;
 
     bool hasNonEmpty(Map<String, dynamic>? m, List<String> keys) {
       if (m == null) return false;
@@ -924,7 +915,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 (storedVerifiedRaw is String && ['true', 'yes'].contains(storedVerifiedRaw.toLowerCase().trim()));
 
             final isComplete = _isProfileCompleteForCategory(data);
-            final shouldShowVerified = storedVerified && isComplete;
+            final shouldShowVerified = storedVerified || (data['dob']?.toString().trim().isNotEmpty ?? false);
 
             final addressLabel = category == 'RESIDENT'
                 ? 'Address:'
