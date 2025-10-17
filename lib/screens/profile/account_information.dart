@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:project_radar_app/screens/profile/edit_account_info.dart';
 import 'package:project_radar_app/services/navigation.dart';
 import 'package:intl/intl.dart';
@@ -15,8 +14,7 @@ class AccountInformationScreen extends StatefulWidget {
 }
 
 class _AccountInformationScreenState extends State<AccountInformationScreen> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final SupabaseClient supabase = Supabase.instance.client;
   late Future<Map<String, dynamic>> _userData;
 
   @override
@@ -26,54 +24,62 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
   }
 
   Future<Map<String, dynamic>> _fetchUserData() async {
-    final User? user = _auth.currentUser;
+    final user = supabase.auth.currentUser;
     if (user == null) return {};
 
-    final DocumentSnapshot userDoc =
-        await _firestore.collection('users').doc(user.uid).get();
-    if (!userDoc.exists) return {};
+    try {
+      final response = await supabase
+          .from('app_users')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
 
-    final data = userDoc.data() as Map<String, dynamic>;
+      if (response == null) return {};
 
-    Map<String, dynamic>? safeMap(dynamic v) {
-      if (v is Map) return Map<String, dynamic>.from(v);
-      return null;
+      Map<String, dynamic>? safeMap(dynamic v) {
+        if (v is Map) return Map<String, dynamic>.from(v);
+        return null;
+      }
+
+      final residentMap = safeMap(response['resident_address']);
+      final workMap = safeMap(response['work_address']);
+      final homeMap = safeMap(response['home_address']);
+      final schoolMap = safeMap(response['school_address']);
+
+      String photoUrl = '';
+      if ((response['photo_url'] ?? '').toString().isNotEmpty) {
+        photoUrl = response['photo_url'].toString();
+      } else if (user.userMetadata?['avatar_url'] != null && 
+                 user.userMetadata!['avatar_url']!.isNotEmpty) {
+        photoUrl = user.userMetadata!['avatar_url']!;
+      }
+
+      final createdAt = response['created_at'];
+
+      return {
+        'first_name': response['first_name'] ?? '',
+        'middle_name': response['middle_name'] ?? '',
+        'last_name': response['last_name'] ?? '',
+        'email': (response['email'] ?? user.email ?? '').toString(),
+        'phone': response['phone'] ?? 'Not provided',
+        'created_at': createdAt ?? DateTime.now().toIso8601String(),
+        'photo_url': photoUrl,
+        'dob': response['dob'] ?? '',
+        'address': response['address'] ?? '',
+        'blood_type': response['blood_type'] ?? '',
+        'height': response['height'] ?? '',
+        'weight': response['weight'] ?? '',
+        'user_category': (response['user_category'] ?? '').toString(),
+        'resident_address': residentMap,
+        'work_address': workMap,
+        'home_address': homeMap,
+        'school_address': schoolMap,
+        'id_url': response['id_url'] ?? '',
+      };
+    } catch (e) {
+      print('Error fetching user data: $e');
+      return {};
     }
-
-    final residentMap = safeMap(data['residentAddress']);
-    final workMap = safeMap(data['workAddress']);
-    final homeMap = safeMap(data['homeAddress']);
-    final schoolMap = safeMap(data['schoolAddress']);
-
-    String photoUrl = '';
-    if ((data['photoURL'] ?? '').toString().isNotEmpty) {
-      photoUrl = data['photoURL'].toString();
-    } else if (user.photoURL != null && user.photoURL!.isNotEmpty) {
-      photoUrl = user.photoURL!;
-    }
-
-    final createdAt = data['createdAt'];
-
-    return {
-      'firstName': data['firstName'] ?? '',
-      'middleName': data['middleName'] ?? '',
-      'lastName': data['lastName'] ?? '',
-      'email': (data['email'] ?? user.email ?? '').toString(),
-      'phone': data['phone'] ?? 'Not provided',
-      'createdAt': createdAt ?? FieldValue.serverTimestamp(),
-      'photoURL': photoUrl,
-      'dob': data['dob'] ?? '',
-      'address': data['address'] ?? '',
-      'bloodType': data['bloodType'] ?? '',
-      'height': data['height'] ?? '',
-      'weight': data['weight'] ?? '',
-      'userCategory': (data['userCategory'] ?? '').toString(),
-      'residentAddress': residentMap,
-      'workAddress': workMap,
-      'homeAddress': homeMap,
-      'schoolAddress': schoolMap,
-      'idURL': data['idURL'] ?? '',
-    };
   }
 
   String _composeAddressFromMap(Map<String, dynamic>? m, {bool isHomeCitySuffix = false}) {
@@ -176,9 +182,13 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
   String _formatCreatedAt(dynamic ts) {
     try {
       DateTime dt;
-      if (ts is Timestamp) dt = ts.toDate();
-      else if (ts is DateTime) dt = ts;
-      else dt = DateTime.now();
+      if (ts is String) {
+        dt = DateTime.parse(ts);
+      } else if (ts is DateTime) {
+        dt = ts;
+      } else {
+        dt = DateTime.now();
+      }
       return DateFormat('MMMM d, y').format(dt);
     } catch (_) {
       return '';
@@ -248,15 +258,15 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
 
           final userData = snapshot.data!;
           final parts = [
-            userData['firstName'],
-            userData['middleName'],
-            userData['lastName'],
+            userData['first_name'],
+            userData['middle_name'],
+            userData['last_name'],
           ];
           final fullName = parts
               .where((part) => part != null && part.toString().trim().isNotEmpty)
               .join(' ');
 
-          final joinedDate = _formatCreatedAt(userData['createdAt']);
+          final joinedDate = _formatCreatedAt(userData['created_at']);
           final fallbackAddress = (userData['address'] ?? '').toString().trim();
           
           String phoneDisplay = userData['phone']?.toString() ?? 'Not provided';
@@ -278,7 +288,7 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
                   phoneDisplay,
                   userData['dob']?.toString() ?? '',
                   fallbackAddress,
-                  userData['bloodType']?.toString() ?? '',
+                  userData['blood_type']?.toString() ?? '',
                   userData['height']?.toString() ?? '',
                   userData['weight']?.toString() ?? '',
                   joinedDate,
@@ -293,12 +303,12 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
     );
   }
 
-    Widget _buildProfileHeader(
+  Widget _buildProfileHeader(
     BuildContext context,
-    Map<String, dynamic> userData,) 
-    {
+    Map<String, dynamic> userData,
+  ) {
     const primaryColor = Color(0xFF28588B);
-    final String photoUrl = (userData['photoURL'] ?? '').toString();
+    final String photoUrl = (userData['photo_url'] ?? '').toString();
 
     // Gray circular placeholder with account icon
     Widget _grayPlaceholder(double size) {
@@ -393,7 +403,7 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            capitalizeName('${userData['firstName']} ${userData['lastName']}'),
+            capitalizeName('${userData['first_name']} ${userData['last_name']}'),
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
@@ -413,7 +423,6 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
     );
   }
 
-
   Widget _buildAccountInfoCard(
     BuildContext context,
     String fullName,
@@ -427,24 +436,24 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
     String joinedDate,
     Map<String, dynamic> userData,
   ) {
-    final category = (userData['userCategory'] ?? '').toString().toUpperCase();
+    final category = (userData['user_category'] ?? '').toString().toUpperCase();
     final displayCategory = category.isNotEmpty
         ? (category.length == 1
             ? category.toUpperCase()
             : category[0].toUpperCase() + category.substring(1).toLowerCase())
         : '';
 
-    final residentMap = userData['residentAddress'] is Map
-        ? Map<String, dynamic>.from(userData['residentAddress'])
+    final residentMap = userData['resident_address'] is Map
+        ? Map<String, dynamic>.from(userData['resident_address'])
         : null;
-    final workMap = userData['workAddress'] is Map
-        ? Map<String, dynamic>.from(userData['workAddress'])
+    final workMap = userData['work_address'] is Map
+        ? Map<String, dynamic>.from(userData['work_address'])
         : null;
-    final homeMap = userData['homeAddress'] is Map
-        ? Map<String, dynamic>.from(userData['homeAddress'])
+    final homeMap = userData['home_address'] is Map
+        ? Map<String, dynamic>.from(userData['home_address'])
         : null;
-    final schoolMap = userData['schoolAddress'] is Map
-        ? Map<String, dynamic>.from(userData['schoolAddress'])
+    final schoolMap = userData['school_address'] is Map
+        ? Map<String, dynamic>.from(userData['school_address'])
         : null;
 
     final List<Widget> addressWidgets = [];
@@ -506,7 +515,7 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
       ]);
     }
 
-    final String idUrl = (userData['idURL'] ?? '').toString();
+    final String idUrl = (userData['id_url'] ?? '').toString();
 
     // helper placeholder for ID thumbnail
     Widget _idPlaceholder() {

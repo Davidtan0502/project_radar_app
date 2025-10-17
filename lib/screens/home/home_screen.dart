@@ -7,8 +7,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:project_radar_app/widgets/capitalize_names.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:project_radar_app/screens/profile/account_information.dart';
@@ -18,7 +17,6 @@ import 'package:intl/intl.dart';
 import 'package:project_radar_app/screens/alerts/report_tracker_screen.dart';
 
 import 'package:shimmer/shimmer.dart';
-import 'package:firebase_storage/firebase_storage.dart'; // << added
 
 class Config {
   static const weatherApiKey = "1e0dbc808580ffe843728e24a729dcee";
@@ -42,6 +40,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingWeather = false;
   StreamSubscription<Position>? _positionStreamSubscription;
   Timer? _weatherTimer;
+
+  // Add Supabase client
+  final SupabaseClient supabase = Supabase.instance.client;
 
   @override
   void initState() {
@@ -88,57 +89,49 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // UPDATED: _getUserProfile now resolves photoURL (storage path -> download URL)
-  // and sets photoURL to '' when resolution fails so the UI shows the placeholder.
+  // UPDATED: _getUserProfile for Supabase
   Future<Map<String, dynamic>?> _getUserProfile() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = supabase.auth.currentUser;
     if (user != null) {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      final data = doc.data();
-      if (data == null) return null;
-
       try {
-        final rawPhoto = (data['photoURL'] ?? user.photoURL ?? '').toString().trim();
+        final response = await supabase
+            .from('app_users')
+            .select()
+            .eq('id', user.id)
+            .maybeSingle();
+
+        if (response == null) return null;
+
+        // Supabase handles photo URLs differently - if you store photo URLs in your users table
+        final rawPhoto = (response['photo_url'] ?? '').toString().trim();
         String finalPhoto = '';
 
         if (rawPhoto.isEmpty) {
           finalPhoto = '';
         } else {
-          final p = rawPhoto;
-          // if it's already an http(s) URL, use directly (we'll add a cache-bust token)
-          if (p.startsWith('http://') || p.startsWith('https://')) {
-            finalPhoto = p;
+          // If it's already a full URL, use it directly
+          if (rawPhoto.startsWith('http://') || rawPhoto.startsWith('https://')) {
+            finalPhoto = rawPhoto;
           } else {
-            // try to treat as Firebase Storage path/ref
-            try {
-              final ref = FirebaseStorage.instance.ref().child(p);
-              final url = await ref.getDownloadURL();
-              finalPhoto = url;
-              debugPrint('DEBUG: Resolved storage path "$p" -> $url');
-            } catch (e) {
-              // resolution failed (file removed / invalid path) -> ensure empty so placeholder shows
-              debugPrint('DEBUG: unable to resolve photo storage path "$p": $e');
-              finalPhoto = '';
-            }
+            // For Supabase Storage, you might need to construct the URL
+            // This depends on how you've set up your storage
+            finalPhoto = ''; // Set to empty if not a full URL
           }
         }
 
-        // Add small cache-busting suffix for web/mobile so a changed/removed photo is refetched.
+        // Add cache-busting suffix
         if (finalPhoto.startsWith('http')) {
           final ts = DateTime.now().millisecondsSinceEpoch;
           finalPhoto = finalPhoto.contains('?') ? '$finalPhoto&v=$ts' : '$finalPhoto?v=$ts';
         }
 
-        // Return a copy with our resolved URL (may be empty)
-        final Map<String, dynamic> out = Map<String, dynamic>.from(data);
+        // Return data with resolved photo URL
+        final Map<String, dynamic> out = Map<String, dynamic>.from(response);
         out['photoURL'] = finalPhoto;
         return out;
       } catch (e) {
-        debugPrint('DEBUG: _getUserProfile error resolving photo -> $e');
-        // safest fallback: return original data but ensure photoURL is empty so placeholder is used
-        final Map<String, dynamic> out = Map<String, dynamic>.from(data);
-        out['photoURL'] = '';
-        return out;
+        debugPrint('DEBUG: _getUserProfile error -> $e');
+        return null;
       }
     }
     return null;
@@ -287,7 +280,9 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     _cacheLocationData(address);
-    _mapController.animateCamera(CameraUpdate.newLatLng(_initialPosition!));
+    if (_mapController != null) {
+      _mapController.animateCamera(CameraUpdate.newLatLng(_initialPosition!));
+    }
 
     await _fetchWeather(position.latitude, position.longitude);
   }
@@ -383,7 +378,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final town = (m['town'] ?? '').toString().trim();
     final city = (m['city'] ?? '').toString().trim();
     final zip = (m['zip'] ?? '').toString().trim();
-    final country = (m['country'] ?? '').toString().trim(); // <-- added
+    final country = (m['country'] ?? '').toString().trim();
 
     final parts = <String>[];
 
@@ -408,7 +403,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Only add city if it's present and not equal to town (reduces duplication)
     if (city.isNotEmpty && city != town) {
-      // keep city as-is (we don't auto-append "City" in the short form)
       parts.add(city);
     }
 
@@ -424,7 +418,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Helper: check whether required fields are present for the given category
   bool _isProfileCompleteForCategory(Map<String, dynamic> data) {
-    final category = (data['userCategory'] ?? '').toString().toUpperCase();
+    final category = (data['user_category'] ?? '').toString().toUpperCase();
 
     bool hasNonEmpty(Map<String, dynamic>? m, List<String> keys) {
       if (m == null) return false;
@@ -459,28 +453,28 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (category == 'RESIDENT') {
-      final resident = data['residentAddress'] is Map ? Map<String, dynamic>.from(data['residentAddress']) : null;
+      final resident = data['resident_address'] is Map ? Map<String, dynamic>.from(data['resident_address']) : null;
       // require house, street, barangay, zip AND (town OR city/municipality)
       return hasNonEmpty(resident, ['house', 'street', 'barangay', 'zip']) && hasTownOrCity(resident);
     } else if (category == 'EMPLOYEE') {
-      final work = data['workAddress'] is Map ? Map<String, dynamic>.from(data['workAddress']) : null;
-      final home = data['homeAddress'] is Map ? Map<String, dynamic>.from(data['homeAddress']) : null;
+      final work = data['work_address'] is Map ? Map<String, dynamic>.from(data['work_address']) : null;
+      final home = data['home_address'] is Map ? Map<String, dynamic>.from(data['home_address']) : null;
       // require work address complete (street, barangay, zip + town/city) and home complete (house,street,barangay,zip + town/city)
       return hasNonEmpty(work, ['street', 'barangay', 'zip']) && hasTownOrCity(work) &&
              hasNonEmpty(home, ['house', 'street', 'barangay', 'zip']) && hasTownOrCity(home);
     } else if (category == 'STUDENT') {
-      final school = data['schoolAddress'] is Map ? Map<String, dynamic>.from(data['schoolAddress']) : null;
-      final home = data['homeAddress'] is Map ? Map<String, dynamic>.from(data['homeAddress']) : null;
+      final school = data['school_address'] is Map ? Map<String, dynamic>.from(data['school_address']) : null;
+      final home = data['home_address'] is Map ? Map<String, dynamic>.from(data['home_address']) : null;
       // require school (schoolName,street,barangay,zip + town/city) AND home (house,street,barangay,zip + town/city)
       return hasNonEmpty(school, ['schoolName', 'street', 'barangay', 'zip']) && hasTownOrCity(school) &&
              hasNonEmpty(home, ['house', 'street', 'barangay', 'zip']) && hasTownOrCity(home);
     } else {
       // unknown category: require at least one of legacy address or any address map
       final fallback = (data['address'] ?? '').toString().trim();
-      final anyMapPresent = (data['residentAddress'] is Map && (data['residentAddress'] as Map).isNotEmpty) ||
-                           (data['workAddress'] is Map && (data['workAddress'] as Map).isNotEmpty) ||
-                           (data['schoolAddress'] is Map && (data['schoolAddress'] as Map).isNotEmpty) ||
-                           (data['homeAddress'] is Map && (data['homeAddress'] as Map).isNotEmpty);
+      final anyMapPresent = (data['resident_address'] is Map && (data['resident_address'] as Map).isNotEmpty) ||
+                           (data['work_address'] is Map && (data['work_address'] as Map).isNotEmpty) ||
+                           (data['school_address'] is Map && (data['school_address'] as Map).isNotEmpty) ||
+                           (data['home_address'] is Map && (data['home_address'] as Map).isNotEmpty);
       return fallback.isNotEmpty || anyMapPresent;
     }
   }
@@ -535,7 +529,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildLocationCard(),
               const SizedBox(height: 20),
 
-              // <-- Inserted Recent Incidents here (merged from the first file)
+              // Recent Incidents
               _buildRecentIncidents(),
               const SizedBox(height: 20),
 
@@ -685,7 +679,7 @@ class _HomeScreenState extends State<HomeScreen> {
             alignment: Alignment.centerRight,
             child: TextButton.icon(
               onPressed: () {
-                if (_currentPosition != null) {
+                if (_currentPosition != null && _mapController != null) {
                   _mapController.animateCamera(CameraUpdate.newLatLng(
                     LatLng(
                       _currentPosition!.latitude,
@@ -704,7 +698,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------- RECENT INCIDENTS (merged) ----------
+  // ---------- RECENT INCIDENTS (Supabase version) ----------
   Widget _buildRecentIncidents() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -749,12 +743,12 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
           SizedBox(
             height: 185,
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('incidents')
-                  .orderBy('timestamp', descending: true)
-                  .limit(10)
-                  .snapshots(),
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: supabase
+                  .from('incidents')
+                  .stream(primaryKey: ['id'])
+                  .order('timestamp', ascending: false)
+                  .limit(10),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Text('Error: ${snapshot.error}');
@@ -763,14 +757,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
 
+                final incidents = snapshot.data ?? [];
+                
                 // filter out declined locally
-                final docs = (snapshot.data?.docs ?? [])
-                    .where((doc) =>
-                        (doc['status'] ?? '').toString().toLowerCase() !=
+                final filteredIncidents = incidents
+                    .where((incident) =>
+                        (incident['status'] ?? '').toString().toLowerCase() !=
                         'declined')
                     .toList();
 
-                if (docs.isEmpty) {
+                if (filteredIncidents.isEmpty) {
                   return const Center(
                     child: Text(
                       'No recent incidents found.',
@@ -780,15 +776,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
 
                 return ListView.separated(
-                  itemCount: docs.length,
+                  itemCount: filteredIncidents.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
-                    final data = docs[index].data() as Map<String, dynamic>;
-                    final incidentType = data['incidentType'] ?? 'Unknown type';
+                    final data = filteredIncidents[index];
+                    final incidentType = data['incident_type'] ?? 'Unknown type';
                     final address = data['address'] ?? 'Unknown address';
-                    final timestamp = data['timestamp'] as Timestamp?;
+                    final timestamp = data['timestamp'];
                     final time = timestamp != null
-                        ? DateFormat('MMM d, h:mm a').format(timestamp.toDate())
+                        ? DateFormat('MMM d, h:mm a').format(DateTime.parse(timestamp))
                         : 'Unknown time';
 
                     IconData icon;
@@ -870,8 +866,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------- UPDATED profile card ----------
-  // Keep the updated profile card from the second file (aligns avatar with name)
+  // ---------- UPDATED profile card for Supabase ----------
   Widget _buildProfileCard() {
     return InkWell(
       borderRadius: BorderRadius.circular(20),
@@ -902,27 +897,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // ---- Extract profile data ----
             final photo = (data['photoURL'] ?? '').toString().trim();
-            final name = [data['firstName'], data['lastName']]
+            final name = [data['first_name'], data['last_name']]
                 .where((e) => (e ?? '').toString().trim().isNotEmpty)
                 .map((e) => capitalizeName(e.toString()))
                 .join(' ');
 
-            final category = (data['userCategory'] ?? '').toString().toUpperCase();
+            final category = (data['user_category'] ?? '').toString().toUpperCase();
             final fallback = (data['address'] ?? "No address set").toString();
 
             String displayedAddress = fallback;
             if (category == 'RESIDENT') {
-              final addr = data['residentAddress'] is Map ? Map<String, dynamic>.from(data['residentAddress']) : null;
+              final addr = data['resident_address'] is Map ? Map<String, dynamic>.from(data['resident_address']) : null;
               displayedAddress = _composeShortAddress(addr, fallback: fallback);
             } else if (category == 'STUDENT') {
-              final addr = data['schoolAddress'] is Map ? Map<String, dynamic>.from(data['schoolAddress']) : null;
+              final addr = data['school_address'] is Map ? Map<String, dynamic>.from(data['school_address']) : null;
               displayedAddress = _composeShortAddress(addr, fallback: fallback);
             } else if (category == 'EMPLOYEE') {
-              final addr = data['workAddress'] is Map ? Map<String, dynamic>.from(data['workAddress']) : null;
+              final addr = data['work_address'] is Map ? Map<String, dynamic>.from(data['work_address']) : null;
               displayedAddress = _composeShortAddress(addr, fallback: fallback);
             }
 
-            final storedVerifiedRaw = data['isVerified'];
+            final storedVerifiedRaw = data['is_verified'];
             final bool storedVerified = storedVerifiedRaw == true ||
                 storedVerifiedRaw == 1 ||
                 storedVerifiedRaw == '1' ||

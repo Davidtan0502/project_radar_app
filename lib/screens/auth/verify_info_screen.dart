@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// A confirmation screen that displays the user's input
 class VerifyInfoScreen extends StatefulWidget {
   final String lastName;
   final String firstName;
@@ -8,16 +7,11 @@ class VerifyInfoScreen extends StatefulWidget {
   final String email;
   final String phone;
   final String password;
-
-  // New optional fields: RegisterScreen does not need to pass these,
-  // but if it does, we'll display them.
   final String? userCategory;
   final Map<String, dynamic>? residentAddress;
   final Map<String, dynamic>? workAddress;
   final Map<String, dynamic>? homeAddress;
   final Map<String, dynamic>? schoolAddress;
-
-  // Callbacks (kept for compatibility with RegisterScreen)
   final VoidCallback onConfirm;
   final VoidCallback onEdit;
 
@@ -29,13 +23,11 @@ class VerifyInfoScreen extends StatefulWidget {
     required this.email,
     required this.phone,
     required this.password,
-    // optional address/category fields
     this.userCategory,
     this.residentAddress,
     this.workAddress,
     this.homeAddress,
     this.schoolAddress,
-    // callbacks (RegisterScreen passes () {} so this matches)
     required this.onConfirm,
     required this.onEdit,
   });
@@ -44,26 +36,73 @@ class VerifyInfoScreen extends StatefulWidget {
   State<VerifyInfoScreen> createState() => _VerifyInfoScreenState();
 }
 
-class _VerifyInfoScreenState extends State<VerifyInfoScreen> {
+class _VerifyInfoScreenState extends State<VerifyInfoScreen>
+    with SingleTickerProviderStateMixin {
   bool _isLoading = false;
+  late AnimationController _animationController;
+  late Animation<Color?> _colorAnimation;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _slideAnimation;
 
-  /// Pops with `false` to signal "edit".
+  final Color _primaryColor = const Color(0xFF336699);
+  final Color _backgroundColor = const Color(0xFFF0F4F8);
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..forward();
+
+    _colorAnimation = ColorTween(
+      begin: const Color(0xFF336699),
+      end: const Color(0xFF5588CC),
+    ).animate(_animationController);
+
+    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0, 0.5, curve: Curves.easeInOut),
+      ),
+    );
+
+    _slideAnimation = Tween<double>(begin: 20, end: 0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.3, 1, curve: Curves.easeOut),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
   void _handleEdit() {
-    // call provided callback (kept for compatibility) but preserve existing behavior
     widget.onEdit();
     Navigator.pop(context, false);
   }
 
-  /// Pops with `true` to signal "confirm".
   Future<void> _handleConfirm() async {
     setState(() => _isLoading = true);
-    // call provided callback (kept for compatibility)
-    widget.onConfirm();
-    await Future.delayed(const Duration(milliseconds: 300));
-    Navigator.pop(context, true);
+    
+    try {
+      // Call the onConfirm callback which will trigger _createAccount
+      widget.onConfirm();
+      
+      // Wait a bit to show loading state
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Don't pop - let the success dialog handle navigation
+    } catch (e) {
+      setState(() => _isLoading = false);
+      // Error will be handled in _createAccount
+    }
   }
 
-  /// Capitalize each word in a multi-word string
   String _capitalizeEachWord(String value) {
     if (value.trim().isEmpty) return value;
     return value
@@ -74,9 +113,6 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen> {
         .join(' ');
   }
 
-  /// Map short category tokens to friendly labels
-  /// Accepts: "RESIDENT", "EMPLOYEE", "STUDENT" (case-insensitive) and falls back
-  /// to the existing capitalization logic for other values.
   String _friendlyCategory(String? token) {
     if (token == null) return '';
     final t = token.trim().toUpperCase();
@@ -88,12 +124,10 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen> {
       case 'STUDENT':
         return 'Student';
       default:
-        // fallback to previous behavior (title-case whatever was passed)
         return _capitalizeEachWord(token.trim());
     }
   }
 
-  /// Safely read a string field from an address map, return empty string if missing
   String _addr(Map<String, dynamic>? m, String key) {
     if (m == null) return '';
     final val = m[key];
@@ -101,149 +135,112 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen> {
     return val.toString();
   }
 
-  // ------------ helper label-detection functions (extended variants) ------------
-
-  bool _containsLabel(String value, List<String> labels) {
-    if (value.trim().isEmpty) return false;
-    // join escaped labels and match as whole words (case-insensitive)
-    final escaped = labels.map(RegExp.escape).join('|');
-    final pattern = RegExp(r'\b(' + escaped + r')\b', caseSensitive: false);
-    return pattern.hasMatch(value);
-  }
-
-  bool _hasStreetLabel(String value) {
-    // Common street-like suffixes/abbreviations that indicate the user already labeled the street:
-    // street, st, st., str, str., road, rd, rd., avenue, ave, ave., av, av., boulevard, blvd, blvd.,
-    // lane, ln, ln., drive, dr, dr., place, pl, pl., way
-    return _containsLabel(value, [
-      'street',
-      'st',
-      'st\\.',
-      'str',
-      'str\\.',
-      'road',
-      'rd',
-      'rd\\.',
-      'avenue',
-      'ave',
-      'ave\\.',
-      'av',
-      'av\\.',
-      'boulevard',
-      'blvd',
-      'blvd\\.',
-      'lane',
-      'ln',
-      'ln\\.',
-      'drive',
-      'dr',
-      'dr\\.',
-      'place',
-      'pl',
-      'pl\\.',
-      'way'
-    ]);
-  }
-
-  bool _hasBarangayLabel(String value) {
-    // Recognize barangay variants: barangay, brgy, brgy., brg, brg., bgy, bgy., brgy-
-    return _containsLabel(value, [
-      'barangay',
-      'barangay\\.',
-      'brgy',
-      'brgy\\.',
-      'brg',
-      'brg\\.',
-      'bgy',
-      'bgy\\.',
-      'brgy\\-'
-    ]);
-  }
-
-  bool _hasCityLabel(String value) {
-    // Recognize city variants: city, city.  (we purposely keep this tight to avoid false matches)
-    return _containsLabel(value, ['city', 'city\\.']);
-  }
-
-  /// Build a compact address block (label + inline text)
-  /// NOTE: this was changed to produce a single inline string (comma-separated)
-  /// so it uses less vertical space and avoids overflow.
   Widget _buildAddressBlock(String title, Map<String, dynamic> map) {
-    // collect non-empty parts in preferred order
     final parts = <String>[];
-    final schoolName = _addr(map, 'schoolName');
+    
+    // School name (for student)
+    final schoolName = _addr(map, 'school_name');
     if (schoolName.isNotEmpty) parts.add(_capitalizeEachWord(schoolName));
 
+    // House and street
     final house = _addr(map, 'house');
     final street = _addr(map, 'street');
     if (house.isNotEmpty && street.isNotEmpty) {
-      // For street: append "Street" only when user did NOT include a street label already
-      final streetPart = _hasStreetLabel(street)
-          ? _capitalizeEachWord(street)
-          : '${_capitalizeEachWord(street)} Street';
-      parts.add('${_capitalizeEachWord(house)}, $streetPart');
+      parts.add('${_capitalizeEachWord(house)}, ${_capitalizeEachWord(street)}');
     } else if (house.isNotEmpty) {
       parts.add(_capitalizeEachWord(house));
     } else if (street.isNotEmpty) {
-      final streetPart = _hasStreetLabel(street)
-          ? _capitalizeEachWord(street)
-          : '${_capitalizeEachWord(street)} Street';
-      parts.add(streetPart);
+      parts.add(_capitalizeEachWord(street));
     }
 
+    // Barangay
     final barangay = _addr(map, 'barangay');
     if (barangay.isNotEmpty) {
-      // Prefix "Barangay " only when user did NOT already include it (or brgy variants)
-      final barangayPart = _hasBarangayLabel(barangay)
-          ? _capitalizeEachWord(barangay)
-          : 'Barangay ${_capitalizeEachWord(barangay)}';
-      parts.add(barangayPart);
+      parts.add('Barangay ${_capitalizeEachWord(barangay)}');
     }
 
+    // Town
     final town = _addr(map, 'town');
     if (town.isNotEmpty) parts.add(_capitalizeEachWord(town));
 
+    // ZIP
     final zip = _addr(map, 'zip');
     if (zip.isNotEmpty) parts.add('ZIP: $zip');
 
+    // City
     final city = _addr(map, 'city');
-    if (city.isNotEmpty) {
-      // Only for Home Address we append "City" (unless user already wrote 'city')
-      if (title == 'Home Address') {
-        final cityPart = _hasCityLabel(city)
-            ? _capitalizeEachWord(city)
-            : '${_capitalizeEachWord(city)} City';
-        parts.add(cityPart);
-      } else {
-        // For non-home addresses, just show city as-is/title-cased
-        parts.add(_capitalizeEachWord(city));
-      }
-    }
+    if (city.isNotEmpty) parts.add(_capitalizeEachWord(city));
 
+    // Country
     final country = _addr(map, 'country');
     if (country.isNotEmpty) parts.add(_capitalizeEachWord(country));
 
-    // Join into single inline string (comma-separated). If empty, show '-'.
     final inline = parts.isNotEmpty ? parts.join(', ') : '-';
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              color: _primaryColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            inline,
+            style: const TextStyle(
+              color: Color.fromARGB(221, 11, 11, 11),
+              fontSize: 14,
+            ),
+            softWrap: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoTile(String label, String value) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: 120,
             child: Text(
-              '$title:',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              '$label:',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: Colors.grey.shade700,
+              ),
             ),
           ),
           Expanded(
-            // allow soft wrapping; since it's a single Text it will wrap horizontally
             child: Text(
-              inline,
-              style: const TextStyle(color: Color.fromARGB(221, 11, 11, 11)),
-              softWrap: true,
+              value.isNotEmpty ? value : '-',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Color.fromARGB(221, 11, 11, 11),
+              ),
             ),
           ),
         ],
@@ -254,146 +251,261 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Verify Your Details'),
-        backgroundColor: const Color(0xFF336699),
-        automaticallyImplyLeading: false,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Card(
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            // <-- Allow the details to scroll if they don't fit vertically -->
-            child: SingleChildScrollView(
+      backgroundColor: _backgroundColor,
+      body: AnimatedBuilder(
+        animation: _colorAnimation,
+        builder: (context, child) {
+          return Container(
+            color: _colorAnimation.value,
+            child: SafeArea(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Center(
-                    child: Text(
-                      'Please confirm your details',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  // Header with back button
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          "Verify Your Details",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  _buildInfoTile('Last Name', _capitalizeEachWord(widget.lastName)),
-                  _buildInfoTile('First Name', _capitalizeEachWord(widget.firstName)),
-                  // only show middle name label if non-empty (keeps layout similar)
-                  if (widget.middleName.trim().isNotEmpty)
-                    _buildInfoTile('Middle Name', _capitalizeEachWord(widget.middleName)),
-                  _buildInfoTile('Email', widget.email),
-                  _buildInfoTile('Phone', '+63${widget.phone}'),
-                  _buildInfoTile('Password', '*' * widget.password.length),
-
-                  // New: show selected category if provided (mapped from short token to friendly label)
-                  if (widget.userCategory != null && widget.userCategory!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    _buildInfoTile('Category', _friendlyCategory(widget.userCategory)),
-                  ],
-
-                  const SizedBox(height: 12),
-
-                  // Address sections — show only if maps are provided & non-empty
-                  if (widget.residentAddress != null && widget.residentAddress!.isNotEmpty) ...[
-                    _buildAddressBlock('Resident Address', widget.residentAddress!),
-                  ],
-                  if (widget.workAddress != null && widget.workAddress!.isNotEmpty) ...[
-                    _buildAddressBlock('Work Address', widget.workAddress!),
-                  ],
-                  if (widget.homeAddress != null && widget.homeAddress!.isNotEmpty) ...[
-                    _buildAddressBlock('Home Address', widget.homeAddress!),
-                  ],
-                  if (widget.schoolAddress != null && widget.schoolAddress!.isNotEmpty) ...[
-                    _buildAddressBlock('School Address', widget.schoolAddress!),
-                  ],
-
-                  const SizedBox(height: 16),
-                  // keep buttons below the scrollable content; they will appear after content
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _handleEdit,
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: const BorderSide(color: Color(0xFF336699)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'Edit',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Color(0xFF336699),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _handleConfirm,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF336699),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
+                  
+                  Expanded(
+                    child: AnimatedBuilder(
+                      animation: _animationController,
+                      builder: (context, child) {
+                        return Opacity(
+                          opacity: _fadeAnimation.value,
+                          child: Transform.translate(
+                            offset: Offset(0, _slideAnimation.value),
+                            child: Container(
+                              margin: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 4),
                                   ),
-                                )
-                              : const Text(
-                                  'Confirm',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.white,
-                                  ),
+                                ],
+                              ),
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Header Icon and Title
+                                    Center(
+                                      child: Column(
+                                        children: [
+                                          Icon(
+                                            Icons.verified_user_outlined,
+                                            size: 48,
+                                            color: _primaryColor,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Confirm Your Information',
+                                            style: TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.w700,
+                                              color: _primaryColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'Please review all details before submitting',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 14,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    
+                                    const SizedBox(height: 24),
+                                    
+                                    // Personal Information Section
+                                    Text(
+                                      'Personal Information',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 16,
+                                        color: Colors.grey.shade800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    
+                                    _buildInfoTile('Last Name', _capitalizeEachWord(widget.lastName)),
+                                    const SizedBox(height: 8),
+                                    _buildInfoTile('First Name', _capitalizeEachWord(widget.firstName)),
+                                    if (widget.middleName.trim().isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      _buildInfoTile('Middle Name', _capitalizeEachWord(widget.middleName)),
+                                    ],
+                                    const SizedBox(height: 8),
+                                    _buildInfoTile('Email', widget.email),
+                                    const SizedBox(height: 8),
+                                    _buildInfoTile('Phone', '+63${widget.phone}'),
+                                    const SizedBox(height: 8),
+                                    _buildInfoTile('Password', '*' * widget.password.length),
+
+                                    if (widget.userCategory != null && widget.userCategory!.trim().isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      _buildInfoTile('Category', _friendlyCategory(widget.userCategory)),
+                                    ],
+
+                                    const SizedBox(height: 24),
+
+                                    // Address Sections
+                                    if (widget.residentAddress != null && widget.residentAddress!.isNotEmpty) ...[
+                                      Text(
+                                        'Resident Address',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                          color: Colors.grey.shade800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _buildAddressBlock('Resident Address', widget.residentAddress!),
+                                      const SizedBox(height: 16),
+                                    ],
+                                    
+                                    if (widget.workAddress != null && widget.workAddress!.isNotEmpty) ...[
+                                      Text(
+                                        'Work Address',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                          color: Colors.grey.shade800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _buildAddressBlock('Work Address', widget.workAddress!),
+                                      const SizedBox(height: 16),
+                                    ],
+                                    
+                                    if (widget.homeAddress != null && widget.homeAddress!.isNotEmpty) ...[
+                                      Text(
+                                        'Home Address',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                          color: Colors.grey.shade800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _buildAddressBlock('Home Address', widget.homeAddress!),
+                                      const SizedBox(height: 16),
+                                    ],
+                                    
+                                    if (widget.schoolAddress != null && widget.schoolAddress!.isNotEmpty) ...[
+                                      Text(
+                                        'School Address',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                          color: Colors.grey.shade800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _buildAddressBlock('School Address', widget.schoolAddress!),
+                                      const SizedBox(height: 16),
+                                    ],
+
+                                    const SizedBox(height: 32),
+                                    
+                                    // Action Buttons
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: OutlinedButton(
+                                            onPressed: _handleEdit,
+                                            style: OutlinedButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(vertical: 16),
+                                              side: BorderSide(color: _primaryColor),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              'Edit Details',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: _primaryColor,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: ElevatedButton(
+                                            onPressed: _isLoading ? null : _handleConfirm,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: _primaryColor,
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(vertical: 16),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              elevation: 2,
+                                            ),
+                                            child: _isLoading
+                                                ? const SizedBox(
+                                                    width: 20,
+                                                    height: 20,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: Colors.white,
+                                                    ),
+                                                  )
+                                                : Text(
+                                                    'Confirm & Submit',
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
-                        ),
-                      ),
-                    ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoTile(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value.isNotEmpty ? value : '-',
-              style: const TextStyle(color: Color.fromARGB(221, 11, 11, 11)),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

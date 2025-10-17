@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'verify_info_screen.dart';
-import 'package:another_flushbar/flushbar.dart';
-import 'dart:math'; // <-- added for selection clamping
+import 'dart:math';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -16,8 +14,8 @@ class _RegisterScreenState extends State<RegisterScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<Color?> _colorAnimation;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  
+  final SupabaseClient supabase = Supabase.instance.client;
 
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _lastNameController = TextEditingController();
@@ -35,30 +33,30 @@ class _RegisterScreenState extends State<RegisterScreen>
   String? _errorMessage;
 
   // Resident address
-  final TextEditingController _houseController = TextEditingController(); // House/Unit
-  final TextEditingController _streetController = TextEditingController(); // Street
-  final TextEditingController _barangayController = TextEditingController(); // Barangay
-  final TextEditingController _residentTownController = TextEditingController(); // Resident town manual storage
-  String? _selectedTown; // used for resident dropdown
-  final TextEditingController _zipController = TextEditingController(); // Resident ZIP
+  final TextEditingController _houseController = TextEditingController();
+  final TextEditingController _streetController = TextEditingController();
+  final TextEditingController _barangayController = TextEditingController();
+  final TextEditingController _residentTownController = TextEditingController();
+  String? _selectedTown;
+  final TextEditingController _zipController = TextEditingController();
   final TextEditingController _cityController =
-      TextEditingController(text: "Manila City"); // read-only for resident
+      TextEditingController(text: "Manila City");
   final TextEditingController _countryController =
-      TextEditingController(text: "Philippines"); // read-only
+      TextEditingController(text: "Philippines");
 
   // Work address (Employee)
   final TextEditingController _workStreetController =
-      TextEditingController(); // Street/Building for work
+      TextEditingController();
   final TextEditingController _workBarangayController =
       TextEditingController();
   final TextEditingController _workTownController =
-      TextEditingController(); // manual town fallback if user types
-  String? _selectedWorkTown; // dropdown selection for work
+      TextEditingController();
+  String? _selectedWorkTown;
   final TextEditingController _workZipController = TextEditingController();
   final TextEditingController _workCityController =
-      TextEditingController(); // now editable (manual)
+      TextEditingController(text: "Manila City");
   final TextEditingController _workCountryController =
-      TextEditingController(text: "Philippines"); // read-only
+      TextEditingController(text: "Philippines");
 
   // Home address (for Employee and Student)
   final TextEditingController _homeHouseController = TextEditingController();
@@ -66,34 +64,31 @@ class _RegisterScreenState extends State<RegisterScreen>
   final TextEditingController _homeBarangayController =
       TextEditingController();
   final TextEditingController _homeTownController =
-      TextEditingController(); // manual town for home (optional)
-  String? _selectedHomeTown; // kept for compatibility but UI uses manual controller
+      TextEditingController();
+  String? _selectedHomeTown;
   final TextEditingController _homeZipController = TextEditingController();
   final TextEditingController _homeCityController =
-      TextEditingController(); // manual and required for Employee/Student
+      TextEditingController();
   final TextEditingController _homeCountryController =
-      TextEditingController(text: "Philippines"); // read-only
+      TextEditingController(text: "Philippines");
 
   // Student school address
-  final TextEditingController _schoolNameController = TextEditingController(); // School name
+  final TextEditingController _schoolNameController = TextEditingController();
   final TextEditingController _schoolStreetController =
-      TextEditingController(); // Street/building
+      TextEditingController();
   final TextEditingController _schoolBarangayController =
       TextEditingController();
   final TextEditingController _schoolTownController =
-      TextEditingController(); // manual town fallback if user types
-  String? _selectedSchoolTown; // dropdown selection for school
+      TextEditingController();
+  String? _selectedSchoolTown;
   final TextEditingController _schoolZipController = TextEditingController();
   final TextEditingController _schoolCityController =
-      TextEditingController(); // now editable (manual)
+      TextEditingController(text: "Manila City");
   final TextEditingController _schoolCountryController =
-      TextEditingController(text: "Philippines"); // read-only
+      TextEditingController(text: "Philippines");
 
-  bool _hasMiddleName = false; // NEW: middle name optional checkbox
-
-  // NEW: use short tokens for categories
-  // valid values: 'RESIDENT', 'EMPLOYEE', 'STUDENT'
-  String _selectedCategory = "RESIDENT"; // default
+  bool _hasMiddleName = false;
+  String _selectedCategory = "RESIDENT";
 
   final List<String> _towns = [
     "Tondo",
@@ -114,7 +109,6 @@ class _RegisterScreenState extends State<RegisterScreen>
     "Sampaloc",
   ];
 
-  // control flags for showing manual town input for employee/student
   bool _showWorkTownManual = false;
   bool _showSchoolTownManual = false;
 
@@ -131,13 +125,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       end: const Color(0xFF5588CC),
     ).animate(_controller);
 
-    // Initialize work/school city defaults (keeps previous default but editable)
-    _workCityController.text = "Manila City";
-    _schoolCityController.text = "Manila City";
-
-    // -------------------------------
-    // New: listeners to auto Title-Case many manual text fields (EXCEPT email/phone/password/zip)
-    // Apply Title Case to: names, address text fields, town and city manual fields, school name, etc.
+    // Initialize title case listeners
     void addTitleListener(TextEditingController c) {
       c.addListener(() {
         final text = c.text;
@@ -155,38 +143,28 @@ class _RegisterScreenState extends State<RegisterScreen>
       });
     }
 
-    // Name fields
     addTitleListener(_lastNameController);
     addTitleListener(_firstNameController);
     addTitleListener(_middleNameController);
-
-    // Resident address textual fields (not ZIP)
     addTitleListener(_houseController);
     addTitleListener(_streetController);
     addTitleListener(_barangayController);
     addTitleListener(_residentTownController);
-    addTitleListener(_cityController); // city readOnly by default but safe to have
-
-    // Work address textual fields
+    addTitleListener(_cityController);
     addTitleListener(_workStreetController);
     addTitleListener(_workBarangayController);
     addTitleListener(_workTownController);
     addTitleListener(_workCityController);
-
-    // Home address textual fields
     addTitleListener(_homeHouseController);
     addTitleListener(_homeStreetController);
     addTitleListener(_homeBarangayController);
     addTitleListener(_homeTownController);
     addTitleListener(_homeCityController);
-
-    // School address textual fields
     addTitleListener(_schoolNameController);
     addTitleListener(_schoolStreetController);
     addTitleListener(_schoolBarangayController);
     addTitleListener(_schoolTownController);
     addTitleListener(_schoolCityController);
-    // -------------------------------
   }
 
   @override
@@ -199,24 +177,19 @@ class _RegisterScreenState extends State<RegisterScreen>
     _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-
-    // NEW: dispose all new controllers
     _houseController.dispose();
     _streetController.dispose();
     _barangayController.dispose();
     _zipController.dispose();
     _cityController.dispose();
     _countryController.dispose();
-
     _residentTownController.dispose();
-
     _workStreetController.dispose();
     _workBarangayController.dispose();
     _workTownController.dispose();
     _workZipController.dispose();
     _workCityController.dispose();
     _workCountryController.dispose();
-
     _homeHouseController.dispose();
     _homeStreetController.dispose();
     _homeBarangayController.dispose();
@@ -224,7 +197,6 @@ class _RegisterScreenState extends State<RegisterScreen>
     _homeZipController.dispose();
     _homeCityController.dispose();
     _homeCountryController.dispose();
-
     _schoolNameController.dispose();
     _schoolStreetController.dispose();
     _schoolBarangayController.dispose();
@@ -232,11 +204,9 @@ class _RegisterScreenState extends State<RegisterScreen>
     _schoolZipController.dispose();
     _schoolCityController.dispose();
     _schoolCountryController.dispose();
-
     super.dispose();
   }
 
-  // Helper: convert input to Title Case (each word first letter uppercase, rest lowercase)
   String _toTitleCase(String input) {
     if (input.trim().isEmpty) return input;
     final parts = input.split(RegExp(r'\s+'));
@@ -249,7 +219,6 @@ class _RegisterScreenState extends State<RegisterScreen>
     return transformed;
   }
 
-  // NEW: improved email validation (accepts subdomains like stamesa.sti.edu.ph)
   bool _isValidEmail(String email) {
     final regex = RegExp(
       r'^[\w\.-]+@[A-Za-z0-9.-]+\.(edu\.ph|org\.ph|edu|com|net|org|gov|ph)$',
@@ -258,54 +227,13 @@ class _RegisterScreenState extends State<RegisterScreen>
     return regex.hasMatch(email);
   }
 
-  // Validate and defer registration until confirmation
   void _submitRegistration() {
     if (!_formKey.currentState!.validate()) return;
 
-    // build the address maps here (same as in _createAccount)
-    final residentAddress = {
-      'house': _houseController.text.trim(),
-      'street': _streetController.text.trim(),
-      'barangay': _barangayController.text.trim(),
-      'town': _residentTownController.text.trim(),
-      'zip': _zipController.text.trim(),
-      'city': _cityController.text.trim(),
-      'country': _countryController.text.trim(),
-    };
-
-    final workAddress = {
-      'street': _workStreetController.text.trim(),
-      'barangay': _workBarangayController.text.trim(),
-      // prefer dropdown unless 'Other' selected or dropdown null then fallback to manual controller
-      'town': (_selectedWorkTown != null && _selectedWorkTown != 'Other')
-          ? _selectedWorkTown
-          : _workTownController.text.trim(),
-      'zip': _workZipController.text.trim(),
-      'city': _workCityController.text.trim(),
-      'country': _workCountryController.text.trim(),
-    };
-
-    final homeAddress = {
-      'house': _homeHouseController.text.trim(),
-      'street': _homeStreetController.text.trim(),
-      'barangay': _homeBarangayController.text.trim(),
-      'town': _selectedHomeTown ?? _homeTownController.text.trim(),
-      'zip': _homeZipController.text.trim(),
-      'city': _homeCityController.text.trim(),
-      'country': _homeCountryController.text.trim(),
-    };
-
-    final schoolAddress = {
-      'schoolName': _schoolNameController.text.trim(),
-      'street': _schoolStreetController.text.trim(),
-      'barangay': _schoolBarangayController.text.trim(),
-      'town': (_selectedSchoolTown != null && _selectedSchoolTown != 'Other')
-          ? _selectedSchoolTown
-          : _schoolTownController.text.trim(),
-      'zip': _schoolZipController.text.trim(),
-      'city': _schoolCityController.text.trim(),
-      'country': _schoolCountryController.text.trim(),
-    };
+    final residentAddress = _buildResidentAddress();
+    final workAddress = _buildWorkAddress();
+    final homeAddress = _buildHomeAddress();
+    final schoolAddress = _buildSchoolAddress();
 
     Navigator.push<bool>(
       context,
@@ -318,25 +246,36 @@ class _RegisterScreenState extends State<RegisterScreen>
           phone: _phoneController.text.trim(),
           password: _passwordController.text,
           userCategory: _selectedCategory,
-          // PASS only the maps relevant to the chosen category; others are null
           residentAddress: _selectedCategory == "RESIDENT" ? residentAddress : null,
           workAddress: _selectedCategory == "EMPLOYEE" ? workAddress : null,
           homeAddress: (_selectedCategory == "EMPLOYEE" || _selectedCategory == "STUDENT")
               ? homeAddress
               : null,
           schoolAddress: _selectedCategory == "STUDENT" ? schoolAddress : null,
-          onConfirm: () {},
-          onEdit: () {},
+          onConfirm: () {
+            // This will be called when user confirms in VerifyInfoScreen
+            _createAccount(
+              residentAddress: residentAddress,
+              workAddress: workAddress,
+              homeAddress: homeAddress,
+              schoolAddress: schoolAddress,
+            );
+          },
+          onEdit: () {
+            // User wants to edit - just go back
+            Navigator.pop(context);
+          },
         ),
       ),
-    ).then((confirmed) {
-      if (confirmed == true) {
-        _createAccount();
-      }
-    });
+    );
   }
 
-  Future<void> _createAccount() async {
+  Future<void> _createAccount({
+    required Map<String, dynamic>? residentAddress,
+    required Map<String, dynamic>? workAddress,
+    required Map<String, dynamic>? homeAddress,
+    required Map<String, dynamic>? schoolAddress,
+  }) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -344,142 +283,692 @@ class _RegisterScreenState extends State<RegisterScreen>
 
     try {
       final email = _emailController.text.trim().toLowerCase();
-      final methods = await _auth.fetchSignInMethodsForEmail(email);
-      if (methods.isNotEmpty) {
-        throw FirebaseAuthException(
-          code: 'email-already-in-use',
-          message: 'Email already registered',
-        );
-      }
+      final password = _passwordController.text.trim();
+      
+      debugPrint('Starting registration for: $email');
 
-      UserCredential userCredential = await _auth
-          .createUserWithEmailAndPassword(
+      // ✅ FIXED: Sign up with ALL metadata that the trigger needs
+      final AuthResponse authResponse = await supabase.auth.signUp(
         email: email,
-        password: _passwordController.text.trim(),
+        password: password,
+        data: {
+          'type': 'app', // This tells the trigger to create app_users record
+          'first_name': _firstNameController.text.trim(),
+          'last_name': _lastNameController.text.trim(),
+          'middle_name': _hasMiddleName ? _middleNameController.text.trim() : null,
+          'phone': _phoneController.text.trim().isNotEmpty 
+              ? '+63${_phoneController.text.trim()}' 
+              : null,
+          'user_category': _selectedCategory,
+          'resident_address': _selectedCategory == "RESIDENT" ? residentAddress : null,
+          'work_address': _selectedCategory == "EMPLOYEE" ? workAddress : null,
+          'home_address': (_selectedCategory == "EMPLOYEE" || _selectedCategory == "STUDENT")
+              ? homeAddress
+              : null,
+          'school_address': _selectedCategory == "STUDENT" ? schoolAddress : null,
+        },
       );
 
-      // Send verification email, but don't let a failure stop the flow entirely.
-      try {
-        await userCredential.user!.sendEmailVerification();
-        debugPrint('Verification email sent to $email');
-      } catch (e) {
-        debugPrint('Error sending verification email: $e');
-        // still continue to create the Firestore record below
+      if (authResponse.user == null) {
+        throw Exception('Failed to create user account in Auth');
       }
 
-      // NEW: Build address maps to store in Firestore
-      final residentAddress = {
-        'house': _houseController.text.trim(),
-        'street': _streetController.text.trim(),
-        'barangay': _barangayController.text.trim(),
-        'town': _residentTownController.text.trim(), // uses controller (synced from dropdown)
-        'zip': _zipController.text.trim(),
-        'city': _cityController.text.trim(),
-        'country': _countryController.text.trim(),
-      };
+      debugPrint('Auth user created: ${authResponse.user!.id}');
+      debugPrint('Session exists: ${authResponse.session != null}');
+      debugPrint('User email: ${authResponse.user!.email}');
 
-      final workAddress = {
-        'street': _workStreetController.text.trim(),
-        'barangay': _workBarangayController.text.trim(), // <-- FIXED: was using street controller before
-        // prefer dropdown selection (unless 'Other'), fallback to text controller
-        'town': (_selectedWorkTown != null && _selectedWorkTown != 'Other')
-            ? _selectedWorkTown
-            : _workTownController.text.trim(),
-        'zip': _workZipController.text.trim(),
-        'city': _workCityController.text.trim(),
-        'country': _workCountryController.text.trim(),
-      };
+      // ✅ The trigger should now automatically create the app_users record
+      // Let's wait a moment and verify the record was created
+      await Future.delayed(const Duration(seconds: 2));
 
-      final homeAddress = {
-        'house': _homeHouseController.text.trim(),
-        'street': _homeStreetController.text.trim(),
-        'barangay': _homeBarangayController.text.trim(),
-        'town': _selectedHomeTown ?? _homeTownController.text.trim(),
-        'zip': _homeZipController.text.trim(),
-        'city': _homeCityController.text.trim(),
-        'country': _homeCountryController.text.trim(),
-      };
-
-      final schoolAddress = {
-        'schoolName': _schoolNameController.text.trim(),
-        'street': _schoolStreetController.text.trim(),
-        'barangay': _schoolBarangayController.text.trim(),
-        'town': (_selectedSchoolTown != null && _selectedSchoolTown != 'Other')
-            ? _selectedSchoolTown
-            : _schoolTownController.text.trim(),
-        'zip': _schoolZipController.text.trim(),
-        'city': _schoolCityController.text.trim(),
-        'country': _schoolCountryController.text.trim(),
-      };
-
-      final userData = {
-        'firstName': _firstNameController.text.trim(),
-        'lastName': _lastNameController.text.trim(),
-        'middleName': _hasMiddleName ? _middleNameController.text.trim() : "",
-        'email': email,
-        'phone': '+63${_phoneController.text.trim()}',
-        'password': _passwordController.text.trim(), // <-- NOTE: storing plaintext password is insecure
-        'status': 'approved',
-        'createdAt': FieldValue.serverTimestamp(),
-        'userCategory': _selectedCategory,
-        // store conditional addresses
-        if (_selectedCategory == "RESIDENT") 'residentAddress': residentAddress,
-        if (_selectedCategory == "EMPLOYEE") 'workAddress': workAddress,
-        if (_selectedCategory == "EMPLOYEE" || _selectedCategory == "STUDENT")
-          'homeAddress': homeAddress,
-        if (_selectedCategory == "STUDENT") 'schoolAddress': schoolAddress,
-      };
-
-      // store user record
-      final uid = userCredential.user!.uid;
-      await _firestore.collection('users').doc(uid).set(userData);
-
-      // IMPORTANT: sign out the newly-created user so auth-state listeners
-      // won't navigate to Home while the email is unverified.
+      // Verify the app_users record was created by the trigger
       try {
-        await _auth.signOut();
-        debugPrint('Signed out newly created user to prevent auto-navigation to Home.');
+        final userRecord = await supabase
+            .from('app_users')
+            .select()
+            .eq('id', authResponse.user!.id)
+            .single();
+
+        debugPrint('✅ app_users record created by trigger: ${userRecord['id']}');
       } catch (e) {
-        debugPrint('Error signing out after registration: $e');
+        debugPrint('⚠️ Trigger may not have created app_users record yet: $e');
+        // This might be OK - the trigger could be delayed
       }
 
       if (!mounted) return;
-      Navigator.popUntil(context, (route) => route.isFirst);
-      Flushbar(
-        message:
-            'Verification email sent. Please check your inbox and verify your email to login.',
-        duration: const Duration(seconds: 8),
-        margin: const EdgeInsets.all(8),
-        borderRadius: BorderRadius.circular(8),
-        backgroundColor: const Color.fromARGB(255, 25, 167, 0),
-        flushbarPosition: FlushbarPosition.TOP,
-      ).show(context);
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorMessage = _getErrorMessage(e.code);
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Registration failed. Please try again.';
-      });
+      
+      // Show success message
+      _showSuccessDialog();
+
+    } on AuthException catch (e) {
+      debugPrint('AuthException: ${e.message}');
+      final errorMsg = _getAuthErrorMessage(e);
+      setState(() => _errorMessage = errorMsg);
+      _showErrorDialog(errorMsg);
+    } catch (e, stackTrace) {
+      debugPrint('Unexpected error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
+      // Show generic error
+      _showErrorDialog('Registration failed. Please try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  String _getErrorMessage(String errorCode) {
-    switch (errorCode) {
-      case 'email-already-in-use':
-        return 'This email is already registered.';
-      case 'invalid-email':
-        return 'Please enter a valid email address.';
-      case 'operation-not-allowed':
-        return 'Email/password accounts are not enabled.';
-      case 'weak-password':
-        return 'Password is too weak. Use at least 6 characters.';
-      default:
-        return 'Registration failed. Please try again.';
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Check Your Email',
+          style: TextStyle(
+            color: Color(0xFF336699),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Registration successful!',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'We\'ve sent a verification email to:',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _emailController.text.trim(),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Please check your inbox and click the verification link to activate your account.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'You will be automatically redirected back to the app after verification.',
+              style: TextStyle(
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                color: Colors.blue,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.popUntil(context, (route) => route.isFirst);
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF336699),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: const Text(
+              'OK',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Map<String, dynamic> _removeNullValues(Map<String, dynamic> map) {
+    return Map.from(map)..removeWhere((key, value) => value == null);
+  }
+
+  String _getAuthErrorMessage(AuthException e) {
+    final message = e.message.toLowerCase();
+    
+    if (message.contains('already registered') || message.contains('user exists')) {
+      return 'This email is already registered. Please try logging in or use a different email.';
+    } else if (message.contains('invalid email')) {
+      return 'Please enter a valid email address.';
+    } else if (message.contains('password') && message.contains('weak')) {
+      return 'Password is too weak. Use at least 6 characters with letters, numbers, and special characters.';
+    } else if (message.contains('rate limit') || message.contains('too many requests')) {
+      return 'Too many attempts. Please try again in a few minutes.';
+    } else {
+      return 'Registration failed: ${e.message}';
     }
+  }
+
+  Map<String, dynamic> _buildResidentAddress() {
+    return {
+      'house': _houseController.text.trim(),
+      'street': _streetController.text.trim(),
+      'barangay': _barangayController.text.trim(),
+      'town': _residentTownController.text.trim(),
+      'zip': _zipController.text.trim(),
+      'city': _cityController.text.trim(),
+      'country': _countryController.text.trim(),
+    };
+  }
+
+  Map<String, dynamic> _buildWorkAddress() {
+    return {
+      'street': _workStreetController.text.trim(),
+      'barangay': _workBarangayController.text.trim(),
+      'town': (_selectedWorkTown != null && _selectedWorkTown != 'Other')
+          ? _selectedWorkTown
+          : _workTownController.text.trim(),
+      'zip': _workZipController.text.trim(),
+      'city': _workCityController.text.trim(),
+      'country': _workCountryController.text.trim(),
+    };
+  }
+
+  Map<String, dynamic> _buildHomeAddress() {
+    return {
+      'house': _homeHouseController.text.trim(),
+      'street': _homeStreetController.text.trim(),
+      'barangay': _homeBarangayController.text.trim(),
+      'town': _selectedHomeTown ?? _homeTownController.text.trim(),
+      'zip': _homeZipController.text.trim(),
+      'city': _homeCityController.text.trim(),
+      'country': _homeCountryController.text.trim(),
+    };
+  }
+
+  Map<String, dynamic> _buildSchoolAddress() {
+    return {
+      'school_name': _schoolNameController.text.trim(),
+      'street': _schoolStreetController.text.trim(),
+      'barangay': _schoolBarangayController.text.trim(),
+      'town': (_selectedSchoolTown != null && _selectedSchoolTown != 'Other')
+          ? _selectedSchoolTown
+          : _schoolTownController.text.trim(),
+      'zip': _schoolZipController.text.trim(),
+      'city': _schoolCityController.text.trim(),
+      'country': _schoolCountryController.text.trim(),
+    };
+  }
+
+  void _showErrorDialog(String message) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.error_outline,
+              color: Colors.red.shade600,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Registration Error',
+              style: TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontSize: 14,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF336699),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: const Text(
+              'OK',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Enhanced Text Field
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    bool obscureText = false,
+    TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
+    bool readOnly = false,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      validator: validator,
+      readOnly: readOnly,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+      ),
+      decoration: InputDecoration(
+        prefixIcon: Container(
+          margin: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Icon(
+            icon,
+            color: const Color(0xFF336699),
+            size: 20,
+          ),
+        ),
+        labelText: label,
+        labelStyle: TextStyle(
+          color: Colors.grey.shade600,
+          fontWeight: FontWeight.w500,
+        ),
+        floatingLabelStyle: const TextStyle(
+          color: Color(0xFF336699),
+          fontWeight: FontWeight.w600,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300, width: 1.5),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300, width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF336699), width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red, width: 1.5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red, width: 2),
+        ),
+        filled: true,
+        fillColor: readOnly ? Colors.grey.shade50 : Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        errorStyle: const TextStyle(
+          color: Colors.red,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  // Enhanced Phone Field
+  Widget _buildPhoneField() {
+    return TextFormField(
+      controller: _phoneController,
+      keyboardType: TextInputType.phone,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+      ),
+      validator: (val) {
+        if (val == null || val.isEmpty) {
+          return 'Please enter your contact number';
+        }
+        final digitsOnly = val.trim();
+        if (!RegExp(r'^[9]\d{9}$').hasMatch(digitsOnly)) {
+          return 'Enter a valid 10-digit number starting with 9';
+        }
+        return null;
+      },
+      decoration: InputDecoration(
+        labelText: 'Phone Number',
+        labelStyle: TextStyle(
+          color: Colors.grey.shade600,
+          fontWeight: FontWeight.w500,
+        ),
+        floatingLabelStyle: const TextStyle(
+          color: Color(0xFF336699),
+          fontWeight: FontWeight.w600,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300, width: 1.5),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300, width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF336699), width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red, width: 1.5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red, width: 2),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        errorStyle: const TextStyle(
+          color: Colors.red,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+        prefixIcon: Container(
+          margin: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/ph_flag.png',
+                width: 20,
+                height: 20,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(
+                    Icons.flag,
+                    color: Color(0xFF336699),
+                    size: 20,
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                '+63',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF336699),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Enhanced Password Field
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String label,
+    required bool isVisible,
+    required VoidCallback onToggleVisibility,
+    required String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: !isVisible,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+      ),
+      validator: validator,
+      decoration: InputDecoration(
+        prefixIcon: Container(
+          margin: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Icon(
+            Icons.lock,
+            color: const Color(0xFF336699),
+            size: 20,
+          ),
+        ),
+        labelText: label,
+        labelStyle: TextStyle(
+          color: Colors.grey.shade600,
+          fontWeight: FontWeight.w500,
+        ),
+        floatingLabelStyle: const TextStyle(
+          color: Color(0xFF336699),
+          fontWeight: FontWeight.w600,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300, width: 1.5),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300, width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF336699), width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red, width: 1.5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red, width: 2),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        errorStyle: const TextStyle(
+          color: Colors.red,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+        suffixIcon: IconButton(
+          icon: Icon(
+            isVisible ? Icons.visibility : Icons.visibility_off,
+            color: Colors.grey.shade600,
+            size: 20,
+          ),
+          onPressed: onToggleVisibility,
+        ),
+      ),
+    );
+  }
+
+  // Enhanced Dropdown Field
+  Widget _buildDropdownField({
+    required String value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+    required String label,
+    required String? Function(String?)? validator,
+  }) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      items: items.map((item) {
+        return DropdownMenuItem(
+          value: item,
+          child: Text(
+            item,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        );
+      }).toList(),
+      onChanged: onChanged,
+      style: const TextStyle(
+        color: Colors.black87,
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(
+          color: Colors.grey.shade600,
+          fontWeight: FontWeight.w500,
+        ),
+        floatingLabelStyle: const TextStyle(
+          color: Color(0xFF336699),
+          fontWeight: FontWeight.w600,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300, width: 1.5),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300, width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF336699), width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red, width: 1.5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red, width: 2),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+        errorStyle: const TextStyle(
+          color: Colors.red,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+        prefixIcon: Container(
+          margin: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: const Icon(
+            Icons.category,
+            color: Color(0xFF336699),
+            size: 20,
+          ),
+        ),
+      ),
+      validator: validator,
+      dropdownColor: Colors.white,
+      icon: const Icon(
+        Icons.arrow_drop_down,
+        color: Color(0xFF336699),
+      ),
+    );
+  }
+
+  // Enhanced Town Dropdown Field
+  Widget _buildTownDropdownField({
+    required String? value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+    required String label,
+    required String? Function(String?)? validator,
+    bool showOtherOption = false,
+  }) {
+    final dropdownItems = showOtherOption 
+        ? [...items, 'Other']
+        : items;
+
+    return DropdownButtonFormField<String>(
+      value: value,
+      items: dropdownItems.map((item) {
+        return DropdownMenuItem(
+          value: item,
+          child: Text(
+            item,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        );
+      }).toList(),
+      onChanged: onChanged,
+      style: const TextStyle(
+        color: Colors.black87,
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(
+          color: Colors.grey.shade600,
+          fontWeight: FontWeight.w500,
+        ),
+        floatingLabelStyle: const TextStyle(
+          color: Color(0xFF336699),
+          fontWeight: FontWeight.w600,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300, width: 1.5),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300, width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF336699), width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red, width: 1.5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red, width: 2),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+        errorStyle: const TextStyle(
+          color: Colors.red,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+        prefixIcon: Container(
+          margin: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: const Icon(
+            Icons.location_city,
+            color: Color(0xFF336699),
+            size: 20,
+          ),
+        ),
+      ),
+      validator: validator,
+      dropdownColor: Colors.white,
+      icon: const Icon(
+        Icons.arrow_drop_down,
+        color: Color(0xFF336699),
+      ),
+    );
   }
 
   @override
@@ -547,33 +1036,44 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         CrossAxisAlignment.stretch,
                                     children: [
                                       if (_errorMessage != null)
-                                        Padding(
-                                          padding:
-                                              const EdgeInsets.only(bottom: 16),
-                                          child: Text(
-                                            _errorMessage!,
-                                            style: const TextStyle(
-                                              color: Colors.red,
-                                              fontSize: 14,
-                                            ),
-                                            textAlign: TextAlign.center,
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.shade50,
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(color: Colors.red.shade200),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.error_outline,
+                                                color: Colors.red.shade600,
+                                                size: 20,
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Text(
+                                                  _errorMessage!,
+                                                  style: TextStyle(
+                                                    color: Colors.red.shade700,
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
 
-                                      // CATEGORY dropdown (replaced ChoiceChips)
-                                      DropdownButtonFormField<String>(
+                                      const SizedBox(height: 16),
+
+                                      // CATEGORY dropdown
+                                      _buildDropdownField(
                                         value: _selectedCategory,
-                                        items: const [
-                                          DropdownMenuItem(value: "RESIDENT", child: Text("RESIDENT")),
-                                          DropdownMenuItem(value: "EMPLOYEE", child: Text("EMPLOYEE")),
-                                          DropdownMenuItem(value: "STUDENT", child: Text("STUDENT")),
-                                        ],
+                                        items: const ["RESIDENT", "EMPLOYEE", "STUDENT"],
                                         onChanged: (val) => setState(() { _selectedCategory = val ?? "RESIDENT"; }),
-                                        decoration: InputDecoration(
-                                          labelText: "Category",
-                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                          contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                                        ),
+                                        label: "Category",
+                                        validator: (val) => val == null ? 'Please select a category' : null,
                                       ),
 
                                       const SizedBox(height: 16),
@@ -583,8 +1083,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         'Last Name',
                                         Icons.person,
                                         validator: (val) {
-                                          if (val == null ||
-                                              val.trim().isEmpty) {
+                                          if (val == null || val.trim().isEmpty) {
                                             return 'Enter last name';
                                           }
                                           return null;
@@ -596,8 +1095,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         'First Name',
                                         Icons.person_outline,
                                         validator: (val) {
-                                          if (val == null ||
-                                              val.trim().isEmpty) {
+                                          if (val == null || val.trim().isEmpty) {
                                             return 'Enter first name';
                                           }
                                           return null;
@@ -605,16 +1103,25 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       ),
                                       const SizedBox(height: 12),
 
-                                      // NEW: Optional middle name checkbox (keeps layout)
-                                      Row(
-                                        children: [
-                                          Checkbox(
-                                            value: _hasMiddleName,
-                                            onChanged: (val) =>
-                                                setState(() => _hasMiddleName = val!),
-                                          ),
-                                          const Text("I have a middle name"),
-                                        ],
+                                      // Optional middle name checkbox
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        child: Row(
+                                          children: [
+                                            Checkbox(
+                                              value: _hasMiddleName,
+                                              onChanged: (val) =>
+                                                  setState(() => _hasMiddleName = val!),
+                                              activeColor: const Color(0xFF336699),
+                                            ),
+                                            const Text(
+                                              "I have a middle name",
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                       if (_hasMiddleName)
                                         _buildTextField(
@@ -625,7 +1132,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                             if (val == null || val.trim().isEmpty) {
                                               return 'Enter middle name';
                                             }
-                                            // simple name pattern — adjust if needed
                                             final pattern = RegExp(r"^[A-Za-z\s\.'-]+$");
                                             if (!pattern.hasMatch(val.trim())) {
                                               return 'Enter a valid middle name';
@@ -633,7 +1139,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                             return null;
                                           },
                                         ),
-                                      const SizedBox(height: 12),
+                                      if (_hasMiddleName) const SizedBox(height: 12),
 
                                       _buildTextField(
                                         _emailController,
@@ -642,9 +1148,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         keyboardType:
                                             TextInputType.emailAddress,
                                         validator: (val) {
-                                          if (val == null ||
-                                              val.isEmpty ||
-                                              !_isValidEmail(val)) {
+                                          if (val == null || val.isEmpty || !_isValidEmail(val)) {
                                             return 'Enter valid email';
                                           }
                                           return null;
@@ -652,59 +1156,16 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       ),
                                       const SizedBox(height: 12),
 
-                                      TextFormField(
-                                        controller: _phoneController,
-                                        keyboardType: TextInputType.phone,
-                                        validator: (val) {
-                                          if (val == null || val.isEmpty) {
-                                            return 'Please enter your contact number';
-                                          }
-                                          // Must be exactly 10 digits, all numeric, and start with 9
-                                          final digitsOnly = val.trim();
-                                          if (!RegExp(
-                                            r'^[9]\d{9}$',
-                                          ).hasMatch(digitsOnly)) {
-                                            return 'Enter a valid 10-digit number starting with 9';
-                                          }
-                                          return null;
-                                        },
-                                        decoration: InputDecoration(
-                                          labelText: 'Phone Number',
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                vertical: 14,
-                                                horizontal: 16,
-                                              ),
-                                          prefixIcon: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: const [
-                                                Image(
-                                                  image: AssetImage(
-                                                    'assets/ph_flag.png',
-                                                  ),
-                                                  width: 24,
-                                                  height: 24,
-                                                ),
-                                                SizedBox(width: 8),
-                                                Text('+63'),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
+                                      _buildPhoneField(),
                                       const SizedBox(height: 12),
-                                      TextFormField(
+
+                                      _buildPasswordField(
                                         controller: _passwordController,
-                                        obscureText: !_isPasswordVisible,
+                                        label: 'Password',
+                                        isVisible: _isPasswordVisible,
+                                        onToggleVisibility: () => setState(() {
+                                          _isPasswordVisible = !_isPasswordVisible;
+                                        }),
                                         validator: (val) {
                                           if (val == null || val.isEmpty) {
                                             return 'Password is required';
@@ -712,37 +1173,21 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           if (val.length < 6) {
                                             return 'At least 6 characters';
                                           }
-                                          // Must contain letters, numbers, and special characters
                                           final regex = RegExp(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$');
                                           if (!regex.hasMatch(val)) {
                                             return 'Include letters, numbers, and special characters';
                                           }
                                           return null;
                                         },
-                                        decoration: InputDecoration(
-                                          labelText: 'Password',
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          contentPadding: const EdgeInsets.symmetric(
-                                            vertical: 14,
-                                            horizontal: 16,
-                                          ),
-                                          prefixIcon: const Icon(Icons.lock),
-                                          suffixIcon: IconButton(
-                                            icon: Icon(
-                                              _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                                            ),
-                                            onPressed: () => setState(() {
-                                              _isPasswordVisible = !_isPasswordVisible;
-                                            }),
-                                          ),
-                                        ),
                                       ),
                                       const SizedBox(height: 12),
-                                      TextFormField(
+                                      _buildPasswordField(
                                         controller: _confirmPasswordController,
-                                        obscureText: !_isConfirmPasswordVisible,
+                                        label: 'Confirm Password',
+                                        isVisible: _isConfirmPasswordVisible,
+                                        onToggleVisibility: () => setState(() {
+                                          _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                                        }),
                                         validator: (val) {
                                           if (val == null || val.isEmpty) {
                                             return 'Confirm Password is required';
@@ -752,42 +1197,20 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           }
                                           return null;
                                         },
-                                        decoration: InputDecoration(
-                                          labelText: 'Confirm Password',
-                                          prefixIcon: const Icon(
-                                            Icons.lock_outline,
-                                          ),
-                                          suffixIcon: IconButton(
-                                            icon: Icon(
-                                              _isConfirmPasswordVisible
-                                                  ? Icons.visibility
-                                                  : Icons.visibility_off,
-                                            ),
-                                            onPressed: () {
-                                              setState(() {
-                                                _isConfirmPasswordVisible =
-                                                    !_isConfirmPasswordVisible;
-                                              });
-                                            },
-                                          ),
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                vertical: 14,
-                                                horizontal: 16,
-                                              ),
-                                        ),
                                       ),
                                       const SizedBox(height: 24),
 
-                                      // RESIDENT only: Address header + resident address (shown only for RESIDENT)
+                                      // RESIDENT Address
                                       if (_selectedCategory == "RESIDENT") ...[
-                                        const Text("Address", style: TextStyle(fontWeight: FontWeight.bold)),
-                                        const SizedBox(height: 8),
+                                        const Text(
+                                          "Address", 
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                            color: Colors.black87,
+                                          )
+                                        ),
+                                        const SizedBox(height: 12),
 
                                         _buildTextField(_houseController, "House/Unit/Building No.", Icons.home,
                                             validator: (val) {
@@ -795,7 +1218,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           return null;
                                         }),
                                         const SizedBox(height: 12),
-                                        _buildTextField(_streetController, "Street Name", Icons.aod,
+                                        _buildTextField(_streetController, "Street Name", Icons.location_on,
                                             validator: (val) {
                                           if (val == null || val.trim().isEmpty) return 'Enter street name';
                                           return null;
@@ -808,21 +1231,17 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         }),
                                         const SizedBox(height: 12),
 
-                                        // Resident Town as dropdown (required)
-                                        DropdownButtonFormField<String>(
+                                        // Resident Town dropdown
+                                        _buildTownDropdownField(
                                           value: _selectedTown ?? (_residentTownController.text.isNotEmpty ? _residentTownController.text : null),
-                                          items: _towns.map((town) => DropdownMenuItem(value: town, child: Text(town))).toList(),
+                                          items: _towns,
                                           onChanged: (val) {
                                             setState(() {
                                               _selectedTown = val;
-                                              if (val != null) _residentTownController.text = val; // keep existing storage logic unchanged
+                                              if (val != null) _residentTownController.text = val;
                                             });
                                           },
-                                          decoration: InputDecoration(
-                                            labelText: "Town",
-                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                            contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                                          ),
+                                          label: "Town",
                                           validator: (val) {
                                             final townVal = _selectedTown ?? _residentTownController.text;
                                             if (townVal == null || townVal.trim().isEmpty) return 'Select town';
@@ -830,7 +1249,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           },
                                         ),
                                         const SizedBox(height: 12),
-                                        // Resident ZIP (4 digits)
                                         _buildTextField(_zipController, "ZIP Code", Icons.local_post_office, keyboardType: TextInputType.number,
                                             validator: (val) {
                                           if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
@@ -838,19 +1256,23 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           return null;
                                         }),
                                         const SizedBox(height: 12),
-
-                                        // City & Country as non-editable textboxes (read-only)
                                         _buildTextField(_cityController, "City/Municipality", Icons.location_city, readOnly: true, validator: (_) => null),
                                         const SizedBox(height: 12),
                                         _buildTextField(_countryController, "Country", Icons.flag, readOnly: true, validator: (_) => null),
                                         const SizedBox(height: 12),
-                                      ] else
-                                        const SizedBox.shrink(),
+                                      ],
 
-                                      // Employee: Work Address block (street/building, barangay, town dropdown+optional manual, zip, city editable, country)
+                                      // EMPLOYEE Address
                                       if (_selectedCategory == "EMPLOYEE") ...[
-                                        const Text("Work Address", style: TextStyle(fontWeight: FontWeight.bold)),
-                                        const SizedBox(height: 8),
+                                        const Text(
+                                          "Work Address", 
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                            color: Colors.black87,
+                                          )
+                                        ),
+                                        const SizedBox(height: 12),
                                         _buildTextField(_workStreetController, "Street/Building No.", Icons.business, validator: (val) {
                                           if (val == null || val.trim().isEmpty) return 'Enter work street/building';
                                           return null;
@@ -862,34 +1284,23 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         }),
                                         const SizedBox(height: 12),
 
-                                        // Work town dropdown (optional). Includes "Other" to allow manual input.
-                                        DropdownButtonFormField<String>(
+                                        // Work town dropdown
+                                        _buildTownDropdownField(
                                           value: _selectedWorkTown ?? (_workTownController.text.isNotEmpty ? _workTownController.text : null),
-                                          items: [
-                                            ..._towns.map((town) => DropdownMenuItem(value: town, child: Text(town))),
-                                            const DropdownMenuItem(value: 'Other', child: Text('Other (type manually)')),
-                                          ],
+                                          items: _towns,
                                           onChanged: (val) {
                                             setState(() {
                                               _selectedWorkTown = val;
-                                              // when Other chosen, show manual input; otherwise sync manual controller for convenience
                                               _showWorkTownManual = val == 'Other';
                                               if (val != null && val != 'Other') _workTownController.text = val;
                                             });
                                           },
-                                          decoration: InputDecoration(
-                                            labelText: "Town",
-                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                            contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                                          ),
-                                          // optional: don't force selection
-                                          validator: (val) {
-                                            return null;
-                                          },
+                                          label: "Town",
+                                          validator: null,
+                                          showOtherOption: true,
                                         ),
                                         const SizedBox(height: 12),
 
-                                        // Manual town input shown only when user selects 'Other' or types directly
                                         if (_showWorkTownManual || (_selectedWorkTown == null && _workTownController.text.isNotEmpty))
                                           Column(
                                             children: [
@@ -904,16 +1315,20 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           return null;
                                         }),
                                         const SizedBox(height: 12),
-
-                                        // Work city: now editable (manual)
                                         _buildTextField(_workCityController, "City/Municipality", Icons.location_city, validator: (_) => null),
                                         const SizedBox(height: 12),
                                         _buildTextField(_workCountryController, "Country", Icons.flag, readOnly: true, validator: (_) => null),
-                                        const SizedBox(height: 16),
+                                        const SizedBox(height: 20),
 
-                                        // Employee: Home Address block
-                                        const Text("Home Address", style: TextStyle(fontWeight: FontWeight.bold)),
-                                        const SizedBox(height: 8),
+                                        const Text(
+                                          "Home Address", 
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                            color: Colors.black87,
+                                          )
+                                        ),
+                                        const SizedBox(height: 12),
                                         _buildTextField(_homeHouseController, "House/Unit/Building No.", Icons.home, validator: (val) {
                                           if (val == null || val.trim().isEmpty) return 'Enter house/unit/building no.';
                                           return null;
@@ -929,15 +1344,10 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           return null;
                                         }),
                                         const SizedBox(height: 12),
-                                        // Home town is manual text input (optional)
                                         _buildTextField(
                                           _homeTownController,
                                           "Town (Optional)",
                                           Icons.location_city,
-                                          validator: (val) {
-                                            // Town optional
-                                            return null;
-                                          },
                                         ),
                                         const SizedBox(height: 12),
                                         _buildTextField(_homeZipController, "ZIP Code", Icons.local_post_office, keyboardType: TextInputType.number, validator: (val) {
@@ -946,7 +1356,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           return null;
                                         }),
                                         const SizedBox(height: 12),
-                                        // Home city remains MANUAL and REQUIRED
                                         _buildTextField(_homeCityController, "City/Municipality", Icons.location_city, validator: (val) {
                                           if (val == null || val.trim().isEmpty) return 'Enter city/municipality';
                                           return null;
@@ -955,11 +1364,17 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         _buildTextField(_homeCountryController, "Country", Icons.flag, readOnly: true, validator: (_) => null),
                                       ],
 
-                                      // Student: School Address + Home Address
+                                      // STUDENT Address
                                       if (_selectedCategory == "STUDENT") ...[
-                                        const Text("School Address", style: TextStyle(fontWeight: FontWeight.bold)),
-                                        const SizedBox(height: 8),
-                                        // School name
+                                        const Text(
+                                          "School Address", 
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                            color: Colors.black87,
+                                          )
+                                        ),
+                                        const SizedBox(height: 12),
                                         _buildTextField(_schoolNameController, "Full School Name", Icons.school, validator: (val) {
                                           if (val == null || val.trim().isEmpty) return 'Enter full school name';
                                           return null;
@@ -976,13 +1391,10 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         }),
                                         const SizedBox(height: 12),
 
-                                        // School town dropdown (optional + "Other")
-                                        DropdownButtonFormField<String>(
+                                        // School town dropdown
+                                        _buildTownDropdownField(
                                           value: _selectedSchoolTown ?? (_schoolTownController.text.isNotEmpty ? _schoolTownController.text : null),
-                                          items: [
-                                            ..._towns.map((town) => DropdownMenuItem(value: town, child: Text(town))),
-                                            const DropdownMenuItem(value: 'Other', child: Text('Other (type manually)')),
-                                          ],
+                                          items: _towns,
                                           onChanged: (val) {
                                             setState(() {
                                               _selectedSchoolTown = val;
@@ -990,15 +1402,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                                               if (val != null && val != 'Other') _schoolTownController.text = val;
                                             });
                                           },
-                                          decoration: InputDecoration(
-                                            labelText: "Town",
-                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                            contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                                          ),
-                                          validator: (val) {
-                                            // optional
-                                            return null;
-                                          },
+                                          label: "Town",
+                                          validator: null,
+                                          showOtherOption: true,
                                         ),
                                         const SizedBox(height: 12),
 
@@ -1016,14 +1422,20 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           return null;
                                         }),
                                         const SizedBox(height: 12),
-                                        // School city now editable (manual)
                                         _buildTextField(_schoolCityController, "City/Municipality", Icons.location_city, validator: (_) => null),
                                         const SizedBox(height: 12),
                                         _buildTextField(_schoolCountryController, "Country", Icons.flag, readOnly: true, validator: (_) => null),
-                                        const SizedBox(height: 16),
+                                        const SizedBox(height: 20),
 
-                                        const Text("Home Address", style: TextStyle(fontWeight: FontWeight.bold)),
-                                        const SizedBox(height: 8),
+                                        const Text(
+                                          "Home Address", 
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                            color: Colors.black87,
+                                          )
+                                        ),
+                                        const SizedBox(height: 12),
                                         _buildTextField(_homeHouseController, "House/Unit/Building No.", Icons.home, validator: (val) {
                                           if (val == null || val.trim().isEmpty) return 'Enter house/unit/building no.';
                                           return null;
@@ -1039,15 +1451,10 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           return null;
                                         }),
                                         const SizedBox(height: 12),
-                                        // Home town manual input for students as well — optional
                                         _buildTextField(
                                           _homeTownController,
                                           "Town (Optional)",
                                           Icons.location_city,
-                                          validator: (val) {
-                                            // Town is optional
-                                            return null;
-                                          },
                                         ),
                                         const SizedBox(height: 12),
                                         _buildTextField(_homeZipController, "ZIP Code", Icons.local_post_office, keyboardType: TextInputType.number, validator: (val) {
@@ -1072,10 +1479,25 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           backgroundColor: _colorAnimation.value,
                                           padding: const EdgeInsets.symmetric(vertical: 16),
                                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          elevation: 2,
                                         ),
                                         child: _isLoading
-                                            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                            : const Text('Register', style: TextStyle(fontSize: 16, color: Colors.white)),
+                                            ? const SizedBox(
+                                                width: 24, 
+                                                height: 24, 
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2, 
+                                                  color: Colors.white
+                                                )
+                                              )
+                                            : const Text(
+                                                'Register', 
+                                                style: TextStyle(
+                                                  fontSize: 16, 
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w600,
+                                                )
+                                              ),
                                       ),
                                     ],
                                   ),
@@ -1092,37 +1514,6 @@ class _RegisterScreenState extends State<RegisterScreen>
             ),
           );
         },
-      ),
-    );
-  }
-
-  // keep your original helper but add readOnly parameter (NEW)
-  // Replace your current _buildTextField with this safer version:
-  Widget _buildTextField(
-    TextEditingController? controller, // allow nullable now
-    String label,
-    IconData icon, {
-    bool obscureText = false,
-    TextInputType keyboardType = TextInputType.text,
-    String? Function(String?)? validator,
-    bool readOnly = false,
-  }) {
-    // If controller is null that's fine — TextFormField accepts null and will manage its own internal controller.
-    // We keep behavior identical otherwise.
-    return TextFormField(
-      controller: controller,
-      obscureText: obscureText,
-      keyboardType: keyboardType,
-      validator: validator,
-      readOnly: readOnly,
-      decoration: InputDecoration(
-        prefixIcon: Icon(icon),
-        labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 14,
-          horizontal: 16,
-        ),
       ),
     );
   }

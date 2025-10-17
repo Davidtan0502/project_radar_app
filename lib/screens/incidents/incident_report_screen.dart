@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import 'dart:io';
-import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:project_radar_app/screens/incidents/config_loader.dart';
 import 'package:project_radar_app/screens/incidents/suspicious_content_screen.dart';
-import '../../services/config.dart';
 import 'location_picker_screen.dart';
 
 class IncidentReportPage extends StatefulWidget {
@@ -47,8 +43,8 @@ class _IncidentReportPageState extends State<IncidentReportPage>
   bool _isLoadingLocation = true;
   Timer? _addressTypingTimer;
 
-  final CollectionReference _incidentsCollection =
-      FirebaseFirestore.instance.collection('incidents');
+  // Replace Firebase with Supabase
+  final SupabaseClient supabase = Supabase.instance.client;
   List<File> _selectedImages = [];
 
   GoogleMapController? _mapController;
@@ -116,22 +112,38 @@ class _IncidentReportPageState extends State<IncidentReportPage>
   }
 
   Future<List<String>> _uploadImages(String incidentId) async {
-    final storage = FirebaseStorage.instance;
     List<String> urls = [];
+    final user = supabase.auth.currentUser;
+    
+    if (user == null) {
+      print('User not authenticated');
+      return urls;
+    }
 
     for (final img in _selectedImages) {
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final ref = storage.ref().child('incidents/$incidentId/$fileName');
-
       try {
-        final snapshot = await ref.putFile(img);
-        final url = await snapshot.ref.getDownloadURL();
-        urls.add(url);
+        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${_selectedImages.indexOf(img)}.jpg';
+        final filePath = '${user.id}/$incidentId/$fileName';
+
+        print('🔼 Uploading image: $filePath');
+        
+        // ✅ FIXED: Upload the File object directly (no bytes conversion needed)
+        await supabase.storage
+            .from('incidents')
+            .upload(filePath, img);
+
+        final publicUrl = supabase.storage
+            .from('incidents')
+            .getPublicUrl(filePath);
+
+        urls.add(publicUrl);
+        print('✅ Image uploaded successfully: $publicUrl');
       } catch (e) {
-        print('Error uploading image $fileName: $e');
+        print('❌ Error uploading image: $e');
       }
     }
 
+    print('📊 Total images uploaded: ${urls.length}/${_selectedImages.length}');
     return urls;
   }
 
@@ -160,22 +172,24 @@ class _IncidentReportPageState extends State<IncidentReportPage>
   }
 
   Future<void> _loadUserInfo() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = supabase.auth.currentUser;
     if (user == null) return;
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      if (!doc.exists) return;
-      final data = doc.data()!;
+      final response = await supabase
+          .from('app_users')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (response == null) return;
+      
       if (!mounted) return;
       setState(() {
-        final first = data['firstName'] as String? ?? '';
-        final last = data['lastName'] as String? ?? '';
+        final first = response['first_name'] as String? ?? '';
+        final last = response['last_name'] as String? ?? '';
         _nameController.text = [first, last].where((s) => s.isNotEmpty).join(' ');
 
-        String phone = data['phone'] as String? ?? '';
+        String phone = response['phone'] as String? ?? '';
         if (phone.startsWith('+63') && phone.length == 13) {
           phone = '0${phone.substring(3)}';
         }
@@ -461,42 +475,55 @@ class _IncidentReportPageState extends State<IncidentReportPage>
         print('DEBUG: Content not suspicious, proceeding directly');
       }
 
-      final docRef = await _incidentsCollection.add({
-        'name': _nameController.text.trim(),
-        'address': _addressController.text.trim(),
-        'landmark': _landmarkController.text.trim(),
-        'contactNumber': _cellphoneController.text.trim(),
-        'incidentType': _incidentType == 'Other'
-            ? _otherIncidentTypeController.text.trim()
-            : _incidentType,
-        'description': description,
-        'timestamp': FieldValue.serverTimestamp(),
-        'status': isSuspicious ? 'Under Review' : 'Pending',
-        'latitude': double.tryParse(_latitudeController.text) ?? 0.0,
-        'longitude': double.tryParse(_longitudeController.text) ?? 0.0,
-        'barangay': _barangayController.text.trim(),
-        'street': _streetController.text.trim(),
-        'suspicionScore': suspicionScore,
-        'requiresReview': isSuspicious,
-        'userId': FirebaseAuth.instance.currentUser?.uid,
-        'aiAnalysis': aiExplanation,
-        if (matchedPatterns.isNotEmpty) 'matchedPatterns': matchedPatterns,
-        'statusUpdates': [
-          {
-            'status': isSuspicious ? 'Under Review' : 'Pending',
-            'timestamp': Timestamp.now(),
-            'note': 'Report submitted',
-          }
-        ],
-      });
+      // ✅ FIXED: Generate a proper incident ID FIRST
+      final incidentId = 'incident_${DateTime.now().millisecondsSinceEpoch}_${supabase.auth.currentUser?.id ?? 'anonymous'}';
 
+      // Upload images first to get URLs
       List<String> imageUrls = [];
       if (_selectedImages.isNotEmpty) {
-        imageUrls = await _uploadImages(docRef.id);
-        if (imageUrls.isNotEmpty) {
-          await docRef.update({'imageUrls': imageUrls});
-        }
+        imageUrls = await _uploadImages(incidentId);
       }
+
+      // Insert incident record
+      final response = await supabase
+          .from('incidents')
+          .insert({
+            'name': _nameController.text.trim(),
+            'address': _addressController.text.trim(),
+            'landmark': _landmarkController.text.trim(),
+            'contact_number': _cellphoneController.text.trim(),
+            'incident_type': _incidentType == 'Other'
+                ? _otherIncidentTypeController.text.trim()
+                : _incidentType,
+            'description': description,
+            'timestamp': DateTime.now().toIso8601String(),
+            'status': isSuspicious ? 'Under Review' : 'Pending',
+            'latitude': double.tryParse(_latitudeController.text) ?? 0.0,
+            'longitude': double.tryParse(_longitudeController.text) ?? 0.0,
+            'barangay': _barangayController.text.trim(),
+            'street': _streetController.text.trim(),
+            'suspicion_score': suspicionScore,
+            'requires_review': isSuspicious,
+            'user_id': supabase.auth.currentUser?.id,
+            'ai_analysis': aiExplanation,
+            if (matchedPatterns.isNotEmpty) 'matched_patterns': matchedPatterns,
+            'image_urls': imageUrls,
+            'incident_status_updates': [
+              {
+                'status': isSuspicious ? 'Under Review' : 'Pending',
+                'timestamp': DateTime.now().toIso8601String(),
+                'note': 'Report submitted',
+              }
+            ],
+          })
+          .select();
+
+      if (response.isEmpty) {
+        throw Exception('Failed to create incident record');
+      }
+
+      final createdIncident = response.first;
+      print('✅ Incident created with ID: ${createdIncident['id']}');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1065,7 +1092,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [_primaryColor, _primaryColor.withOpacity(0.8)],
+                      colors: [_primaryColor, Color.lerp(_primaryColor, Colors.black, 0.2)!],
                     ),
                   ),
                   child: Center(
@@ -1162,7 +1189,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
                               const SizedBox(height: 16),
 
                               DropdownButtonFormField<String>(
-                                value: _incidentType,
+                                initialValue: _incidentType,
                                 decoration: InputDecoration(
                                   labelText: 'Incident Type',
                                   prefixIcon: Icon(Icons.warning_amber_outlined, color: _primaryColor),
@@ -1208,7 +1235,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
                                     padding: const EdgeInsets.symmetric(vertical: 18),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     elevation: 2,
-                                    shadowColor: _primaryColor.withOpacity(0.3),
+                                    shadowColor: Color.lerp(_primaryColor, Colors.black, 0.3),
                                   ),
                                   child: _isSubmitting
                                       ? SizedBox(

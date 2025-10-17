@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ResolvedReportsScreen extends StatelessWidget {
   const ResolvedReportsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Timestamp for 24 hours ago
-    final twentyFourHoursAgo = DateTime.now().subtract(const Duration(hours: 24));
+    final supabase = Supabase.instance.client;
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -28,13 +27,12 @@ class ResolvedReportsScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('incidents')
-            .where('status', isEqualTo: 'Resolved')
-            .where('timestamp',
-                isGreaterThanOrEqualTo: Timestamp.fromDate(twentyFourHoursAgo))
-            .snapshots(),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: supabase
+            .from('incidents')
+            .stream(primaryKey: ['id'])
+            .eq('status', 'resolved')
+            .order('timestamp', ascending: false),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return _buildMessage(
@@ -51,8 +49,16 @@ class ResolvedReportsScreen extends StatelessWidget {
             );
           }
 
-          final docs = snapshot.data?.docs ?? [];
-          if (docs.isEmpty) {
+          final incidents = snapshot.data ?? [];
+          
+          // Filter for last 24 hours in the builder
+          final twentyFourHoursAgo = DateTime.now().subtract(const Duration(hours: 24));
+          final recentIncidents = incidents.where((incident) {
+            final timestamp = _parseTimestamp(incident['timestamp']);
+            return timestamp != null && timestamp.isAfter(twentyFourHoursAgo);
+          }).toList();
+
+          if (recentIncidents.isEmpty) {
             return _buildMessage(
               icon: Icons.assignment_turned_in_outlined,
               message: "No resolved cases in the last 24 hours",
@@ -62,12 +68,12 @@ class ResolvedReportsScreen extends StatelessWidget {
 
           return ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: docs.length,
+            itemCount: recentIncidents.length,
             itemBuilder: (context, index) {
-              final data = docs[index].data() as Map<String, dynamic>;
+              final data = recentIncidents[index];
 
               final description = data['description'] ?? 'No description';
-              final location = data['location'] ?? 'Unknown location';
+              final location = data['address'] ?? 'Unknown location';
               final lat = data['latitude']?.toString() ?? 'N/A';
               final lng = data['longitude']?.toString() ?? 'N/A';
 
@@ -115,6 +121,19 @@ class ResolvedReportsScreen extends StatelessWidget {
         },
       ),
     );
+  }
+
+  DateTime? _parseTimestamp(dynamic timestamp) {
+    if (timestamp == null) return null;
+    if (timestamp is DateTime) return timestamp;
+    if (timestamp is String) {
+      try {
+        return DateTime.parse(timestamp);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
   }
 
   Widget _buildMessage({

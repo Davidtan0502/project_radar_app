@@ -2,19 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-/// Top-level background handler required by firebase_messaging
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  await NotificationService.handleBackgroundMessage(message);
-}
 
 class NotificationService {
   // Singleton instance
@@ -22,35 +13,31 @@ class NotificationService {
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  // Firebase services
-  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  // Supabase client
+  final SupabaseClient _supabase = Supabase.instance.client;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
+  
   // State management
   final ValueNotifier<int> unreadCount = ValueNotifier<int>(0);
   final Set<String> _processedUpdateKeys = {};
   String? _currentUserId;
   GlobalKey<NavigatorState>? _navigatorKey;
 
-  // Keep per-user listener subscription
-  StreamSubscription<QuerySnapshot>? _incidentSubscription;
+  // Supabase Realtime subscription
+  StreamSubscription<List<Map<String, dynamic>>>? _incidentSubscription;
+  RealtimeChannel? _presenceChannel;
 
   // Configuration
   static const String _androidChannelId = 'incident_updates_channel';
   static const String _androidChannelName = 'Incident Updates';
-  static const String _fcmTokensCollection = 'fcm_tokens';
-  static const String _usersCollection = 'users';
-
-  // Duplicate prevention
-  final Map<String, DateTime> _serverNotificationTimestamps = {};
+  static const String _pushSubscriptionsTable = 'push_subscriptions'; // Supabase table for push subscriptions
 
   /// Initialize the notification service
   Future<void> initialize({GlobalKey<NavigatorState>? navigatorKey}) async {
     _navigatorKey = navigatorKey;
 
     try {
-      // Request permissions
+      // Request permissions (for local notifications)
       await _requestPermissions();
 
       // Initialize local notifications
@@ -59,43 +46,36 @@ class NotificationService {
       // Create notification channels
       await _createNotificationChannels();
 
-      // Set up message handlers
-      _setupMessageHandlers();
+      // Set up Supabase Realtime listeners
+      _setupRealtimeListeners();
 
-      // Handle token refresh
-      _setupTokenRefreshHandler();
-
-      // Register background handler
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-      // Log token for testing
-      await _logTokenForTesting();
-
-      debugPrint('Notification service initialized successfully');
+      debugPrint('Supabase Notification service initialized successfully');
     } catch (e) {
       debugPrint('Error initializing notification service: $e');
     }
   }
 
-  /// Set the current user and manage their FCM tokens
+  /// Set the current user and manage their notification subscriptions
   Future<void> setCurrentUser(String? userId) async {
     if (userId == _currentUserId) return;
 
-    // Remove old user's token and stop their listener
+    // Remove old user's subscription and stop their listener
     if (_currentUserId != null) {
-      await _removeTokenFromFirestore(_currentUserId!);
+      await _removeUserFromPresence(_currentUserId!);
       _stopIncidentListener();
     }
 
     _currentUserId = userId;
 
     if (userId != null) {
-      // Save new user's token
-      await _saveTokenToFirestore(userId);
+      // Register new user for push notifications
+      await _registerForPushNotifications(userId);
       // Load unread count
       await _loadUnreadCount(userId);
-      // Start listener for this user's incidents (UI updates only)
+      // Start listener for this user's incidents using Supabase Realtime
       _startIncidentListenerForUser(userId);
+      // Join presence channel
+      await _joinPresenceChannel(userId);
     } else {
       unreadCount.value = 0;
     }
@@ -105,24 +85,21 @@ class NotificationService {
 
   Future<void> _requestPermissions() async {
     try {
-      final NotificationSettings settings = await _firebaseMessaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-        carPlay: false,
-        criticalAlert: false,
-        provisional: false,
-        announcement: false,
-      );
-
-      debugPrint('Notification permissions: ${settings.authorizationStatus}');
-
+      // For local notifications, we'll use the local_notifications package
+      // You might want to use permission_handler package for more granular control
       if (Platform.isIOS) {
-        await _firebaseMessaging.setForegroundNotificationPresentationOptions(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
+        await _localNotifications
+            .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+            ?.requestPermissions(
+              alert: true,
+              badge: true,
+              sound: true,
+            );
+      }
+      
+      if (Platform.isAndroid) {
+        // Android permissions are typically handled in manifest
+        // You can add additional permission handling here if needed
       }
     } catch (e) {
       debugPrint('Error requesting permissions: $e');
@@ -130,7 +107,8 @@ class NotificationService {
   }
 
   Future<void> _initializeLocalNotifications() async {
-    const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const AndroidInitializationSettings androidSettings = 
+        AndroidInitializationSettings('@mipmap/ic_launcher');
     const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -168,39 +146,50 @@ class NotificationService {
     }
   }
 
-  void _setupMessageHandlers() {
-    // Handle initial message when app is opened from terminated state
-    FirebaseMessaging.instance.getInitialMessage().then(_handleMessage);
-
-    // Handle message when app is in background
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessage);
-
-    // Handle message when app is in foreground
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+  void _setupRealtimeListeners() {
+    // Listen for broadcast messages (for push notifications from server)
+    _supabase.channel('broadcast')
+        .onBroadcast(
+          event: 'notification', 
+          callback: (payload) {
+            _handleBroadcastNotification(payload);
+          }
+        )
+        .subscribe();
   }
 
-  void _setupTokenRefreshHandler() {
-    _firebaseMessaging.onTokenRefresh.listen((String newToken) async {
-      debugPrint('FCM token refreshed: $newToken');
-      if (_currentUserId != null) {
-        await _saveTokenToFirestore(_currentUserId!, token: newToken);
-      }
-    });
+  Future<void> _registerForPushNotifications(String userId) async {
+    try {
+      // In a real implementation, you would:
+      // 1. Get device token from FCM/APNS
+      // 2. Store it in Supabase push_subscriptions table
+      // 3. Set up service worker for web push if needed
+      
+      // For now, we'll just store the user's notification preferences
+      await _supabase.from('user_preferences').upsert({
+        'user_id': userId,
+        'push_notifications_enabled': true,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+
+      debugPrint('Push notifications registered for user: $userId');
+    } catch (e) {
+      debugPrint('Error registering for push notifications: $e');
+    }
   }
 
   void _startIncidentListenerForUser(String userId) {
     _stopIncidentListener();
 
     try {
-      _incidentSubscription = _firestore
-          .collection('incidents')
-          .where('userId', isEqualTo: userId)
-          .snapshots()
-          .listen((QuerySnapshot snapshot) {
-        for (final change in snapshot.docChanges) {
-          if (change.type == DocumentChangeType.modified) {
-            _handleIncidentUpdate(change.doc);
-          }
+      // Use Supabase Realtime to listen for incident updates for this user
+      _incidentSubscription = _supabase
+          .from('incidents')
+          .stream(primaryKey: ['id'])
+          .eq('user_id', userId)
+          .listen((List<Map<String, dynamic>> incidents) {
+        for (final incident in incidents) {
+          _handleIncidentUpdate(incident);
         }
       }, onError: (e) => debugPrint('Incident listener error: $e'));
     } catch (e) {
@@ -213,116 +202,107 @@ class NotificationService {
     _incidentSubscription = null;
   }
 
-  // MARK: - FCM Token Management
-
-  Future<void> _saveTokenToFirestore(String userId, {String? token}) async {
-    try {
-      final String? resolvedToken = token ?? await _firebaseMessaging.getToken();
-      if (resolvedToken == null || resolvedToken.isEmpty) return;
-
-      // Store token in users collection
-      await _firestore.collection(_usersCollection).doc(userId).set({
-        'fcmTokens': FieldValue.arrayUnion([resolvedToken]),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      // Store in separate tokens collection
-      await _firestore.collection(_fcmTokensCollection).doc(resolvedToken).set({
-        'userId': userId,
-        'token': resolvedToken,
-        'platform': Platform.operatingSystem,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-      debugPrint('FCM token saved for user: $userId');
-    } catch (e) {
-      debugPrint('Error saving FCM token: $e');
-    }
+  Future<void> _joinPresenceChannel(String userId) async {
+    _presenceChannel?.unsubscribe();
+    
+    _presenceChannel = _supabase.channel('notifications:$userId')
+      ..onPresenceSync((payload) {
+        debugPrint('User $userId joined notification channel');
+      })
+      ..subscribe();
   }
 
-  Future<void> _removeTokenFromFirestore(String userId) async {
+  Future<void> _removeUserFromPresence(String userId) async {
     try {
-      final String? token = await _firebaseMessaging.getToken();
-      if (token == null) return;
-
-      // Remove from users collection
-      try {
-        await _firestore.collection(_usersCollection).doc(userId).update({
-          'fcmTokens': FieldValue.arrayRemove([token]),
-        });
-      } catch (e) {
-        debugPrint('Could not remove token from users/$userId: $e');
-      }
-
-      // Remove from tokens collection
-      try {
-        await _firestore.collection(_fcmTokensCollection).doc(token).delete();
-      } catch (e) {
-        debugPrint('Could not delete fcm_tokens/$token: $e');
-      }
-
-      debugPrint('FCM token removed for user: $userId');
+      await _presenceChannel?.unsubscribe();
+      _presenceChannel = null;
     } catch (e) {
-      debugPrint('Error removing FCM token: $e');
-    }
-  }
-
-  Future<void> _logTokenForTesting() async {
-    try {
-      final String? token = await _firebaseMessaging.getToken();
-      if (token != null) {
-        debugPrint('FCM Token: $token');
-      }
-    } catch (e) {
-      debugPrint('Error getting FCM token: $e');
+      debugPrint('Error removing user from presence: $e');
     }
   }
 
   // MARK: - Message Handling
 
-  static Future<void> handleBackgroundMessage(RemoteMessage message) async {
+  void _handleBroadcastNotification(Map<String, dynamic> payload) {
     try {
-      final instance = NotificationService();
-      await instance._showNotificationFromRemote(message);
+      debugPrint('Received broadcast notification: $payload');
+      
+      final notificationType = payload['type']?.toString();
+      final data = payload['data'] is Map ? Map<String, dynamic>.from(payload['data']) : {};
+      
+      switch (notificationType) {
+        case 'incident_update':
+          _handleIncidentBroadcast(Map<String, dynamic>.from(data));
+          break;
+        case 'admin_message':
+          _handleAdminMessageBroadcast(Map<String, dynamic>.from(data));
+          break;
+        case 'system_alert':
+          _handleSystemAlertBroadcast(Map<String, dynamic>.from(data));
+          break;
+        default:
+          _showNotificationFromPayload(payload);
+      }
     } catch (e) {
-      debugPrint('Background handler error: $e');
+      debugPrint('Error handling broadcast notification: $e');
     }
   }
 
-  void _handleMessage(RemoteMessage? message) {
-    if (message == null) return;
-    debugPrint('Message opened: ${message.messageId}');
-    _handleNotificationData(message.data);
-  }
+  void _handleIncidentBroadcast(Map<String, dynamic> data) {
+    final incidentId = data['incident_id']?.toString();
+    final title = data['title']?.toString() ?? 'Incident Update';
+    final body = data['message']?.toString() ?? 'Your incident has been updated';
+    final userId = data['user_id']?.toString();
 
-  void _handleForegroundMessage(RemoteMessage message) {
-    debugPrint('Foreground message: ${message.messageId}');
-    
-    // Check if this is from server (Cloud Function)
-    final isFromServer = message.data['source'] == 'server';
-    
-    if (isFromServer) {
-      // Server notification - track it to avoid duplicates
-      final incidentId = message.data['incidentId'];
+    if (userId == _currentUserId) {
+      _showLocalNotification(
+        id: incidentId?.hashCode ?? DateTime.now().millisecondsSinceEpoch,
+        title: title,
+        body: body,
+        data: Map<String, dynamic>.from(data),
+      );
+
       if (incidentId != null) {
-        _serverNotificationTimestamps[incidentId] = DateTime.now();
+        _updateUnreadCount(userId!, incidentId);
       }
     }
-    
-    _showNotificationFromRemote(message);
   }
 
-  void _handleIncidentUpdate(DocumentSnapshot doc) {
-    try {
-      final data = doc.data() as Map<String, dynamic>?;
-      if (data == null) return;
+  void _handleAdminMessageBroadcast(Map<String, dynamic> data) {
+    final title = data['title']?.toString() ?? 'Admin Message';
+    final body = data['message']?.toString() ?? 'New message from admin';
+    final userId = data['user_id']?.toString();
 
-      final incidentId = doc.id;
-      final previousStatus = data['previousStatus']?.toString();
-      final currentStatus = data['status']?.toString();
-      final adminNote = data['latestAdminNote']?.toString();
-      final userId = data['userId']?.toString();
+    if (userId == _currentUserId) {
+      _showLocalNotification(
+        id: DateTime.now().millisecondsSinceEpoch,
+        title: title,
+        body: body,
+        data: Map<String, dynamic>.from(data),
+      );
+    }
+  }
+
+  void _handleSystemAlertBroadcast(Map<String, dynamic> data) {
+    final title = data['title']?.toString() ?? 'System Alert';
+    final body = data['message']?.toString() ?? 'System notification';
+    
+    // System alerts go to all users
+    _showLocalNotification(
+      id: DateTime.now().millisecondsSinceEpoch,
+      title: title,
+      body: body,
+      data: Map<String, dynamic>.from(data),
+    );
+  }
+
+  void _handleIncidentUpdate(Map<String, dynamic> incident) {
+    try {
+      final incidentId = incident['id']?.toString();
+      final previousStatus = incident['previous_status']?.toString();
+      final currentStatus = incident['status']?.toString();
+      final adminNote = incident['latest_admin_note']?.toString();
+      final userId = incident['user_id']?.toString();
       final updateKey = '$incidentId|${currentStatus ?? "null"}';
 
       // Avoid processing duplicates
@@ -334,22 +314,14 @@ class NotificationService {
         _processedUpdateKeys.remove(_processedUpdateKeys.first);
       }
 
-      // Check if server already sent a notification for this incident
-      final serverNotificationTime = _serverNotificationTimestamps[incidentId];
-      final now = DateTime.now();
-      
-      // If server sent a notification in the last 5 seconds, skip local notification
-      if (serverNotificationTime != null && 
-          now.difference(serverNotificationTime).inSeconds < 5) {
-        debugPrint('Skipping local notification - server notification already received for incident $incidentId');
-        return;
-      }
+      // Only process if this is for the current user
+      if (userId != _currentUserId) return;
 
       // Handle status changes
       if (previousStatus != currentStatus && currentStatus != null) {
         _sendStatusUpdateNotification(
-          incidentId: incidentId,
-          incidentType: data['incidentType']?.toString() ?? 'Incident',
+          incidentId: incidentId!,
+          incidentType: incident['incident_type']?.toString() ?? 'Incident',
           oldStatus: previousStatus ?? 'Unknown',
           newStatus: currentStatus,
           adminNote: adminNote,
@@ -359,15 +331,18 @@ class NotificationService {
 
       // Handle recent admin notes
       if (adminNote != null && adminNote.isNotEmpty) {
-        final lastUpdated = data['lastUpdated'] as Timestamp?;
-        if (lastUpdated != null &&
-            DateTime.now().difference(lastUpdated.toDate()).inMinutes < 10) {
-          _sendAdminNoteNotification(
-            incidentId: incidentId,
-            incidentType: data['incidentType']?.toString() ?? 'Incident',
-            adminNote: adminNote,
-            userId: userId,
-          );
+        final lastUpdatedStr = incident['last_updated']?.toString();
+        if (lastUpdatedStr != null) {
+          final lastUpdated = DateTime.tryParse(lastUpdatedStr);
+          if (lastUpdated != null &&
+              DateTime.now().difference(lastUpdated).inMinutes < 10) {
+            _sendAdminNoteNotification(
+              incidentId: incidentId!,
+              incidentType: incident['incident_type']?.toString() ?? 'Incident',
+              adminNote: adminNote,
+              userId: userId,
+            );
+          }
         }
       }
     } catch (e) {
@@ -377,22 +352,20 @@ class NotificationService {
 
   // MARK: - Notification Display
 
-  Future<void> _showNotificationFromRemote(RemoteMessage message) async {
+  Future<void> _showNotificationFromPayload(Map<String, dynamic> payload) async {
     try {
-      final notification = message.notification;
-      final data = message.data;
-
-      final title = notification?.title ?? data['title'] ?? 'Incident Update';
-      final body = notification?.body ?? data['body'] ?? 'Your incident report has been updated';
+      final title = payload['title']?.toString() ?? 'Notification';
+      final body = payload['body']?.toString() ?? payload['message']?.toString() ?? 'New notification';
+      final data = payload['data'] is Map ? Map<String, dynamic>.from(payload['data']) : {};
 
       await _showLocalNotification(
-        id: message.hashCode,
+        id: payload.hashCode,
         title: title,
         body: body,
-        data: data,
+        data: (Map<String, dynamic>.from(data)),
       );
     } catch (e) {
-      debugPrint('Error showing notification from remote: $e');
+      debugPrint('Error showing notification from payload: $e');
     }
   }
 
@@ -491,7 +464,7 @@ class NotificationService {
   }
 
   void _handleNotificationData(Map<String, dynamic> data) {
-    final incidentId = data['incidentId']?.toString();
+    final incidentId = data['incident_id']?.toString() ?? data['incidentId']?.toString();
     if (incidentId == null) return;
 
     // Mark as read when notification is tapped
@@ -529,9 +502,9 @@ class NotificationService {
       title: title,
       body: body,
       data: {
-        'incidentId': incidentId,
+        'incident_id': incidentId,
         'type': 'status_update',
-        'newStatus': newStatus,
+        'new_status': newStatus,
       },
     );
 
@@ -549,7 +522,7 @@ class NotificationService {
       id: id,
       title: 'Update on Your $incidentType Report',
       body: 'Admin: ${_truncateText(adminNote, 100)}',
-      data: {'incidentId': incidentId, 'type': 'admin_note'},
+      data: {'incident_id': incidentId, 'type': 'admin_note'},
     );
 
     if (userId != null) _updateUnreadCount(userId, incidentId);
@@ -605,57 +578,53 @@ class NotificationService {
 
   // MARK: - Public API
 
-  Future<String?> getFCMToken() => _firebaseMessaging.getToken();
-  
-  Future<void> subscribeToTopic(String topic) => _firebaseMessaging.subscribeToTopic(topic);
-  
-  Future<void> unsubscribeFromTopic(String topic) => _firebaseMessaging.unsubscribeFromTopic(topic);
+  /// Send a test notification
+  Future<void> sendTestNotification() async {
+    await _showLocalNotification(
+      id: 9999,
+      title: 'Test Notification',
+      body: 'This is a test notification from your app',
+      data: {'type': 'test', 'testTime': DateTime.now().toString()},
+    );
+  }
+
+  /// Send a broadcast notification to all users (admin function)
+  Future<void> sendBroadcastNotification({
+    required String title,
+    required String message,
+    required String type,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      await _supabase.channel('broadcast').sendBroadcastMessage(
+        event: 'notification',
+        payload: {
+          'title': title,
+          'message': message,
+          'type': type,
+          'data': data ?? {},
+          'sent_at': DateTime.now().toIso8601String(),
+        },
+      );
+    } catch (e) {
+      debugPrint('Error sending broadcast notification: $e');
+    }
+  }
 
   /// Cleanup on account delete
   Future<void> cleanupOnAccountDelete({required String userId}) async {
     try {
-      // Remove tokens from Firestore
-      List<String> tokens = [];
+      // Remove notification preferences from Supabase
       try {
-        final userDoc = await _firestore.collection(_usersCollection).doc(userId).get();
-        final data = userDoc.data();
-        if (data != null && data['fcmTokens'] is List) {
-          tokens = (data['fcmTokens'] as List).whereType<String>().toList();
-        }
+        await _supabase.from('user_preferences').delete().eq('user_id', userId);
       } catch (e) {
-        debugPrint('Failed to read stored tokens for $userId: $e');
-      }
-
-      if (tokens.isNotEmpty) {
-        try {
-          final batch = _firestore.batch();
-          final userRef = _firestore.collection(_usersCollection).doc(userId);
-
-          for (final token in tokens) {
-            if (token.trim().isEmpty) continue;
-            final tokenRef = _firestore.collection(_fcmTokensCollection).doc(token);
-            batch.delete(tokenRef);
-            batch.update(userRef, {
-              'fcmTokens': FieldValue.arrayRemove([token])
-            });
-          }
-          await batch.commit();
-        } catch (e) {
-          debugPrint('Failed to batch remove token docs for $userId: $e');
-        }
-      }
-
-      // Remove current device token
-      try {
-        await _removeTokenFromFirestore(userId);
-      } catch (e) {
-        debugPrint('Best-effort _removeTokenFromFirestore failed: $e');
+        debugPrint('Failed to remove preferences from Supabase for $userId: $e');
       }
 
       // Clear local state
       _stopIncidentListener();
+      await _removeUserFromPresence(userId);
       _processedUpdateKeys.clear();
-      _serverNotificationTimestamps.clear();
       _currentUserId = null;
       unreadCount.value = 0;
 
@@ -673,19 +642,10 @@ class NotificationService {
     }
   }
 
-  Future<void> sendTestNotification() async {
-    await _showLocalNotification(
-      id: 9999,
-      title: 'Test Notification',
-      body: 'This is a test notification from your app',
-      data: {'type': 'test', 'testTime': DateTime.now().toString()},
-    );
-  }
-
   void dispose() {
     _processedUpdateKeys.clear();
-    _serverNotificationTimestamps.clear();
     unreadCount.dispose();
     _stopIncidentListener();
+    _presenceChannel?.unsubscribe();
   }
 }

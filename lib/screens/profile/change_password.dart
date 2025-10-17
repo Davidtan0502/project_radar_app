@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChangePassword extends StatefulWidget {
   const ChangePassword({super.key});
@@ -23,7 +23,7 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
   String? _newPasswordError;
   String? _confirmPasswordError;
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final SupabaseClient _supabase = Supabase.instance.client;
 
   @override
   void initState() {
@@ -97,23 +97,33 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
     });
 
     try {
-      final user = _auth.currentUser;
+      final user = _supabase.auth.currentUser;
       if (user == null || user.email == null) {
-        throw FirebaseAuthException(
-          code: 'no-user',
-          message: 'User not found or not logged in.',
-        );
+        throw Exception('User not found or not logged in.');
       }
 
-      // Re-authenticate
-      final cred = EmailAuthProvider.credential(
-        email: user.email!,
-        password: currentPassword,
-      );
-      await user.reauthenticateWithCredential(cred);
+      // In Supabase, we need to use the updateUser method
+      // Note: Supabase doesn't require reauthentication for password change
+      // but we should verify the current password first for security
+      
+      // Verify current password by attempting to sign in
+      try {
+        await _supabase.auth.signInWithPassword(
+          email: user.email!,
+          password: currentPassword,
+        );
+      } catch (e) {
+        throw Exception('The current password you entered is incorrect.');
+      }
 
       // Update password
-      await user.updatePassword(newPassword);
+      final response = await _supabase.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+
+      if (response.user == null) {
+        throw Exception('Failed to update password. Please try again.');
+      }
 
       // Clear fields
       _currentPasswordController.clear();
@@ -129,39 +139,35 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
         );
         Navigator.pop(context);
       }
-    } on FirebaseAuthException catch (e) {
+    } catch (e) {
       setState(() {
-        if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
-          _currentPasswordError =
-              'The current password you entered is incorrect.';
-        } else if (e.code == 'weak-password') {
-          _newPasswordError =
-              'The new password is too weak. Use at least 6 characters with letters and numbers.';
-        } else if (e.code == 'requires-recent-login') {
+        final errorMessage = e.toString();
+        
+        if (errorMessage.contains('incorrect') || 
+            errorMessage.contains('Invalid login credentials')) {
+          _currentPasswordError = 'The current password you entered is incorrect.';
+        } else if (errorMessage.contains('weak') || 
+                   errorMessage.contains('Password should be at least')) {
+          _newPasswordError = 'The new password is too weak. Use at least 6 characters.';
+        } else if (errorMessage.contains('network') || 
+                   errorMessage.contains('Connection')) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text(
-                'Please log out and log in again before changing your password.',
-              ),
+              content: Text('Network error. Please check your connection.'),
               backgroundColor: Colors.orange,
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${e.message}'),
+              content: Text('Error: $errorMessage'),
               backgroundColor: Colors.red,
             ),
           );
         }
       });
+      
       // Re-validate to show field error
-      _formKey.currentState!.validate();
-    } catch (_) {
-      setState(() {
-        _currentPasswordError =
-            'An unexpected error occurred. Please try again.';
-      });
       _formKey.currentState!.validate();
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -257,35 +263,34 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                       },
                     ),
                     const SizedBox(height: 16),
-                   TextFormField(
-                    controller: _newPasswordController,
-                    obscureText: !_showNewPassword,
-                    decoration: _buildInputDecoration(
-                      'New Password',
-                      _showNewPassword,
-                      () => setState(
-                        () => _showNewPassword = !_showNewPassword,
+                    TextFormField(
+                      controller: _newPasswordController,
+                      obscureText: !_showNewPassword,
+                      decoration: _buildInputDecoration(
+                        'New Password',
+                        _showNewPassword,
+                        () => setState(
+                          () => _showNewPassword = !_showNewPassword,
+                        ),
+                        errorText: _newPasswordError,
                       ),
-                      errorText: _newPasswordError,
+                      validator: (value) {
+                        final val = value?.trim() ?? '';
+                        if (val.isEmpty) return 'Enter a new password';
+                        if (val.length < 6) {
+                          return 'Password must be at least 6 characters';
+                        }
+
+                        // At least one letter, one number, one special char
+                        final regex = RegExp(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}$');
+                        if (!regex.hasMatch(val)) {
+                          return 'Must include letters, numbers & special characters';
+                        }
+
+                        if (_newPasswordError != null) return _newPasswordError;
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      final val = value?.trim() ?? '';
-                      if (val.isEmpty) return 'Enter a new password';
-                      if (val.length < 6) {
-                        return 'Password must be at least 6 characters';
-                      }
-
-                      //At least one letter, one number, one special char
-                      final regex = RegExp(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}$');
-                      if (!regex.hasMatch(val)) {
-                        return 'Must include letters, numbers & special characters';
-                      }
-
-                      if (_newPasswordError != null) return _newPasswordError;
-                      return null;
-                    },
-                  ),
-
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _confirmPasswordController,
@@ -325,19 +330,18 @@ class _ChangePasswordScreenState extends State<ChangePassword> {
                           ),
                           elevation: 3,
                         ),
-                        child:
-                            _isLoading
-                                ? const CircularProgressIndicator(
+                        child: _isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text(
+                                'Save',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
                                   color: Colors.white,
-                                )
-                                : const Text(
-                                  'Save',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
                                 ),
+                              ),
                       ),
                     ),
                   ],

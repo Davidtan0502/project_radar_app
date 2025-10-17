@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:project_radar_app/screens/profile/account_information.dart';
 import 'package:project_radar_app/screens/profile/emergency_contacts_screen.dart';
 import 'package:project_radar_app/screens/profile/help_and_support.dart';
@@ -8,7 +7,6 @@ import 'package:project_radar_app/screens/profile/settings&privacy_screen.dart';
 import 'package:project_radar_app/screens/auth/login_screen.dart';
 import 'package:project_radar_app/widgets/capitalize_names.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:firebase_storage/firebase_storage.dart'; // added to resolve storage paths to download URLs
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -22,80 +20,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _firstName = '';
   String _lastName = '';
   String _photoURL = '';
-  String _resolvedPhotoURL = ''; // final URL to use in Image.network (may be same as _photoURL)
+  String _resolvedPhotoURL = ''; // final URL to use in Image.network
   bool _isVerified = false;
   String _email = '';
-  Stream<DocumentSnapshot>? _userDocStream;
-  late final User? _user;
+  final SupabaseClient _supabase = Supabase.instance.client;
 
   // NEW: store latest user document map so we can inspect addresses and dob
   Map<String, dynamic>? _userDataMap;
 
-  // cache resolved storage paths to download URLs to avoid repeated getDownloadURL() calls
+  // cache resolved storage paths to URLs to avoid repeated calls
   final Map<String, String> _resolvedUrlCache = {};
 
   @override
   void initState() {
     super.initState();
-    _user = FirebaseAuth.instance.currentUser;
-    if (_user != null) {
-      // Listen to the user document so changes (like isVerified) show up immediately
-      _userDocStream =
-          FirebaseFirestore.instance.collection('users').doc(_user!.uid).snapshots();
-      _userDocStream!.listen(
-        (doc) async {
-          if (!mounted) return;
-          final data = (doc.data() as Map<String, dynamic>?) ?? {};
-
-          // prefer photoURL stored in document, then auth user photoURL
-          final rawPhoto = (data['photoURL'] ?? _user!.photoURL ?? '').toString().trim();
-
+    _loadUserData();
+    // Listen to auth state changes for real-time updates
+    _supabase.auth.onAuthStateChange.listen((data) {
+      final event = data.event;
+      if (event == AuthChangeEvent.signedOut) {
+        if (mounted) {
           setState(() {
-            _userDataMap = data; // store for completeness/dob checks
-            _firstName = capitalizeName(data['firstName'] ?? '');
-            _lastName = capitalizeName(data['lastName'] ?? '');
-            _isVerified = data['isVerified'] ?? false;
-            _photoURL = rawPhoto;
-            _email = (data['email'] ?? _user!.email) ?? '';
             _isLoading = false;
+            _firstName = '';
+            _lastName = '';
+            _photoURL = '';
+            _resolvedPhotoURL = '';
+            _isVerified = false;
+            _email = '';
+            _userDataMap = null;
           });
-
-          // If user removed their photo, clear cache & resolved url so placeholder is immediate
-          if (rawPhoto.isEmpty) {
-            _resolvedUrlCache.clear();
-            if (mounted) setState(() => _resolvedPhotoURL = '');
-            return;
-          }
-
-          // resolve photo URL if needed (non-blocking)
-          await _resolvePhotoUrlIfNeeded(_photoURL);
-        },
-        onError: (_) {
-          // Fallback to one-time load if stream errors
-          _loadUserData();
-        },
-      );
-    } else {
-      _loadUserData();
-    }
+        }
+      } else if (event == AuthChangeEvent.signedIn || event == AuthChangeEvent.userUpdated) {
+        _loadUserData();
+      }
+    });
   }
 
   Future<void> _loadUserData() async {
     try {
-      final user = _user;
+      final user = _supabase.auth.currentUser;
       if (user != null) {
-        final doc =
-            await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final response = await _supabase
+            .from('app_users')
+            .select()
+            .eq('id', user.id)
+            .single();
 
-        if (doc.exists) {
-          final data = doc.data()!;
-          final rawPhoto = (data['photoURL'] ?? user.photoURL ?? '').toString().trim();
+        if (response != null) {
+          final data = response;
+          final rawPhoto = (data['photo_url'] ?? '').toString().trim();
 
           setState(() {
             _userDataMap = Map<String, dynamic>.from(data);
-            _firstName = capitalizeName(data['firstName'] ?? '');
-            _lastName = capitalizeName(data['lastName'] ?? '');
-            _isVerified = data['isVerified'] ?? false;
+            _firstName = capitalizeName(data['first_name'] ?? '');
+            _lastName = capitalizeName(data['last_name'] ?? '');
+            _isVerified = data['is_verified'] ?? false;
             _photoURL = rawPhoto;
             _email = (data['email'] ?? user.email) ?? '';
             _isLoading = false;
@@ -111,16 +91,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           // resolve photo URL if needed
           await _resolvePhotoUrlIfNeeded(_photoURL);
         } else {
-          // fallback to FirebaseAuth info
-          final displayName = user.displayName ?? '';
-          final parts = displayName.split(' ');
-          final rawPhoto = (user.photoURL ?? '').toString().trim();
+          // fallback to auth user info
+          final rawPhoto = (user.userMetadata?['avatar_url'] ?? '').toString().trim();
+          final fullName = user.userMetadata?['full_name']?.toString() ?? '';
 
           setState(() {
             _userDataMap = null;
-            _firstName = parts.isNotEmpty ? capitalize(parts.first) : 'User';
-            _lastName = parts.length > 1 ? capitalize(parts.last) : '';
-            _isVerified = user.emailVerified;
+            _firstName = fullName.isNotEmpty ? capitalizeName(fullName) : 'User';
+            _lastName = '';
+            _isVerified = false; // Supabase doesn't have emailConfirmed property
             _photoURL = rawPhoto;
             _email = user.email ?? '';
             _isLoading = false;
@@ -143,60 +122,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  /// Normalize common storage-string formats into a 'ref child path' we can pass to FirebaseStorage.ref().child(path)
-  /// Examples handled:
-  /// - already http(s) -> returns unchanged (caller will use direct URL)
-  /// - "gs://bucket/path/to/file.jpg" -> -> "path/to/file.jpg"
-  /// - leading "/" -> trimmed
-  /// - raw filename or "profile_images/uid.jpg" -> used as-is
+  /// Normalize storage paths for Supabase Storage
   String _normalizeStoragePath(String raw) {
     var p = raw.trim();
 
     // If it's an http url, return it as-is
     if (p.startsWith('http://') || p.startsWith('https://')) return p;
 
-    // gs://bucket/path/to/file.jpg  -> strip gs://<bucket>/
-    if (p.startsWith('gs://')) {
-      // remove 'gs://'
-      final withoutScheme = p.replaceFirst(RegExp(r'^gs://'), '');
-      // remove bucket name and leading slash
-      final firstSlash = withoutScheme.indexOf('/');
-      if (firstSlash >= 0 && firstSlash + 1 < withoutScheme.length) {
-        p = withoutScheme.substring(firstSlash + 1);
-      } else {
-        // fallback to whatever remains
-        p = withoutScheme;
-      }
-    }
-
-    // If it's a firebase console 'gs' like "bucket/o/path%2Ffile.jpg" sometimes appears, decode if needed:
-    // remove leading "o/" or "b/<bucket>/o/" patterns (in case user stored an API-like path)
-    p = p.replaceFirst(RegExp(r'^o/'), '');
+    // For Supabase storage paths, they're usually relative to the bucket
+    // Remove any leading slashes
     p = p.replaceFirst(RegExp(r'^/'), '');
-
-    // If the path contains URL-encoded slashes (e.g. profile_images%2Fuid.jpg) decode
-    if (p.contains('%2F') || p.contains('%2f')) {
-      try {
-        p = Uri.decodeFull(p);
-      } catch (_) {}
-    }
 
     return p;
   }
 
-  // Try to resolve a photo path stored in Firestore to a real download URL
-  // If photoUrl already looks like an http(s) URL we use it directly.
-  // If it's a storage path (e.g. "profile_images/uid.jpg" or just a filename),
-  // attempt to call Firebase Storage to getDownloadURL. Failures are caught and
-  // ignored (we leave _resolvedPhotoURL empty so placeholder is shown).
   Future<void> _resolvePhotoUrlIfNeeded(String photoUrl) async {
     if (!mounted) return;
-    if (photoUrl == null || photoUrl.toString().trim().isEmpty) {
+    if (photoUrl.isEmpty) {
       if (mounted) setState(() => _resolvedPhotoURL = '');
       return;
     }
 
-    final raw = photoUrl.toString().trim();
+    final raw = photoUrl;
 
     // Quick heuristic: if it already starts with http(s) use directly
     if (raw.startsWith('http://') || raw.startsWith('https://')) {
@@ -211,14 +158,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    // Normalize common variants and try to get download URL
+    // Normalize path and try to get public URL
     final normalizedPath = _normalizeStoragePath(raw);
     debugPrint('DEBUG: Attempting to resolve profile photo path "$raw" -> normalized "$normalizedPath"');
 
     try {
-      final ref = FirebaseStorage.instance.ref().child(normalizedPath);
-      final url = await ref.getDownloadURL();
+      // Supabase storage provides direct public URLs
+      final url = _supabase.storage.from('avatars').getPublicUrl(normalizedPath);
       if (!mounted) return;
+      
       // Cache and set
       _resolvedUrlCache[raw] = url;
       setState(() => _resolvedPhotoURL = url);
@@ -228,15 +176,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // couldn't resolve: leave _resolvedPhotoURL empty and print debug info
       debugPrint('DEBUG: unable to resolve photo storage path "$raw": $e');
 
-      // As a last-ditch fallback, if the stored value looked like just a filename,
-      // try the common folder we use in the uploader: "profile_images/<uid>.jpg"
+      // As a fallback, try the common folder structure
       try {
-        final userId = _user?.uid ?? '';
+        final userId = _supabase.auth.currentUser?.id ?? '';
         if (userId.isNotEmpty) {
           final guessed = 'profile_images/$userId.jpg';
           debugPrint('DEBUG: trying guessed path "$guessed"');
-          final ref2 = FirebaseStorage.instance.ref().child(guessed);
-          final url2 = await ref2.getDownloadURL();
+          final url2 = _supabase.storage.from('avatars').getPublicUrl(guessed);
           if (!mounted) return;
           _resolvedUrlCache[raw] = url2;
           setState(() => _resolvedPhotoURL = url2);
@@ -247,7 +193,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         debugPrint('DEBUG: guessed path also failed: $e2');
       }
 
-      // final fallback: leave resolved empty so UI uses placeholder or auth photo later
+      // final fallback: leave resolved empty so UI uses placeholder
       if (mounted) setState(() => _resolvedPhotoURL = '');
       return;
     }
@@ -257,37 +203,122 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Confirm Logout"),
-          content: const Text("Are you sure you want to log out?"),
-          actions: [
-            TextButton(
-              child: const Text("Cancel"),
-              onPressed: () => Navigator.of(context).pop(),
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text(
-                "Logout",
-                style: TextStyle(color: Colors.white),
-              ),
-              onPressed: () {
-                FirebaseAuth.instance.signOut();
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) => LoginScreen(onTap: () {}),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.logout_outlined,
+                        color: Colors.red,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      "Confirm Logout",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Content
+                Text(
+                  "Are you sure you want to log out? You'll need to sign in again to access your account.",
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade700,
+                    height: 1.5,
                   ),
-                );
-              },
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          side: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        child: Text(
+                          "Cancel",
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          await _supabase.auth.signOut();
+                          if (mounted) {
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder: (context) => LoginScreen(onTap: () {}),
+                              ),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                        ),
+                        child: const Text(
+                          "Logout",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );
   }
 
-  // ----------------- NEW: completeness helpers -----------------
-  // Returns true if the given map has a non-empty value for any city-like key
+  // ----------------- completeness helpers -----------------
   bool _hasAnyCityLike(Map<String, dynamic>? m) {
     if (m == null) return false;
     final keys = [
@@ -306,7 +337,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return false;
   }
 
-  // treat "town" optional: completeness accepts either town OR any city-like key
   bool _hasTownOrCity(Map<String, dynamic>? m) {
     if (m == null) return false;
     final town = (m['town'] ?? '').toString().trim();
@@ -323,40 +353,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return true;
   }
 
-  // Reuse same category completion rules used elsewhere, but allow home town optional
   bool _isProfileCompleteForCategory(Map<String, dynamic>? data) {
     if (data == null) return false;
 
-    // NEW: require DOB present (non-empty) for profile to be considered complete.
-    // This ensures the verified icon won't show if DOB wasn't provided.
+    // Require DOB present
     final dob = (data['dob'] ?? '').toString().trim();
     if (dob.isEmpty) return false;
 
-    final category = (data['userCategory'] ?? '').toString().toUpperCase();
+    final category = (data['user_category'] ?? '').toString().toUpperCase();
 
     if (category == 'RESIDENT') {
-      final resident = data['residentAddress'] is Map ? Map<String, dynamic>.from(data['residentAddress']) : null;
-      // require house, street, barangay, zip AND (town OR city/municipality)
+      final resident = data['resident_address'] is Map ? Map<String, dynamic>.from(data['resident_address']) : null;
       return _hasNonEmpty(resident, ['house', 'street', 'barangay', 'zip']) && _hasTownOrCity(resident);
     } else if (category == 'EMPLOYEE') {
-      final work = data['workAddress'] is Map ? Map<String, dynamic>.from(data['workAddress']) : null;
-      final home = data['homeAddress'] is Map ? Map<String, dynamic>.from(data['homeAddress']) : null;
-      // require work address complete (street, barangay, zip + town/city) and home complete (house,street,barangay,zip + town/city)
+      final work = data['work_address'] is Map ? Map<String, dynamic>.from(data['work_address']) : null;
+      final home = data['home_address'] is Map ? Map<String, dynamic>.from(data['home_address']) : null;
       return _hasNonEmpty(work, ['street', 'barangay', 'zip']) && _hasTownOrCity(work) &&
              _hasNonEmpty(home, ['house', 'street', 'barangay', 'zip']) && _hasTownOrCity(home);
     } else if (category == 'STUDENT') {
-      final school = data['schoolAddress'] is Map ? Map<String, dynamic>.from(data['schoolAddress']) : null;
-      final home = data['homeAddress'] is Map ? Map<String, dynamic>.from(data['homeAddress']) : null;
-      // require school (schoolName,street,barangay,zip + town/city) AND home (house,street,barangay,zip + town/city)
-      return _hasNonEmpty(school, ['schoolName', 'street', 'barangay', 'zip']) && _hasTownOrCity(school) &&
+      final school = data['school_address'] is Map ? Map<String, dynamic>.from(data['school_address']) : null;
+      final home = data['home_address'] is Map ? Map<String, dynamic>.from(data['home_address']) : null;
+      return _hasNonEmpty(school, ['school_name', 'street', 'barangay', 'zip']) && _hasTownOrCity(school) &&
              _hasNonEmpty(home, ['house', 'street', 'barangay', 'zip']) && _hasTownOrCity(home);
     } else {
       // unknown category: accept if any address map or legacy address exist
       final fallback = (data['address'] ?? '').toString().trim();
-      final anyMapPresent = (data['residentAddress'] is Map && (data['residentAddress'] as Map).isNotEmpty) ||
-                           (data['workAddress'] is Map && (data['workAddress'] as Map).isNotEmpty) ||
-                           (data['schoolAddress'] is Map && (data['schoolAddress'] as Map).isNotEmpty) ||
-                           (data['homeAddress'] is Map && (data['homeAddress'] as Map).isNotEmpty);
+      final anyMapPresent = (data['resident_address'] is Map && (data['resident_address'] as Map).isNotEmpty) ||
+                           (data['work_address'] is Map && (data['work_address'] as Map).isNotEmpty) ||
+                           (data['school_address'] is Map && (data['school_address'] as Map).isNotEmpty) ||
+                           (data['home_address'] is Map && (data['home_address'] as Map).isNotEmpty);
       return fallback.isNotEmpty || anyMapPresent;
     }
   }
@@ -364,10 +389,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const primaryColor = Color(0xFF28588B);
+    const backgroundColor = Color(0xFFF8F9FA);
+
     final fullName = '$_firstName $_lastName'.trim();
 
     // Determine whether we should show the verified icon:
-    final dbIsVerified = (_userDataMap != null) ? (_userDataMap!['isVerified'] ?? false) : _isVerified;
+    final dbIsVerified = (_userDataMap != null) ? (_userDataMap!['is_verified'] ?? false) : _isVerified;
     final profileIsComplete = _isProfileCompleteForCategory(_userDataMap);
     final shouldShowVerified = dbIsVerified && profileIsComplete;
 
@@ -382,7 +410,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final sidePadding = screenWidth * 0.05;
 
     return Scaffold(
-      backgroundColor:  const Color(0xFFF5F8FC),
+      backgroundColor: backgroundColor,
       body: Column(
         children: [
           // Header (now matches Community header style/size) — wrapped in SafeArea to match Community's SafeArea behavior
@@ -424,26 +452,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
 
-          // Profile Section (Messenger-style)
+          // Profile Section
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+              padding: EdgeInsets.fromLTRB(
+                MediaQuery.of(context).size.width * 0.05, // 5% left
+                MediaQuery.of(context).size.height * 0.001, // 1% top - minimal space
+                MediaQuery.of(context).size.width * 0.05, // 5% right
+                MediaQuery.of(context).size.height * 0.02, // 2% bottom
+              ),
             child: Column(
               children: [
                 // Profile Picture
-                // <-- SAFER: prefer resolved http(s) URLs, avoid Image.network on raw storage paths,
-                // clear placeholder immediately when photo is removed
                 Container(
                   width: 120,
                   height: 120,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.grey[300]!, width: 2),
+                    border: Border.all(color: Colors.grey.shade300, width: 2),
                   ),
                   child: _isLoading
                       ? Shimmer.fromColors(
                           baseColor: Colors.grey[300]!,
                           highlightColor: Colors.grey[100]!,
-                          child: const Icon(Icons.account_circle, size: 120),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
                         )
                       : (() {
                           // decide which URL to use (prefer resolved storage URLs)
@@ -462,17 +498,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 errorBuilder: (_, __, ___) {
                                   debugPrint('DEBUG: failed to load resolved profile image -> $resolved');
                                   // fall back to auth photo (if any) or placeholder
-                                  final fallback = _user?.photoURL ?? '';
+                                  final fallback = _supabase.auth.currentUser?.userMetadata?['avatar_url'] ?? '';
                                   if (fallback.isNotEmpty) {
                                     return Image.network(
                                       fallback,
                                       width: 120,
                                       height: 120,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Icon(Icons.account_circle, size: 120, color: Colors.grey),
+                                      errorBuilder: (_, __, ___) => _buildProfilePlaceholder(),
                                     );
                                   }
-                                  return const Icon(Icons.account_circle, size: 120, color: Colors.grey);
+                                  return _buildProfilePlaceholder();
                                 },
                               ),
                             );
@@ -489,28 +525,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 fit: BoxFit.cover,
                                 errorBuilder: (_, __, ___) {
                                   debugPrint('DEBUG: failed to load raw profile image -> $raw');
-                                  final fallback = _user?.photoURL ?? '';
+                                  final fallback = _supabase.auth.currentUser?.userMetadata?['avatar_url'] ?? '';
                                   if (fallback.isNotEmpty) {
                                     return Image.network(
                                       fallback,
                                       width: 120,
                                       height: 120,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Icon(Icons.account_circle, size: 120, color: Colors.grey),
+                                      errorBuilder: (_, __, ___) => _buildProfilePlaceholder(),
                                     );
                                   }
-                                  return const Icon(Icons.account_circle, size: 120, color: Colors.grey);
+                                  return _buildProfilePlaceholder();
                                 },
                               ),
                             );
                           }
 
-                          // Otherwise show placeholder (we avoid calling Image.network on storage paths)
-                          return const Icon(Icons.account_circle, size: 120, color: Colors.grey);
+                          // Otherwise show placeholder
+                          return _buildProfilePlaceholder();
                         })(),
                 ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
 
                 // Name with verification badge
                 Row(
@@ -523,7 +559,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Container(
                           width: 180,
                           height: 28,
-                          color: Colors.white,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       )
                     else
@@ -548,134 +587,284 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
 
-                // Email
+                // Email and Birthday
                 if (_isLoading)
-                  Shimmer.fromColors(
-                    baseColor: Colors.grey[300]!,
-                    highlightColor: Colors.grey[100]!,
-                    child: Container(
-                      width: 200,
-                      height: 16,
-                      color: Colors.white,
-                      margin: const EdgeInsets.only(top: 4),
-                    ),
+                  Column(
+                    children: [
+                      Shimmer.fromColors(
+                        baseColor: Colors.grey[300]!,
+                        highlightColor: Colors.grey[100]!,
+                        child: Container(
+                          width: 200,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          margin: const EdgeInsets.only(bottom: 8),
+                        ),
+                      ),
+                      Shimmer.fromColors(
+                        baseColor: Colors.grey[300]!,
+                        highlightColor: Colors.grey[100]!,
+                        child: Container(
+                          width: 150,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ],
                   )
                 else
                   Column(
                     children: [
                       Text(
                         _email,
-                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
                       ),
-                      const SizedBox(height: 6),
-                      // NEW: Birthday line
+                      const SizedBox(height: 8),
+                      // Birthday line
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.cake, size: 14, color: Colors.grey),
+                          Icon(Icons.cake_outlined, size: 16, color: Colors.grey.shade500),
                           const SizedBox(width: 6),
                           Text(
                             dobDisplay,
-                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
                           ),
                         ],
                       ),
                     ],
                   ),
-
-                const SizedBox(height: 24),
               ],
             ),
           ),
 
-          const Divider(height: 1, thickness: 1),
+          const SizedBox(height: 8),
 
           // Options List
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 15),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: ListView(
                 children: [
-                  _buildOptionTile(
-                    icon: Icons.person_outline,
-                    title: 'Account Information',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AccountInformationScreen(),
+                  // Profile Options Card
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: Colors.grey.shade100,
+                        width: 1,
                       ),
                     ),
-                  ),
-                  _buildOptionTile(
-                    icon: Icons.settings,
-                    title: 'Settings & Privacy',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SettingsScreen(),
-                      ),
+                    child: Column(
+                      children: [
+                        _buildModernOptionTile(
+                          icon: Icons.person_outline,
+                          title: 'Account Information',
+                          subtitle: 'View and manage your account details',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AccountInformationScreen(),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Divider(height: 1, color: Colors.grey.shade200),
+                        ),
+                        _buildModernOptionTile(
+                          icon: Icons.contact_phone_outlined,
+                          title: 'Emergency Contacts',
+                          subtitle: 'Manage your emergency contacts',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const EmergencyContactsScreen(),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  _buildOptionTile(
-                    icon: Icons.help_outline,
-                    title: 'Help & Support',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const HelpSupportScreen(),
+
+                  const SizedBox(height: 16),
+
+                  // Settings & Support Card
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: Colors.grey.shade100,
+                        width: 1,
                       ),
                     ),
-                  ),
-                  _buildOptionTile(
-                    icon: Icons.contact_phone,
-                    title: 'Emergency Contacts',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const EmergencyContactsScreen(),
-                      ),
+                    child: Column(
+                      children: [
+                        _buildModernOptionTile(
+                          icon: Icons.settings_outlined,
+                          title: 'Settings & Privacy',
+                          subtitle: 'Manage your app settings and privacy',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SettingsScreen(),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Divider(height: 1, color: Colors.grey.shade200),
+                        ),
+                        _buildModernOptionTile(
+                          icon: Icons.help_outline,
+                          title: 'Help & Support',
+                          subtitle: 'Get help and contact support',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const HelpSupportScreen(),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  _buildOptionTile(
-                    icon: Icons.logout,
-                    title: 'Logout',
-                    onTap: _logout,
-                    isLogout: true,
+
+                  const SizedBox(height: 16),
+
+                  // Logout Card
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: Colors.red.shade100,
+                        width: 1,
+                      ),
+                    ),
+                    child: _buildModernOptionTile(
+                      icon: Icons.logout_outlined,
+                      title: 'Logout',
+                      subtitle: 'Sign out of your account',
+                      isDestructive: true,
+                      onTap: _logout,
+                    ),
                   ),
                 ],
               ),
             ),
           ),
+
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  Widget _buildOptionTile({
+  Widget _buildProfilePlaceholder() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(Icons.account_circle, size: 120, color: Colors.grey),
+    );
+  }
+
+  Widget _buildModernOptionTile({
     required IconData icon,
     required String title,
+    required String subtitle,
     required VoidCallback onTap,
-    bool isLogout = false,
+    bool isDestructive = false,
   }) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      leading: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: const BoxDecoration(
-          color: Color(0xFFE8F0FA),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          icon,
-          color: isLogout ? Colors.red : const Color(0xFF28588B),
-          size: 24,
+    final color = isDestructive ? Colors.red : const Color(0xFF28588B);
+    
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
+                color: Colors.grey.shade400,
+              ),
+            ],
+          ),
         ),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: onTap,
     );
   }
 }

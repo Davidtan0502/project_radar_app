@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:project_radar_app/screens/alerts/report_detail_screen.dart';
 
@@ -49,13 +48,13 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = FirebaseAuth.instance.currentUser;
+    final currentUser = Supabase.instance.client.auth.currentUser;
 
     if (currentUser == null) {
       return _buildAuthenticationRequiredView();
     }
 
-    return _buildMainContent(currentUser.uid);
+    return _buildMainContent(currentUser.id);
   }
 
   Widget _buildAuthenticationRequiredView() {
@@ -157,7 +156,7 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
     required String userId,
     required bool filterResolved,
   }) {
-    return StreamBuilder<QuerySnapshot>(
+    return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _controller.getUserIncidentsStream(userId),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -168,12 +167,12 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
           return _buildLoadingState();
         }
         
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return _buildEmptyState(filterResolved);
         }
 
         final incidents = _controller.filterAndSortIncidents(
-          snapshot.data!.docs,
+          snapshot.data!,
           filterResolved: filterResolved,
         );
 
@@ -198,10 +197,10 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
           itemCount: incidents.length,
           itemBuilder: (context, index) {
             final incident = incidents[index];
-            final isHighlighted = incident.id == _controller.highlightIncidentId;
+            final isHighlighted = incident['id'] == _controller.highlightIncidentId;
 
             // create / reuse a key for the item so we can find its context later
-            final key = _itemKeys.putIfAbsent(incident.id, () => GlobalKey());
+            final key = _itemKeys.putIfAbsent(incident['id'], () => GlobalKey());
 
             return Container(
               key: key,
@@ -217,7 +216,7 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
                     _scrolledToHighlight = false;
                   }
                 },
-                onDelete: () => _showDeleteConfirmation(incident.id),
+                onDelete: () => _showDeleteConfirmation(incident['id']),
                 onHighlightRemoved: () {
                   _controller.clearHighlight();
                   _scrolledToHighlight = false;
@@ -262,7 +261,7 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
         _buildSearchAndFilterSection(),
         const SizedBox(height: 8),
         Expanded(
-          child: StreamBuilder<QuerySnapshot>(
+          child: StreamBuilder<List<Map<String, dynamic>>>(
             stream: _controller.getResolvedIncidentsStream(),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
@@ -273,12 +272,12 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
                 return _buildLoadingState();
               }
               
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return _buildEmptyState(true);
               }
 
               final incidents = _controller.filterResolvedIncidents(
-                snapshot.data!.docs,
+                snapshot.data!,
                 searchQuery: _controller.searchQuery,
                 timeFilter: _controller.timeFilter,
               );
@@ -459,7 +458,7 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
     );
   }
 
-  void _navigateToDetail(DocumentSnapshot incident) {
+  void _navigateToDetail(Map<String, dynamic> incident) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -483,34 +482,37 @@ class ReportTrackerController {
   String? highlightIncidentId;
   String searchQuery = "";
   String timeFilter = "24h";
+  final SupabaseClient supabase = Supabase.instance.client;
 
-  Stream<QuerySnapshot> getUserIncidentsStream(String userId) {
-    return FirebaseFirestore.instance
-        .collection('incidents')
-        .where('userId', isEqualTo: userId)
-        .snapshots();
+  Stream<List<Map<String, dynamic>>> getUserIncidentsStream(String userId) {
+    return supabase
+        .from('incidents')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', userId)
+        .order('timestamp', ascending: false);
   }
 
-  Stream<QuerySnapshot> getResolvedIncidentsStream() {
-    return FirebaseFirestore.instance
-        .collection('incidents')
-        .where('status', isEqualTo: 'resolved')
-        .snapshots();
+  Stream<List<Map<String, dynamic>>> getResolvedIncidentsStream() {
+    return supabase
+        .from('incidents')
+        .stream(primaryKey: ['id'])
+        .eq('status', 'resolved')
+        .order('timestamp', ascending: false);
   }
 
-  List<DocumentSnapshot> filterAndSortIncidents(
-    List<DocumentSnapshot> docs, {
+  List<Map<String, dynamic>> filterAndSortIncidents(
+    List<Map<String, dynamic>> incidents, {
     required bool filterResolved,
   }) {
-    final filtered = docs.where((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      final status = (data['status'] ?? '').toString().toLowerCase();
+    final filtered = incidents.where((incident) {
+      final status = (incident['status'] ?? '').toString().toLowerCase();
       return filterResolved ? status == "resolved" : status != "resolved";
     }).toList();
 
+    // Already sorted by timestamp from the stream, but we can re-sort if needed
     filtered.sort((a, b) {
-      final aTimestamp = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-      final bTimestamp = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
+      final aTimestamp = _parseTimestamp(a['timestamp']);
+      final bTimestamp = _parseTimestamp(b['timestamp']);
       if (aTimestamp == null && bTimestamp == null) return 0;
       if (aTimestamp == null) return 1;
       if (bTimestamp == null) return -1;
@@ -520,31 +522,29 @@ class ReportTrackerController {
     return filtered;
   }
 
-  List<DocumentSnapshot> filterResolvedIncidents(
-    List<DocumentSnapshot> docs, {
+  List<Map<String, dynamic>> filterResolvedIncidents(
+    List<Map<String, dynamic>> incidents, {
     required String searchQuery,
     required String timeFilter,
   }) {
     final now = DateTime.now();
     
-    return docs.where((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      final ts = data['timestamp'] as Timestamp?;
-      if (ts == null) return false;
-      final date = ts.toDate();
+    return incidents.where((incident) {
+      final timestamp = _parseTimestamp(incident['timestamp']);
+      if (timestamp == null) return false;
 
       // Time filter
-      if (timeFilter == "24h" && date.isBefore(now.subtract(const Duration(hours: 24)))) {
+      if (timeFilter == "24h" && timestamp.isBefore(now.subtract(const Duration(hours: 24)))) {
         return false;
       }
-      if (timeFilter == "7d" && date.isBefore(now.subtract(const Duration(days: 7)))) {
+      if (timeFilter == "7d" && timestamp.isBefore(now.subtract(const Duration(days: 7)))) {
         return false;
       }
 
       // Search filter
       if (searchQuery.isNotEmpty) {
-        final incidentType = (data['incidentType'] ?? '').toString().toLowerCase();
-        final description = (data['description'] ?? '').toString().toLowerCase();
+        final incidentType = (incident['incident_type'] ?? '').toString().toLowerCase();
+        final description = (incident['description'] ?? '').toString().toLowerCase();
         if (!incidentType.contains(searchQuery) && !description.contains(searchQuery)) {
           return false;
         }
@@ -553,17 +553,34 @@ class ReportTrackerController {
     }).toList();
   }
 
+  DateTime? _parseTimestamp(dynamic timestamp) {
+    if (timestamp == null) return null;
+    if (timestamp is DateTime) return timestamp;
+    if (timestamp is String) {
+      try {
+        return DateTime.parse(timestamp);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
   Future<void> deleteReport(String docId, BuildContext context) async {
     try {
-      final docRef = FirebaseFirestore.instance.collection('incidents').doc(docId);
-      final docSnapshot = await docRef.get();
+      // Get the data before deleting for undo functionality
+      final response = await supabase
+          .from('incidents')
+          .select()
+          .eq('id', docId)
+          .single();
 
-      Map<String, dynamic>? deletedData;
-      if (docSnapshot.exists) {
-        deletedData = docSnapshot.data() as Map<String, dynamic>;
-      }
+      final deletedData = response;
 
-      await docRef.delete();
+      await supabase
+          .from('incidents')
+          .delete()
+          .eq('id', docId);
 
       _showUndoSnackbar(context, docId, deletedData);
     } catch (e) {
@@ -595,10 +612,9 @@ class ReportTrackerController {
 
   Future<void> _restoreReport(String docId, Map<String, dynamic> data, BuildContext context) async {
     try {
-      await FirebaseFirestore.instance
-          .collection('incidents')
-          .doc(docId)
-          .set(data);
+      await supabase
+          .from('incidents')
+          .insert(data);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -628,7 +644,7 @@ class ReportTrackerController {
 
 // Incident Card Widget
 class IncidentCard extends StatelessWidget {
-  final DocumentSnapshot incident;
+  final Map<String, dynamic> incident;
   final bool isHighlighted;
   final bool showDelete;
   final VoidCallback onTap;
@@ -647,13 +663,12 @@ class IncidentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = incident.data() as Map<String, dynamic>;
-    final incidentType = data['incidentType'] ?? 'Unknown';
-    final description = data['description'] ?? '';
-    final status = data['status'] ?? 'Pending';
-    final timestamp = data['timestamp'] as Timestamp?;
+    final incidentType = incident['incident_type'] ?? 'Unknown';
+    final description = incident['description'] ?? '';
+    final status = incident['status'] ?? 'Pending';
+    final timestamp = _parseTimestamp(incident['timestamp']);
     final formattedDate = timestamp != null
-        ? DateFormat('MMM dd, yyyy • hh:mm a').format(timestamp.toDate())
+        ? DateFormat('MMM dd, yyyy • hh:mm a').format(timestamp)
         : 'Date not available';
 
     return Container(
@@ -696,6 +711,19 @@ class IncidentCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  DateTime? _parseTimestamp(dynamic timestamp) {
+    if (timestamp == null) return null;
+    if (timestamp is DateTime) return timestamp;
+    if (timestamp is String) {
+      try {
+        return DateTime.parse(timestamp);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
   }
 
   Widget _buildHeaderRow(String incidentType, String status, bool isHighlighted) {
@@ -843,7 +871,7 @@ class IncidentCard extends StatelessWidget {
 
 // Resolved Incident Card Widget
 class ResolvedIncidentCard extends StatelessWidget {
-  final DocumentSnapshot incident;
+  final Map<String, dynamic> incident;
   final VoidCallback onTap;
 
   const ResolvedIncidentCard({
@@ -854,15 +882,14 @@ class ResolvedIncidentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = incident.data() as Map<String, dynamic>;
-    final incidentType = data['incidentType'] ?? 'Unknown';
-    final description = data['description'] ?? '';
-    final location = data['address'] ?? 'No location';
-    final latitude = data['latitude']?.toString() ?? '';
-    final longitude = data['longitude']?.toString() ?? '';
-    final timestamp = data['timestamp'] as Timestamp?;
+    final incidentType = incident['incident_type'] ?? 'Unknown';
+    final description = incident['description'] ?? '';
+    final location = incident['address'] ?? 'No location';
+    final latitude = incident['latitude']?.toString() ?? '';
+    final longitude = incident['longitude']?.toString() ?? '';
+    final timestamp = _parseTimestamp(incident['timestamp']);
     final formattedDate = timestamp != null
-        ? DateFormat('MMM dd, yyyy • hh:mm a').format(timestamp.toDate())
+        ? DateFormat('MMM dd, yyyy • hh:mm a').format(timestamp)
         : 'Unknown date';
 
     return Container(
@@ -901,6 +928,19 @@ class ResolvedIncidentCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  DateTime? _parseTimestamp(dynamic timestamp) {
+    if (timestamp == null) return null;
+    if (timestamp is DateTime) return timestamp;
+    if (timestamp is String) {
+      try {
+        return DateTime.parse(timestamp);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
   }
 
   Widget _buildHeaderRow(String incidentType) {

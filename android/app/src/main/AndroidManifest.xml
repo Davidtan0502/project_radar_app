@@ -11,12 +11,12 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- ✅ PLACE IT HERE -->
+        <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyD72GRS8KWHU8yzaOX7qkolLP5uIW4P2Dk"/>
         
-         <!-- Default small icon for system notifications (system tray) -->
+        <!-- Default small icon for system notifications (system tray) -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@mipmap/ic_launcher" />
@@ -36,14 +36,25 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
 
-            <meta-data
-                android:name="io.flutter.embedding.android.NormalTheme"
-                android:resource="@style/NormalTheme" />
-
+            <!-- Main launcher intent filter -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!-- Deep link intent filter for Supabase auth callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="io.supabase.flutter"
+                    android:host="login-callback" />
+            </intent-filter>
+
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
         </activity>
 
         <meta-data
@@ -52,25 +63,26 @@
     </application>
 
     <queries>
+        <!-- Allow Google Maps -->
+        <package android:name="com.google.android.apps.maps"/>
+        
+        <!-- Allow phone dialer -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel"/>
+        </intent>
 
-    <!-- allow the DIAL intent -->
-    <package android:name="com.google.android.apps.maps"/>
-    <intent>
-        <action android:name="android.intent.action.DIAL" />
-        <data android:scheme="tel"/>
-    </intent>
+        <!-- Allow text processing -->
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
 
-    <intent>
-        <action android:name="android.intent.action.PROCESS_TEXT"/>
-        <data android:mimeType="text/plain"/>
-    </intent>
-
-    <!-- allow opening https://facebook.com links -->
-    <intent>
-        <action android:name="android.intent.action.VIEW" />
-        <data android:scheme="https"/>
-        <data android:host="facebook.com"/>
-    </intent>
-
+        <!-- Allow opening Facebook links -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https"/>
+            <data android:host="facebook.com"/>
+        </intent>
     </queries>
 </manifest>

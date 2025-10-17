@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:photo_view/photo_view.dart';
 
 class ReportDetailScreen extends StatefulWidget {
-  final DocumentSnapshot report;
+  final Map<String, dynamic> report;
 
   const ReportDetailScreen({super.key, required this.report});
 
@@ -18,22 +18,80 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   bool _loading = false;
   bool _expanded = false;
   final ScrollController _scrollController = ScrollController();
+  final SupabaseClient supabase = Supabase.instance.client;
+  List<Map<String, dynamic>> _statusUpdates = [];
+  bool _loadingStatusUpdates = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStatusUpdates();
+  }
+
+  Future<void> _loadStatusUpdates() async {
+    setState(() {
+      _loadingStatusUpdates = true;
+    });
+
+    try {
+      final response = await supabase
+          .from('incident_status_updates')
+          .select()
+          .eq('incident_id', widget.report['id'])
+          .order('created_at', ascending: true);
+
+      if (response != null) {
+        setState(() {
+          _statusUpdates = List<Map<String, dynamic>>.from(response);
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading status updates: $e");
+      // If status updates table doesn't exist or fails, create initial pending status
+      _createInitialStatusUpdate();
+    } finally {
+      setState(() {
+        _loadingStatusUpdates = false;
+      });
+    }
+  }
+
+  void _createInitialStatusUpdate() {
+    // Create initial pending status update for existing incidents
+    final initialUpdate = {
+      'status': 'pending',
+      'note': 'Incident reported',
+      'updated_by': widget.report['name'] ?? 'Anonymous',
+      'created_at': widget.report['timestamp'] ?? widget.report['created_at'] ?? DateTime.now().toIso8601String(),
+    };
+    
+    setState(() {
+      _statusUpdates = [initialUpdate];
+    });
+  }
 
   Future<void> _refreshReport() async {
     setState(() => _loading = true);
     try {
-      await FirebaseFirestore.instance
-          .collection('incidents')
-          .doc(widget.report.id)
-          .get(const GetOptions(source: Source.server));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Report refreshed successfully"),
-          backgroundColor: Colors.green[700],
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      final response = await supabase
+          .from('incidents')
+          .select()
+          .eq('id', widget.report['id'])
+          .single();
+
+      if (response != null) {
+        // Reload status updates when refreshing the report
+        await _loadStatusUpdates();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("Report refreshed successfully"),
+            backgroundColor: Colors.green[700],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
     } catch (e) {
       debugPrint("Error refreshing report: $e");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -135,11 +193,11 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
         onRefresh: _refreshReport,
         color: const Color(0xFF3F73A3),
         backgroundColor: Colors.white,
-        child: StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('incidents')
-              .doc(widget.report.id)
-              .snapshots(),
+        child: StreamBuilder<List<Map<String, dynamic>>>(
+          stream: supabase
+              .from('incidents')
+              .stream(primaryKey: ['id'])
+              .eq('id', widget.report['id']),
           builder: (context, snapshot) {
             if (_loading && !snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
@@ -149,11 +207,11 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
               return _buildErrorState(snapshot.error.toString());
             }
 
-            if (!snapshot.hasData || !snapshot.data!.exists) {
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return _buildNotFoundState();
             }
 
-            final data = snapshot.data!.data() as Map<String, dynamic>;
+            final data = snapshot.data!.first;
             return _buildReportContent(data);
           },
         ),
@@ -238,7 +296,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   }
 
   Widget _buildReportContent(Map<String, dynamic> data) {
-    final String incidentType = data['incidentType'] ?? "Incident";
+    final String incidentType = data['incident_type'] ?? "Incident";
     final String description = data['description'] ?? "No description provided";
     final String status = data['status'] ?? "Pending";
     
@@ -251,23 +309,30 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     final String address = _formatAddress(rawAddress, barangay, city);
     
     final String name = data['name'] ?? "Anonymous";
-    final String contactNumber = data['contactNumber'] ?? "Not provided";
+    final String contactNumber = data['contact_number'] ?? "Not provided";
     final double? latitude = data['latitude'] as double?;
     final double? longitude = data['longitude'] as double?;
-    final bool requiresReview = data['requiresReview'] ?? false;
-    final double suspicionScore = (data['suspicionScore'] ?? 0.0).toDouble();
-    final List<dynamic> imageUrls = data['imageUrls'] ?? [];
+    final bool requiresReview = data['requires_review'] ?? false;
+    final double suspicionScore = (data['suspicion_score'] ?? 0.0).toDouble();
+    final List<dynamic> imageUrls = data['image_urls'] ?? [];
 
-    final String formattedDate = data['timestamp'] != null
-        ? DateFormat('MMMM d, yyyy')
-            .format((data['timestamp'] as Timestamp).toDate())
-        : "Unknown date";
-    final String timeDetail = data['timestamp'] != null
-        ? DateFormat('h:mm a')
-            .format((data['timestamp'] as Timestamp).toDate())
-        : "";
-
-    final List<dynamic> statusUpdates = data['statusUpdates'] ?? [];
+    // Handle timestamp conversion from Supabase
+    final String formattedDate;
+    final String timeDetail;
+    
+    if (data['timestamp'] != null) {
+      DateTime timestamp;
+      if (data['timestamp'] is String) {
+        timestamp = DateTime.parse(data['timestamp']);
+      } else {
+        timestamp = data['timestamp'] as DateTime;
+      }
+      formattedDate = DateFormat('MMMM d, yyyy').format(timestamp);
+      timeDetail = DateFormat('h:mm a').format(timestamp);
+    } else {
+      formattedDate = "Unknown date";
+      timeDetail = "";
+    }
 
     return CustomScrollView(
       controller: _scrollController,
@@ -290,7 +355,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           ),
         ),
         SliverToBoxAdapter(
-          child: _buildTimeline(statusUpdates),
+          child: _buildTimeline(),
         ),
         const SliverToBoxAdapter(
           child: SizedBox(height: 20),
@@ -604,7 +669,52 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     );
   }
 
-  Widget _buildTimeline(List<dynamic> statusUpdates) {
+  Widget _buildTimeline() {
+    if (_loadingStatusUpdates) {
+      return Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(40),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            )
+          ],
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation(Color(0xFF3F73A3)),
+          ),
+        ),
+      );
+    }
+
+    // Create combined timeline with initial pending status if needed
+    final List<Map<String, dynamic>> allStatusUpdates = [];
+    
+    // Add initial pending status if it's not in the updates and current status is pending
+    final hasInitialPending = _statusUpdates.any((update) => 
+        (update['status'] ?? '').toString().toLowerCase() == 'pending');
+    
+    final currentStatus = widget.report['status']?.toString().toLowerCase() ?? 'pending';
+    
+    if (!hasInitialPending && currentStatus == 'pending') {
+      allStatusUpdates.add({
+        'status': 'pending',
+        'note': 'Incident reported',
+        'updated_by': widget.report['name'] ?? 'Anonymous',
+        'created_at': widget.report['timestamp'] ?? widget.report['created_at'] ?? DateTime.now().toIso8601String(),
+        'is_initial': true,
+      });
+    }
+    
+    // Add all the actual status updates
+    allStatusUpdates.addAll(_statusUpdates);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(20),
@@ -613,9 +723,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4))
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
         ],
       ),
       child: Column(
@@ -630,7 +741,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                       color: Color(0xFF2C3E50))),
               const SizedBox(width: 8),
               Chip(
-                label: Text(statusUpdates.length.toString()),
+                label: Text(allStatusUpdates.length.toString()),
                 backgroundColor: Colors.blue[50],
                 labelStyle: const TextStyle(color: Colors.blue),
                 visualDensity: VisualDensity.compact,
@@ -638,10 +749,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          if (statusUpdates.isEmpty)
+          if (allStatusUpdates.isEmpty)
             _buildEmptyTimeline()
           else
-            _buildTimelineList(statusUpdates),
+            _buildTimelineList(allStatusUpdates),
         ],
       ),
     );
@@ -663,30 +774,44 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     );
   }
 
-  Widget _buildTimelineList(List<dynamic> statusUpdates) {
+  Widget _buildTimelineList(List<Map<String, dynamic>> statusUpdates) {
+    // Sort by creation date (newest first for display)
+    final sortedUpdates = List<Map<String, dynamic>>.from(statusUpdates)
+      ..sort((a, b) {
+        final aTime = _parseTimestamp(a['created_at'] ?? a['timestamp']);
+        final bTime = _parseTimestamp(b['created_at'] ?? b['timestamp']);
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime); // Newest first
+      });
+
     return ListView.separated(
       physics: const NeverScrollableScrollPhysics(),
       shrinkWrap: true,
-      itemCount: statusUpdates.length,
+      itemCount: sortedUpdates.length,
       separatorBuilder: (context, index) => const SizedBox(height: 16),
       itemBuilder: (context, index) {
-        final update = statusUpdates[index];
+        final update = sortedUpdates[index];
         return _buildTimelineItem(update, index == 0);
       },
     );
   }
 
   Widget _buildTimelineItem(Map<String, dynamic> update, bool isLatest) {
-    final String statusText = update['status'] ?? "Unknown";
-    final note = update['note'] ?? "";
+    final String statusText = (update['status'] ?? "Unknown").toString();
+    final note = (update['note'] ?? "").toString();
+    final updatedBy = (update['updated_by'] ?? "System").toString();
     DateTime? updateTime;
 
-    if (update['timestamp'] is Timestamp) {
-      updateTime = (update['timestamp'] as Timestamp).toDate();
-    } else if (update['timestamp'] is String) {
+    // Parse timestamp from various possible fields
+    final timestamp = update['created_at'] ?? update['timestamp'];
+    if (timestamp is String) {
       try {
-        updateTime = DateTime.parse(update['timestamp']);
+        updateTime = DateTime.parse(timestamp);
       } catch (_) {}
+    } else if (timestamp is DateTime) {
+      updateTime = timestamp;
     }
 
     final timeStr = updateTime != null ? DateFormat('MMM d').format(updateTime) : "";
@@ -723,10 +848,12 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                     : null,
               ),
             ),
-            Container(
+            if (!isLatest)
+              Container(
                 width: 3,
                 height: 90,
-                color: _getStatusColor(statusText).withOpacity(0.3)),
+                color: _getStatusColor(statusText).withOpacity(0.3),
+              ),
           ],
         ),
         const SizedBox(width: 16),
@@ -756,11 +883,14 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(statusText,
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: _getStatusColor(statusText))),
+                Text(
+                  statusText.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: _getStatusColor(statusText),
+                  ),
+                ),
                 if (note.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(note,
@@ -769,12 +899,34 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                           fontSize: 14,
                           height: 1.4)),
                 ],
+                const SizedBox(height: 8),
+                Text(
+                  'By: $updatedBy',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
               ],
             ),
           ),
         ),
       ],
     );
+  }
+
+  DateTime? _parseTimestamp(dynamic timestamp) {
+    if (timestamp == null) return null;
+    if (timestamp is DateTime) return timestamp;
+    if (timestamp is String) {
+      try {
+        return DateTime.parse(timestamp);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
   }
 
   Future<void> _shareReport() async {

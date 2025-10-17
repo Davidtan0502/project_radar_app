@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:project_radar_app/community/community_screen.dart';
 import 'package:project_radar_app/screens/alerts/alert_screen.dart';
 import 'package:project_radar_app/screens/home/home_screen.dart';
@@ -25,14 +25,16 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<GlobalKey<NavigatorState>> _navigatorKeys =
       List.generate(5, (_) => GlobalKey<NavigatorState>());
 
-  StreamSubscription<User?>? _authSubscription;
+  StreamSubscription<AuthState>? _authSubscription;
+  final SupabaseClient supabase = Supabase.instance.client;
 
   @override
   void initState() {
     super.initState();
 
     // Listen for auth state changes: if user becomes null, navigate to Login and clear stack.
-    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+    _authSubscription = supabase.auth.onAuthStateChange.listen((authState) {
+      final user = authState.session?.user;
       if (user == null) {
         // If user signed out (or was deleted), make sure we clear everything and show login screen.
         if (mounted) {

@@ -1,8 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AdminApprovalScreen extends StatelessWidget {
   const AdminApprovalScreen({super.key});
@@ -10,31 +9,50 @@ class AdminApprovalScreen extends StatelessWidget {
   Future<void> _approveRegistration(
       BuildContext context, String docId, Map<String, dynamic> userData) async {
     try {
-      // 1. Create Firebase Auth account
-      final auth = FirebaseAuth.instance;
+      final supabase = Supabase.instance.client;
+      
+      // 1. Create user account in Supabase Auth
       final password = _generateRandomPassword();
-      final userCredential = await auth.createUserWithEmailAndPassword(
-        email: userData['email'],
-        password: password,
+      final authResponse = await supabase.auth.admin.createUser(
+        AdminUserAttributes(
+          email: userData['email'],
+          password: password,
+          emailConfirm: true, // Auto-confirm email for approved users
+        ),
       );
 
-      // 2. Create user document in Firestore
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userCredential.user?.uid)
-          .set({
-        ...userData,
-        'uid': userCredential.user?.uid,
-        'role': 'user',
-        'status': 'active',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      final userId = authResponse.user!.id;
+
+      // 2. Create user profile in Supabase database
+      await supabase
+          .from('app_users')
+          .insert({
+            'id': userId,
+            'first_name': userData['first_name'],
+            'last_name': userData['last_name'],
+            'middle_name': userData['middle_name'],
+            'email': userData['email'],
+            'phone': userData['phone'],
+            'role': 'user',
+            'status': 'active',
+            'created_at': DateTime.now().toIso8601String(),
+            'user_category': userData['user_category'],
+            // Copy address data based on user category
+            if (userData['user_category'] == "RESIDENT") 
+              'resident_address': userData['resident_address'],
+            if (userData['user_category'] == "EMPLOYEE") 
+              'work_address': userData['work_address'],
+            if (userData['user_category'] == "EMPLOYEE" || userData['user_category'] == "STUDENT")
+              'home_address': userData['home_address'],
+            if (userData['user_category'] == "STUDENT") 
+              'school_address': userData['school_address'],
+          });
 
       // 3. Remove from pending registrations
-      await FirebaseFirestore.instance
-          .collection('pending_registrations')
-          .doc(docId)
-          .delete();
+      await supabase
+          .from('pending_registrations')
+          .delete()
+          .eq('id', docId);
 
       // 4. Send welcome email
       await _sendWelcomeEmail(userData['email'], password);
@@ -43,7 +61,7 @@ class AdminApprovalScreen extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('User approved successfully!')),
       );
-    } on FirebaseAuthException catch (e) {
+    } on AuthException catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Auth Error: ${e.message}')),
@@ -59,11 +77,13 @@ class AdminApprovalScreen extends StatelessWidget {
   Future<void> _rejectRegistration(
       BuildContext context, String docId, String email) async {
     try {
+      final supabase = Supabase.instance.client;
+      
       // 1. Remove from pending registrations
-      await FirebaseFirestore.instance
-          .collection('pending_registrations')
-          .doc(docId)
-          .delete();
+      await supabase
+          .from('pending_registrations')
+          .delete()
+          .eq('id', docId);
 
       // 2. Send rejection email
       await _sendRejectionEmail(email);
@@ -91,6 +111,7 @@ class AdminApprovalScreen extends StatelessWidget {
 
   Future<void> _sendWelcomeEmail(String email, String password) async {
     // Implement your email sending logic here
+    // You can use Supabase Edge Functions or your own email service
     debugPrint('Sending welcome email to $email with password: $password');
   }
 
@@ -101,6 +122,8 @@ class AdminApprovalScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final supabase = Supabase.instance.client;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pending Registrations'),
@@ -111,11 +134,11 @@ class AdminApprovalScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('pending_registrations')
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: supabase
+            .from('pending_registrations')
+            .stream(primaryKey: ['id'])
+            .order('created_at', ascending: false),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
@@ -125,15 +148,17 @@ class AdminApprovalScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (snapshot.data!.docs.isEmpty) {
+          final pendingRegistrations = snapshot.data ?? [];
+
+          if (pendingRegistrations.isEmpty) {
             return const Center(child: Text('No pending registrations'));
           }
 
           return ListView.builder(
-            itemCount: snapshot.data!.docs.length,
+            itemCount: pendingRegistrations.length,
             itemBuilder: (context, index) {
-              final doc = snapshot.data!.docs[index];
-              final data = doc.data() as Map<String, dynamic>;
+              final data = pendingRegistrations[index];
+              final docId = data['id'] as String;
 
               return Card(
                 margin: const EdgeInsets.all(8),
@@ -143,7 +168,7 @@ class AdminApprovalScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${data['firstName']} ${data['lastName']}',
+                        '${data['first_name']} ${data['last_name']}',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -152,9 +177,10 @@ class AdminApprovalScreen extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text('Email: ${data['email']}'),
                       Text('Phone: ${data['phone']}'),
+                      Text('Category: ${data['user_category']}'),
                       const SizedBox(height: 8),
                       Text(
-                        'Submitted: ${(data['createdAt'] as Timestamp).toDate()}',
+                        'Submitted: ${_formatDate(data['created_at'])}',
                         style: const TextStyle(fontSize: 12),
                       ),
                       const SizedBox(height: 16),
@@ -163,14 +189,14 @@ class AdminApprovalScreen extends StatelessWidget {
                         children: [
                           TextButton(
                             onPressed: () =>
-                                _rejectRegistration(context, doc.id, data['email']),
+                                _rejectRegistration(context, docId, data['email']),
                             child: const Text('Reject',
                                 style: TextStyle(color: Colors.red)),
                           ),
                           const SizedBox(width: 8),
                           ElevatedButton(
                             onPressed: () =>
-                                _approveRegistration(context, doc.id, data),
+                                _approveRegistration(context, docId, data),
                             child: const Text('Approve'),
                           ),
                         ],
@@ -184,5 +210,14 @@ class AdminApprovalScreen extends StatelessWidget {
         },
       ),
     );
+  }
+
+  String _formatDate(dynamic date) {
+    if (date is String) {
+      return DateTime.parse(date).toString();
+    } else if (date is DateTime) {
+      return date.toString();
+    }
+    return 'Unknown date';
   }
 }
