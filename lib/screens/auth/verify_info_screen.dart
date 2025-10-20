@@ -147,12 +147,13 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
     final house = _addr(map, 'house');
     final street = _addr(map, 'street');
     if (house.isNotEmpty && street.isNotEmpty) {
-      parts.add('${_capitalizeEachWord(house)}, ${_capitalizeEachWord(street)}');
+      parts.add('${_capitalizeEachWord(house)}, ${_capitalizeEachWord(street)} Street');
     } else if (house.isNotEmpty) {
       parts.add(_capitalizeEachWord(house));
     } else if (street.isNotEmpty) {
-      parts.add(_capitalizeEachWord(street));
+      parts.add('${_capitalizeEachWord(street)} Street');
     }
+
 
     // Barangay
     final barangay = _addr(map, 'barangay');

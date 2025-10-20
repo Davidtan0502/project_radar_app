@@ -329,7 +329,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       debugPrint('Session exists: ${authResponse.session != null}');
       debugPrint('User email: ${authResponse.user!.email}');
 
-      // ✅ The trigger should now automatically create the app_users record
+      // The trigger should now automatically create the app_users record
       // Let's wait a moment and verify the record was created
       await Future.delayed(const Duration(seconds: 2));
 
@@ -341,10 +341,9 @@ class _RegisterScreenState extends State<RegisterScreen>
             .eq('id', authResponse.user!.id)
             .single();
 
-        debugPrint('✅ app_users record created by trigger: ${userRecord['id']}');
+        debugPrint('app_users record created by trigger: ${userRecord['id']}');
       } catch (e) {
-        debugPrint('⚠️ Trigger may not have created app_users record yet: $e');
-        // This might be OK - the trigger could be delayed
+        debugPrint('Trigger may not have created app_users record yet: $e');
       }
 
       if (!mounted) return;
@@ -572,7 +571,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  // Enhanced Text Field
+  //Text Field
   Widget _buildTextField(
     TextEditingController controller,
     String label,
@@ -643,7 +642,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  // Enhanced Phone Field
+  //Phone Field
   Widget _buildPhoneField() {
     return TextFormField(
       controller: _phoneController,
@@ -733,7 +732,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  // Enhanced Password Field
+  //Password Field
   Widget _buildPasswordField({
     required TextEditingController controller,
     required String label,
@@ -808,7 +807,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  // Enhanced Dropdown Field
+  //Dropdown Field
   Widget _buildDropdownField({
     required String value,
     required List<String> items,
@@ -893,7 +892,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  // Enhanced Town Dropdown Field
+  //Town Dropdown Field
   Widget _buildTownDropdownField({
     required String? value,
     required List<String> items,

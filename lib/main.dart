@@ -6,6 +6,7 @@ import 'package:project_radar_app/notification/incident_details_screen.dart';
 import 'package:project_radar_app/notification/notification_service.dart';
 import 'package:project_radar_app/screens/alerts/report_tracker_screen.dart';
 import 'package:project_radar_app/screens/auth/login_screen.dart';
+import 'package:project_radar_app/screens/auth/reset_password_screen.dart';
 import 'package:project_radar_app/screens/home/main_navigation.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -24,7 +25,7 @@ void main() async {
     anonKey: SupabaseConfig.anonKey,
   );
 
-  // Initialize deep linking for email verification
+  // Initialize deep linking for email verification & password recovery
   await _initializeDeepLinking();
 
   // Initialize notification service on non-web platforms
@@ -44,14 +45,30 @@ void main() async {
 }
 
 Future<void> _initializeDeepLinking() async {
-  // Set up deep link handling for email verification
   try {
-    // Supabase Flutter handles deep link initialization automatically.
-    // Check if we have a session from a deep link
-    final initialSession = Supabase.instance.client.auth.currentSession;
+    final supabase = Supabase.instance.client;
+
+    // Listen for Supabase auth events (handles password recovery link)
+    supabase.auth.onAuthStateChange.listen((data) async {
+    final event = data.event;
+    final session = data.session;
+
+    debugPrint('[DeepLink] event: $event, session: $session');
+
+    if (event == AuthChangeEvent.passwordRecovery) {
+      debugPrint('[DeepLink] Password recovery detected, navigating to reset form...');
+      await Supabase.instance.client.auth.signOut();
+      navigatorKey.currentState?.pushNamed('/reset-password');
+    }
+  });
+
+    // Optional: check initial session from deep link
+    final initialSession = supabase.auth.currentSession;
     if (initialSession != null) {
       debugPrint('Initial session found from deep link');
     }
+
+    debugPrint('[DeepLink] Listener attached successfully.');
   } catch (e) {
     debugPrint('Error initializing deep linking: $e');
   }
@@ -82,6 +99,9 @@ class MyApp extends StatelessWidget {
         },
         '/reportTracker': (context) => const ReportTrackerScreen(),
         '/home': (context) => const MainNavigation(),
+
+        //reset password route
+        '/reset-password': (context) => const ResetPasswordScreen(),
       },
       onGenerateRoute: (settings) {
         // Handle unknown routes or add additional routing logic here
@@ -156,7 +176,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
           final currentUser = supabase.auth.currentUser;
           if (currentUser != null && currentUser.emailConfirmedAt != null) {
             // This might be a fresh verification - could navigate to verification success
-            // But let's handle this in the stream to avoid loops
           }
         }
 

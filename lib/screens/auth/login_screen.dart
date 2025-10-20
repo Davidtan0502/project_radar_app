@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/screens/home/main_navigation.dart';
 import 'package:project_radar_app/terms_condition/terms_and_condition.dart';
+import 'package:project_radar_app/screens/auth/reset_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
@@ -35,14 +37,90 @@ class _LoginScreenState extends State<LoginScreen>
   bool _obscurePassword = true;
   String? _emailError;
   String? _passwordError;
+
+  // Prevent opening multiple reset screens
+  bool _isResetScreenOpen = false;
   
   // Supabase client
   final SupabaseClient supabase = Supabase.instance.client;
+
+  // Auth subscription (StreamSubscription for supabase_flutter 2.x)
+  StreamSubscription<dynamic>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
+
+    // subscribe to auth state changes so we can detect password recovery event
+    try {
+      // supabase.auth.onAuthStateChange is a Stream in supabase_flutter 2.x
+      _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
+        try {
+          // `data` shape can vary between SDK versions. handle common shapes safely
+          // Avoid using data[...] indexing (AuthState doesn't implement []), access properties instead.
+          dynamic event;
+          dynamic session;
+
+          // Prefer property access; many SDK versions provide `event` and `session` fields
+          try {
+            event = (data as dynamic).event;
+            session = (data as dynamic).session;
+          } catch (_) {
+            // If property access fails, fall back to treating the whole object as the event
+            event = data;
+            session = null;
+          }
+
+          debugPrint('[AuthState] event: $event, session: $session');
+
+         final ev = event?.toString().toLowerCase() ?? '';
+final bool isRecoveryEvent = ev.contains('password') ||
+                             ev.contains('recover') ||
+                             ev.contains('recovery') ||
+                             ev.contains('password_recovery');
+
+// if it's a recovery-like event, ensure the SDK actually has a session/user
+if (isRecoveryEvent) {
+  // prefer session from the event if provided, otherwise check SDK
+  final dynamic eventSession = session;
+  final currentUser = supabase.auth.currentUser;
+  final currentSession = eventSession ?? supabase.auth.currentSession;
+
+  debugPrint('[AuthState] recovery event detected. eventSession: $eventSession, currentSession: $currentSession, currentUser: $currentUser');
+
+  // If there's no authenticated user or session -> don't navigate (likely link not handled by app)
+  if (currentUser == null && (currentSession == null || (currentSession as dynamic)?.accessToken == null)) {
+    debugPrint('[AuthState] No active recovery session/user found; not navigating to reset screen.');
+    return;
+  }
+
+  if (!mounted) return;
+
+  // Prevent opening multiple reset screens
+  if (_isResetScreenOpen) {
+    debugPrint('[AuthState] Reset screen already open; skipping push.');
+    return;
+  }
+
+  _isResetScreenOpen = true;
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
+  ).then((_) {
+    // Reset the flag when the reset screen is popped
+    _isResetScreenOpen = false;
+  });
+}
+
+        } catch (e, st) {
+          debugPrint('[authListener] handler error: $e\n$st');
+        }
+      });
+    } catch (e, st) {
+      debugPrint('[initState] Failed to subscribe auth changes: $e\n$st');
+    }
   }
 
   void _initializeAnimations() {
@@ -64,28 +142,125 @@ class _LoginScreenState extends State<LoginScreen>
     _passwordController.dispose();
     _emailFocusNode.dispose();
     _passwordFocusNode.dispose();
+
+    // cancel auth subscription if available (StreamSubscription.cancel())
+    try {
+      _authSubscription?.cancel();
+    } catch (e, st) {
+      debugPrint('[dispose] error cancelling auth subscription: $e\n$st');
+    }
+
     super.dispose();
   }
 
   // Email verification step
-  Future<void> _verifyEmail() async {
-    setState(() {
-      _emailError = null;
-      _passwordError = null;
-      _isLoading = true;
-    });
+Future<void> _verifyEmail() async {
+  if (!mounted) return;
 
-    final email = _emailController.text.trim().toLowerCase();
-    
-    if (!_validateEmail(email)) return;
+  setState(() {
+    _emailError = null;
+    _passwordError = null;
+    _isLoading = true;
+  });
 
+  final rawEmail = _emailController.text.trim();
+  if (!_validateEmail(rawEmail)) {
+    // _validateEmail will set _isLoading = false for invalid input
+    return;
+  }
+
+  final email = rawEmail.toLowerCase();
+
+  try {
+    debugPrint('[verifyEmail] attempting RPC rpc_check_email for: $email');
+
+    // Try RPC first (works even with strict RLS if function is security definer)
+    dynamic rpcResult;
+    try {
+      // supabase.rpc usually returns a dynamic object (Map/List) depending on function result
+      rpcResult = await supabase.rpc('rpc_check_email', params: {'_email': email});
+      debugPrint('[verifyEmail] rpc result: $rpcResult (type: ${rpcResult?.runtimeType})');
+    } catch (rpcError) {
+      debugPrint('[verifyEmail] rpc call failed or not available: $rpcError');
+      rpcResult = null;
+    }
+
+    bool exists = false;
+    dynamic finalResult;
+
+    if (rpcResult != null) {
+      // rpc may return a List (Postgres rows) or Map (single row) depending on client/SDK version
+      if (rpcResult is List) {
+        if (rpcResult.isNotEmpty) {
+          finalResult = rpcResult.first;
+          exists = true;
+        }
+      } else if (rpcResult is Map) {
+        finalResult = rpcResult;
+        exists = true;
+      } else {
+        // any other truthy return treat as exists
+        finalResult = rpcResult;
+        exists = true;
+      }
+    }
+
+    // If RPC not available/found, fallback to client-side check (case-insensitive)
+    if (!exists) {
+      debugPrint('[verifyEmail] falling back to client query (ilike)');
+      final dynamic maybeResult = await supabase
+          .from('app_users')
+          .select('id, email')
+          .ilike('email', email)
+          .maybeSingle();
+
+      debugPrint('[verifyEmail] maybeSingle (ilike) returned: $maybeResult (type: ${maybeResult?.runtimeType})');
+      dynamic fallbackResult = maybeResult;
+
+      if (fallbackResult == null) {
+        debugPrint('[verifyEmail] ilike returned null, trying exact eq fallback');
+        fallbackResult = await supabase
+            .from('app_users')
+            .select('id, email')
+            .eq('email', email)
+            .maybeSingle();
+        debugPrint('[verifyEmail] maybeSingle (eq) returned: $fallbackResult (type: ${fallbackResult?.runtimeType})');
+      }
+
+      finalResult = fallbackResult;
+      exists = finalResult != null;
+    }
+
+    if (!mounted) return;
+
+    if (!exists) {
+      setState(() {
+        _isLoading = false;
+        _showPasswordStep = false;
+        _passwordController.clear();
+        _emailError = 'No account found with this email. Please register first.';
+      });
+      _emailFocusNode.requestFocus();
+      return;
+    }
+
+    // Pag nahanap na sa record proceed sa password step
     setState(() {
       _isLoading = false;
       _showPasswordStep = true;
     });
-    
     _focusPasswordField();
+  } catch (e, st) {
+    debugPrint('[verifyEmail] Exception: $e\n$st');
+
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+    });
+
+    _showErrorDialog('Failed to verify email. Please check your network and database policies.');
   }
+}
 
   bool _validateEmail(String email) {
     if (email.isEmpty) {
@@ -310,15 +485,24 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _isLoading = true);
     
     try {
-      await supabase.auth.resetPasswordForEmail(email);
+    
+      final redirectUrl = 'com.projectradar://reset-password';
+
+      await supabase.auth.resetPasswordForEmail(
+        email,
+        redirectTo: redirectUrl,
+      );
+
       if (!mounted) return;
       _showDialog('Password reset instructions have been sent to $email');
-    } on AuthException catch (e) {
+    } on AuthException catch (e, st) {
+      debugPrint('[resetPassword] AuthException: ${e.message}\n$st');
       if (!mounted) return;
-      _showErrorDialog('Error: ${e.message}');
-    } catch (e) {
+      _showErrorDialog('Error sending reset email: ${e.message}');
+    } catch (e, st) {
+      debugPrint('[resetPassword] Unexpected error: $e\n$st');
       if (!mounted) return;
-      _showErrorDialog('Failed to send reset email. Please try again.');
+      _showErrorDialog('Failed to send reset email. Please check SMTP settings in Supabase Auth.');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
