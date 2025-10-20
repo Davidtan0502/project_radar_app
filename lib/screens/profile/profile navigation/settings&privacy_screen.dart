@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:project_radar_app/screens/profile/account_management_screen.dart';
-import 'about_us.dart';
+import 'package:project_radar_app/screens/profile/settings%20and%20privacy%20files/account_management_screen.dart';
+import '../settings and privacy files/about_us.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsScreen extends StatefulWidget {

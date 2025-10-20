@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:project_radar_app/screens/profile/account_management_screen.dart';
+import 'package:project_radar_app/screens/profile/settings%20and%20privacy%20files/account_management_screen.dart';
 import 'package:project_radar_app/services/navigation.dart';
 
 class EditProfileScreen extends StatefulWidget {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:project_radar_app/screens/profile/edit_account_info.dart';
+import 'package:project_radar_app/screens/profile/account%20management%20files/edit_account_info.dart';
 import 'package:project_radar_app/services/navigation.dart';
 import 'package:intl/intl.dart';
 import 'package:project_radar_app/widgets/capitalize_names.dart';
