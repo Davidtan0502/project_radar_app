@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'dart:typed_data';
 
 import 'location_picker_screen.dart';
 
@@ -107,41 +108,57 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     });
   }
 
-  Future<List<String>> _uploadImages(String incidentId) async {
-    List<String> urls = [];
-    final user = supabase.auth.currentUser;
-    
-    if (user == null) {
-      print('User not authenticated');
-      return urls;
-    }
-
-    for (final img in _selectedImages) {
-      try {
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${_selectedImages.indexOf(img)}.jpg';
-        final filePath = '${user.id}/$incidentId/$fileName';
-
-        print('🔼 Uploading image: $filePath');
-        
-        // ✅ FIXED: Upload the File object directly (no bytes conversion needed)
-        await supabase.storage
-            .from('incidents')
-            .upload(filePath, img);
-
-        final publicUrl = supabase.storage
-            .from('incidents')
-            .getPublicUrl(filePath);
-
-        urls.add(publicUrl);
-        print('✅ Image uploaded successfully: $publicUrl');
-      } catch (e) {
-        print('❌ Error uploading image: $e');
-      }
-    }
-
-    print('📊 Total images uploaded: ${urls.length}/${_selectedImages.length}');
+Future<List<String>> _uploadImages(String incidentId) async {
+  List<String> urls = [];
+  final user = supabase.auth.currentUser;
+  
+  if (user == null) {
+    print('❌ User not authenticated');
     return urls;
   }
+
+  for (final img in _selectedImages) {
+    try {
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${_selectedImages.indexOf(img)}.jpg';
+      final filePath = '${user.id}/$incidentId/$fileName';
+
+      print('🔼 Attempting to upload image: $filePath');
+      
+      // Read file as bytes
+      final Uint8List fileBytes = await img.readAsBytes();
+      
+      // Upload bytes instead of File object
+      final uploadResponse = await supabase.storage
+          .from('incidents')
+          .uploadBinary(
+            filePath, 
+            fileBytes,
+            fileOptions: FileOptions(
+              contentType: 'image/jpeg',
+              upsert: false,
+            )
+          );
+
+      print('✅ Upload response: $uploadResponse');
+
+      // Get public URL
+      final publicUrl = supabase.storage
+          .from('incidents')
+          .getPublicUrl(filePath);
+
+      print('🔗 Public URL: $publicUrl');
+      
+      urls.add(publicUrl);
+      
+    } catch (e) {
+      print('❌ Error uploading image: $e');
+      print('❌ Error details: ${e.toString()}');
+    }
+  }
+
+  print('📊 Upload completed: ${urls.length}/${_selectedImages.length} images uploaded');
+  return urls;
+}
 
   Future<void> _updateLatLongFromAddress(String address) async {
     if (address.trim().isEmpty) return;
@@ -415,115 +432,122 @@ class _IncidentReportPageState extends State<IncidentReportPage>
     });
   }
 
-  Future<void> _submitForm() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+Future<void> _submitForm() async {
+  if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    setState(() => _isSubmitting = true);
+  setState(() => _isSubmitting = true);
 
-    try {
-      final description = _concernController.text.trim();
-      final user = supabase.auth.currentUser;
+  try {
+    final description = _concernController.text.trim();
+    final user = supabase.auth.currentUser;
 
-      if (user == null) {
-        throw Exception('User not authenticated');
-      }
-
-      print('=== DEBUG: Submitting incident report ===');
-      print('Description: "$description"');
-
-      // Upload images first to get URLs
-      List<String> imageUrls = [];
-      final incidentId = 'incident_${DateTime.now().millisecondsSinceEpoch}_${user.id}';
-      
-      if (_selectedImages.isNotEmpty) {
-        imageUrls = await _uploadImages(incidentId);
-      }
-
-      // Insert incident record - All incidents start as "Pending"
-      final response = await supabase
-          .from('incidents')
-          .insert({
-            'name': _nameController.text.trim(),
-            'address': _addressController.text.trim(),
-            'landmark': _landmarkController.text.trim(),
-            'contact_number': _cellphoneController.text.trim(),
-            'incident_type': _incidentType == 'Other'
-                ? _otherIncidentTypeController.text.trim()
-                : _incidentType,
-            'description': description,
-            'timestamp': DateTime.now().toIso8601String(),
-            'status': 'Pending', // Always start as Pending
-            'latitude': double.tryParse(_latitudeController.text) ?? 0.0,
-            'longitude': double.tryParse(_longitudeController.text) ?? 0.0,
-            'barangay': _barangayController.text.trim(),
-            'street': _streetController.text.trim(),
-            'suspicion_score': 0.0, // No longer using AI analysis
-            'requires_review': false, // No longer using AI analysis
-            'user_id': user.id,
-            'ai_analysis': 'No AI analysis - manual admin review', // Simplified
-            'matched_patterns': [], // No longer using pattern matching
-            'image_urls': imageUrls,
-          })
-          .select();
-
-      if (response.isEmpty) {
-        throw Exception('Failed to create incident record');
-      }
-
-      final createdIncident = response.first;
-      print('✅ Incident created with ID: ${createdIncident['id']}');
-
-      // Create initial status update in the separate table
-      try {
-        await supabase
-            .from('incident_status_updates')
-            .insert({
-              'incident_id': createdIncident['id'],
-              'status': 'Pending',
-              'timestamp': DateTime.now().toIso8601String(),
-              'note': 'Initial report submitted',
-              'user_id': user.id,
-            });
-        print('✅ Status update created');
-      } catch (e) {
-        print('⚠️ Could not create status update: $e');
-        // Continue anyway - this is optional
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Incident report submitted successfully! Admin will review it shortly.'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        );
-      }
-
-      _resetForm();
-      await Future.delayed(const Duration(seconds: 2));
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      print('Error submitting form: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to submit report: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+    if (user == null) {
+      throw Exception('User not authenticated');
     }
+
+    print('=== DEBUG: Starting form submission ===');
+
+    // Generate a unique incident ID first
+    final incidentId = 'incident_${DateTime.now().millisecondsSinceEpoch}_${user.id}';
+    print('🆔 Generated incident ID: $incidentId');
+
+    // Upload images first to get URLs
+    List<String> imageUrls = [];
+    
+    if (_selectedImages.isNotEmpty) {
+      print('📸 Starting image upload for ${_selectedImages.length} images');
+      imageUrls = await _uploadImages(incidentId);
+      print('✅ Image upload completed: ${imageUrls.length} URLs obtained');
+    } else {
+      print('ℹ️ No images to upload');
+    }
+
+    // Insert incident record
+    print('💾 Inserting incident record into database...');
+    final response = await supabase
+        .from('incidents')
+        .insert({
+          'name': _nameController.text.trim(),
+          'address': _addressController.text.trim(),
+          'landmark': _landmarkController.text.trim(),
+          'contact_number': _cellphoneController.text.trim(),
+          'incident_type': _incidentType == 'Other'
+              ? _otherIncidentTypeController.text.trim()
+              : _incidentType,
+          'description': description,
+          'timestamp': DateTime.now().toIso8601String(),
+          'status': 'Pending',
+          'latitude': double.tryParse(_latitudeController.text) ?? 0.0,
+          'longitude': double.tryParse(_longitudeController.text) ?? 0.0,
+          'barangay': _barangayController.text.trim(),
+          'street': _streetController.text.trim(),
+          'suspicion_score': 0.0,
+          'requires_review': false,
+          'user_id': user.id,
+          'ai_analysis': 'No AI analysis - manual admin review',
+          'matched_patterns': [],
+          'image_urls': imageUrls, // This should now contain the URLs
+        })
+        .select();
+
+    if (response.isEmpty) {
+      throw Exception('Failed to create incident record');
+    }
+
+    final createdIncident = response.first;
+    print('✅ Incident created with ID: ${createdIncident['id']}');
+
+    // Rest of your code remains the same...
+    // Create initial status update
+    try {
+      await supabase
+          .from('incident_status_updates')
+          .insert({
+            'incident_id': createdIncident['id'],
+            'status': 'Pending',
+            'timestamp': DateTime.now().toIso8601String(),
+            'note': 'Initial report submitted',
+            'user_id': user.id,
+          });
+      print('✅ Status update created');
+    } catch (e) {
+      print('⚠️ Could not create status update: $e');
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Incident report submitted successfully! Admin will review it shortly.'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    }
+
+    _resetForm();
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) Navigator.pop(context);
+    
+  } catch (e) {
+    print('❌ Error submitting form: $e');
+    print('❌ Stack trace: ${e.toString()}');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to submit report: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    }
+  } finally {
+    if (mounted) setState(() => _isSubmitting = false);
   }
+}
 
   String? _validatePhone(String? v) {
     if (v == null || v.isEmpty) return 'Please enter your contact number';
