@@ -82,21 +82,20 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
   }
 
   void _handleEdit() {
-  widget.onEdit();
-  Navigator.pushReplacementNamed(context, '/register');
-}
-
+    widget.onEdit();
+    Navigator.pushReplacementNamed(context, '/register');
+  }
 
   Future<void> _handleConfirm() async {
     setState(() => _isLoading = true);
-    
+
     try {
       // Call the onConfirm callback which will trigger _createAccount
       widget.onConfirm();
-      
+
       // Wait a bit to show loading state
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       // Don't pop - let the success dialog handle navigation
     } catch (e) {
       setState(() => _isLoading = false);
@@ -104,14 +103,38 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
     }
   }
 
+  /// Improved capitalization (kept in file for other uses)
   String _capitalizeEachWord(String value) {
     if (value.trim().isEmpty) return value;
-    return value
-        .split(' ')
-        .where((word) => word.isNotEmpty)
-        .map((word) =>
-            word[0].toUpperCase() + (word.length > 1 ? word.substring(1).toLowerCase() : ''))
-        .join(' ');
+
+    final words = value.split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
+
+    List<String> processedWords = [];
+
+    final delimRegex = RegExp(r"([-'\u2019])"); // hyphen, ascii apostrophe, unicode right single quote
+
+    for (final w in words) {
+      final parts = w.split(delimRegex);
+      for (int i = 0; i < parts.length; i++) {
+        final part = parts[i];
+        if (part.isEmpty) continue;
+        if (part.length == 1 && delimRegex.hasMatch(part)) {
+          processedWords.add(part);
+        } else {
+          final first = part[0].toUpperCase();
+          final rest = part.length > 1 ? part.substring(1).toLowerCase() : '';
+          processedWords.add('$first$rest');
+        }
+      }
+
+      final nonEmptyPartsCount = parts.where((p) => p.isNotEmpty).length;
+      final lastTokens = processedWords.sublist(processedWords.length - nonEmptyPartsCount);
+      final rebuilt = lastTokens.join();
+      processedWords.removeRange(processedWords.length - nonEmptyPartsCount, processedWords.length);
+      processedWords.add(rebuilt);
+    }
+
+    return processedWords.join(' ');
   }
 
   String _friendlyCategory(String? token) {
@@ -138,7 +161,7 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
 
   Widget _buildAddressBlock(String title, Map<String, dynamic> map) {
     final parts = <String>[];
-    
+
     // School name (for student)
     final schoolName = _addr(map, 'school_name');
     if (schoolName.isNotEmpty) parts.add(_capitalizeEachWord(schoolName));
@@ -153,7 +176,6 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
     } else if (street.isNotEmpty) {
       parts.add('${_capitalizeEachWord(street)} Street');
     }
-
 
     // Barangay
     final barangay = _addr(map, 'barangay');
@@ -286,7 +308,7 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
                       ],
                     ),
                   ),
-                  
+
                   Expanded(
                     child: AnimatedBuilder(
                       animation: _animationController,
@@ -334,7 +356,7 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
                                         ],
                                       ),
                                     ),
-                                    
+
                                     const SizedBox(height: 16),
                                     Text(
                                       'Please review all details before submitting',
@@ -344,9 +366,9 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
                                       ),
                                       textAlign: TextAlign.center,
                                     ),
-                                    
+
                                     const SizedBox(height: 24),
-                                    
+
                                     // Personal Information Section
                                     Text(
                                       'Personal Information',
@@ -357,10 +379,14 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
                                       ),
                                     ),
                                     const SizedBox(height: 12),
-                                    
-                                    _buildInfoTile('Last Name', _capitalizeEachWord(widget.lastName)),
+
+                                    // >>> CHANGED: display Last Name exactly as entered at registration
+                                    _buildInfoTile('Last Name', widget.lastName),
                                     const SizedBox(height: 8),
-                                    _buildInfoTile('First Name', _capitalizeEachWord(widget.firstName)),
+
+                                    // First Name (kept as-is or you can change to widget.firstName if needed)
+                                    _buildInfoTile('First Name', widget.firstName),
+
                                     if (widget.middleName.trim().isNotEmpty) ...[
                                       const SizedBox(height: 8),
                                       _buildInfoTile('Middle Name', _capitalizeEachWord(widget.middleName)),
@@ -393,7 +419,7 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
                                       _buildAddressBlock('Resident Address', widget.residentAddress!),
                                       const SizedBox(height: 16),
                                     ],
-                                    
+
                                     if (widget.workAddress != null && widget.workAddress!.isNotEmpty) ...[
                                       Text(
                                         'Work Address',
@@ -407,7 +433,7 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
                                       _buildAddressBlock('Work Address', widget.workAddress!),
                                       const SizedBox(height: 16),
                                     ],
-                                    
+
                                     if (widget.homeAddress != null && widget.homeAddress!.isNotEmpty) ...[
                                       Text(
                                         'Home Address',
@@ -421,7 +447,7 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
                                       _buildAddressBlock('Home Address', widget.homeAddress!),
                                       const SizedBox(height: 16),
                                     ],
-                                    
+
                                     if (widget.schoolAddress != null && widget.schoolAddress!.isNotEmpty) ...[
                                       Text(
                                         'School Address',
@@ -437,7 +463,7 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
                                     ],
 
                                     const SizedBox(height: 32),
-                                    
+
                                     // Action Buttons
                                     Row(
                                       children: [

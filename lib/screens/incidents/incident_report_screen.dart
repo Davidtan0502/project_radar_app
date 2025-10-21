@@ -41,6 +41,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
   bool _isSubmitting = false;
   bool _isLoadingLocation = true;
   Timer? _addressTypingTimer;
+  bool _isConfirmed = false; // NEW: Checkbox state
 
   // Replace Firebase with Supabase
   final SupabaseClient supabase = Supabase.instance.client;
@@ -133,7 +134,7 @@ Future<List<String>> _uploadImages(String incidentId) async {
           .uploadBinary(
             filePath, 
             fileBytes,
-            fileOptions: FileOptions(
+            fileOptions: const FileOptions(
               contentType: 'image/jpeg',
               upsert: false,
             )
@@ -429,10 +430,27 @@ Future<List<String>> _uploadImages(String incidentId) async {
       _incidentType = null;
       _isSubmitting = false;
       _selectedImages.clear();
+      _isConfirmed = false; // NEW: Reset checkbox state
     });
   }
 
 Future<void> _submitForm() async {
+  // NEW: Check if checkbox is checked before proceeding
+  if (!_isConfirmed) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please confirm that all information is true and accurate'),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    }
+    return;
+  }
+
   if (!(_formKey.currentState?.validate() ?? false)) return;
 
   setState(() => _isSubmitting = true);
@@ -856,6 +874,39 @@ Future<void> _submitForm() async {
     );
   }
 
+  // NEW: Build confirmation checkbox
+  Widget _buildConfirmationCheckbox() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Checkbox(
+            value: _isConfirmed,
+            onChanged: (bool? value) {
+              setState(() {
+                _isConfirmed = value ?? false;
+              });
+            },
+            activeColor: _primaryColor,
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                'I confirm that all the information provided is true and accurate to the best of my knowledge.',
+                style: TextStyle(
+                  color: Colors.grey.shade700,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildImageUploadSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -955,8 +1006,8 @@ Future<void> _submitForm() async {
                 onPressed: () => Navigator.of(context).pop(),
               ),
               flexibleSpace: FlexibleSpaceBar(
-                title: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 300),
+                title: const AnimatedOpacity(
+                  duration: Duration(milliseconds: 300),
                   opacity: 1,
                   child: Text(
                     'Incident Report',
@@ -975,7 +1026,7 @@ Future<void> _submitForm() async {
                       colors: [_primaryColor, Color.lerp(_primaryColor, Colors.black, 0.2)!],
                     ),
                   ),
-                  child: Center(
+                  child: const Center(
                     child: Opacity(
                       opacity: 0.1,
                       child: Icon(Icons.report_problem, size: 100, color: Colors.white),
@@ -1102,6 +1153,10 @@ Future<void> _submitForm() async {
                               _buildConcernField(),
                               const SizedBox(height: 16),
 
+                              // NEW: Confirmation checkbox added here
+                              _buildConfirmationCheckbox(),
+                              const SizedBox(height: 16),
+
                               _buildImageUploadSection(),
                               const SizedBox(height: 32),
 
@@ -1118,7 +1173,7 @@ Future<void> _submitForm() async {
                                     shadowColor: Color.lerp(_primaryColor, Colors.black, 0.3),
                                   ),
                                   child: _isSubmitting
-                                      ? SizedBox(
+                                      ? const SizedBox(
                                           height: 24,
                                           width: 24,
                                           child: CircularProgressIndicator(
@@ -1126,7 +1181,7 @@ Future<void> _submitForm() async {
                                             valueColor: AlwaysStoppedAnimation(Colors.white),
                                           ),
                                         )
-                                      : Text(
+                                      : const Text(
                                           'SUBMIT REPORT',
                                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5),
                                         ),

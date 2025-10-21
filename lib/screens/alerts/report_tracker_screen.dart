@@ -18,16 +18,25 @@ class ReportTrackerScreen extends StatefulWidget {
 }
 
 class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
-  final ReportTrackerController _controller = ReportTrackerController();
+  // Make controller initialized in initState so we can pass a customizable undo duration
+  late final ReportTrackerController _controller;
   final ScrollController _scrollController = ScrollController();
 
   // Keys for each list item so we can scroll to / ensureVisible
   final Map<String, GlobalKey> _itemKeys = {};
   bool _scrolledToHighlight = false;
 
+  // Keep track of optimistically deleted IDs so we can remove them from the UI
+  final Set<String> _optimisticallyDeletedIds = {};
+
+  // Customizable undo duration (change this number to adjust how long UNDO is visible)
+  int undoDurationSeconds = 4;
+
   @override
   void initState() {
     super.initState();
+
+    _controller = ReportTrackerController(undoDurationSeconds: undoDurationSeconds);
 
     // If a highlight id was passed directly in the widget constructor, use it;
     // otherwise read runtime arguments (ModalRoute) after the first frame so
@@ -176,6 +185,12 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
           filterResolved: filterResolved,
         );
 
+        // Remove any optimistically deleted items from the visible list
+        incidents.removeWhere((incident) {
+          final idVal = incident['id']?.toString() ?? '';
+          return _optimisticallyDeletedIds.contains(idVal);
+        });
+
         if (incidents.isEmpty) return _buildEmptyState(filterResolved);
 
         // Reset scrolled flag if highlight changes
@@ -200,7 +215,7 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
             final isHighlighted = incident['id'] == _controller.highlightIncidentId;
 
             // create / reuse a key for the item so we can find its context later
-            final key = _itemKeys.putIfAbsent(incident['id'], () => GlobalKey());
+            final key = _itemKeys.putIfAbsent(incident['id'].toString(), () => GlobalKey());
 
             return Container(
               key: key,
@@ -216,7 +231,8 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
                     _scrolledToHighlight = false;
                   }
                 },
-                onDelete: () => _showDeleteConfirmation(incident['id']),
+                // Show confirmation first; only after confirm do we do optimistic removal + delete
+                onDelete: () => _showDeleteConfirmation(incident['id'].toString()),
                 onHighlightRemoved: () {
                   _controller.clearHighlight();
                   _scrolledToHighlight = false;
@@ -281,6 +297,12 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
                 searchQuery: _controller.searchQuery,
                 timeFilter: _controller.timeFilter,
               );
+
+              // Also filter optimistically deleted ids (safe in case a resolved one was deleted)
+              incidents.removeWhere((incident) {
+                final idVal = incident['id']?.toString() ?? '';
+                return _optimisticallyDeletedIds.contains(idVal);
+              });
 
               if (incidents.isEmpty) return _buildEmptyState(true);
 
@@ -467,11 +489,39 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
     );
   }
 
-  void _showDeleteConfirmation(String docId) {
+    void _showDeleteConfirmation(String docId) {
+    // Capture the parent/screen context so we can show SnackBars on the main Scaffold
+    final parentContext = context;
+
     showDialog(
       context: context,
-      builder: (BuildContext context) => DeleteConfirmationDialog(
-        onConfirm: () => _controller.deleteReport(docId, context),
+      builder: (BuildContext dialogContext) => DeleteConfirmationDialog(
+        onConfirm: () {
+          // Only after user confirms do we remove the item from UI optimistically
+          setState(() {
+            _optimisticallyDeletedIds.add(docId);
+          });
+
+          // Pass the parentContext (not the dialog's context) to deleteReport
+          _controller.deleteReport(
+            docId,
+            parentContext,
+            onRestoreLocal: () {
+              if (mounted) {
+                setState(() {
+                  _optimisticallyDeletedIds.remove(docId);
+                });
+              }
+            },
+            onDeleteFailedLocal: () {
+              if (mounted) {
+                setState(() {
+                  _optimisticallyDeletedIds.remove(docId);
+                });
+              }
+            },
+          );
+        },
       ),
     );
   }
@@ -483,6 +533,11 @@ class ReportTrackerController {
   String searchQuery = "";
   String timeFilter = "24h";
   final SupabaseClient supabase = Supabase.instance.client;
+
+  // Undo duration customizable via constructor
+  final int undoDurationSeconds;
+
+  ReportTrackerController({this.undoDurationSeconds = 4});
 
   Stream<List<Map<String, dynamic>>> getUserIncidentsStream(String userId) {
     return supabase
@@ -566,7 +621,14 @@ class ReportTrackerController {
     return null;
   }
 
-  Future<void> deleteReport(String docId, BuildContext context) async {
+  /// deleteReport now has callbacks so UI can optimistically hide / restore items.
+  Future<void> deleteReport(
+    String docId,
+    BuildContext context, {
+    VoidCallback? onRestoreLocal,
+    VoidCallback? onDeleteFailedLocal,
+  }) async {
+    Map<String, dynamic>? deletedData;
     try {
       // Get the data before deleting for undo functionality
       final response = await supabase
@@ -575,15 +637,21 @@ class ReportTrackerController {
           .eq('id', docId)
           .single();
 
-      final deletedData = response;
+      // Convert response safely to Map<String, dynamic>
+      if (response is Map) {
+        deletedData = Map<String, dynamic>.from(response as Map);
+      }
 
       await supabase
           .from('incidents')
           .delete()
           .eq('id', docId);
 
-      _showUndoSnackbar(context, docId, deletedData);
+      // Show undo snackbar; UNDO triggers onRestoreLocal immediately and then attempts server restore
+      _showUndoSnackbar(context, docId, deletedData, onRestoreLocal);
     } catch (e) {
+      // notify UI that deletion failed so it can re-show the item
+      if (onDeleteFailedLocal != null) onDeleteFailedLocal();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("Error deleting report: $e"),
@@ -593,7 +661,12 @@ class ReportTrackerController {
     }
   }
 
-  void _showUndoSnackbar(BuildContext context, String docId, Map<String, dynamic>? deletedData) {
+  void _showUndoSnackbar(
+    BuildContext context,
+    String docId,
+    Map<String, dynamic>? deletedData,
+    VoidCallback? onRestoreLocal,
+  ) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text("Report deleted"),
@@ -602,16 +675,24 @@ class ReportTrackerController {
             ? SnackBarAction(
                 label: "UNDO",
                 textColor: Colors.white,
-                onPressed: () => _restoreReport(docId, deletedData, context),
+                onPressed: () {
+                  // Immediately restore the UI (optimistic)
+                  if (onRestoreLocal != null) onRestoreLocal();
+
+                  // Then attempt to restore on the server
+                  _restoreReport(docId, deletedData, context);
+                },
               )
             : null,
-        duration: const Duration(seconds: 4),
+        duration: Duration(seconds: undoDurationSeconds),
       ),
     );
   }
 
   Future<void> _restoreReport(String docId, Map<String, dynamic> data, BuildContext context) async {
     try {
+      // Attempt to re-insert the previous row.
+      // NOTE: if your DB uses an auto-generated primary key, inserting with the same 'id' may conflict.
       await supabase
           .from('incidents')
           .insert(data);

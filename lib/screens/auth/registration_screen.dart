@@ -216,7 +216,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     final transformed = parts.map((word) {
       if (word.isEmpty) return '';
 
-      // Handle hyphenated subwords (e.g. "jay-anne" -> "Jay-Anne")
+      // Handle hyphenated subwords
       final hyphenParts = word.split('-');
       final hyphenTransformed = hyphenParts.map((sub) {
         if (sub.isEmpty) return '';
@@ -239,133 +239,216 @@ class _RegisterScreenState extends State<RegisterScreen>
     return regex.hasMatch(email);
   }
 
-  void _submitRegistration() {
-    if (!_formKey.currentState!.validate()) return;
+  void _submitRegistration() async {
+  if (!_formKey.currentState!.validate()) return;
 
-    final residentAddress = _buildResidentAddress();
-    final workAddress = _buildWorkAddress();
-    final homeAddress = _buildHomeAddress();
-    final schoolAddress = _buildSchoolAddress();
+  final email = _emailController.text.trim().toLowerCase();
+  final phoneInput = _phoneController.text.trim();
 
-    Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => VerifyInfoScreen(
-          lastName: _lastNameController.text.trim(),
-          firstName: _firstNameController.text.trim(),
-          middleName: _hasMiddleName ? _middleNameController.text.trim() : "",
-          email: _emailController.text.trim().toLowerCase(),
-          phone: _phoneController.text.trim(),
-          password: _passwordController.text,
-          userCategory: _selectedCategory,
-          residentAddress: _selectedCategory == "RESIDENT" ? residentAddress : null,
-          workAddress: _selectedCategory == "EMPLOYEE" ? workAddress : null,
-          homeAddress: (_selectedCategory == "EMPLOYEE" || _selectedCategory == "STUDENT")
-              ? homeAddress
-              : null,
-          schoolAddress: _selectedCategory == "STUDENT" ? schoolAddress : null,
-          onConfirm: () {
-            // This will be called when user confirms in VerifyInfoScreen
-            _createAccount(
-              residentAddress: residentAddress,
-              workAddress: workAddress,
-              homeAddress: homeAddress,
-              schoolAddress: schoolAddress,
-            );
-          },
-          onEdit: () {
-            // User wants to edit - just go back
-            Navigator.pop(context);
-          },
-        ),
-      ),
-    );
+  // Normalize phone number to match Supabase RPC logic
+  String normalizePhone(String input) {
+    String digits = input.replaceAll(RegExp(r'\D'), '');
+
+    if (digits.startsWith('09')) {
+      digits = '63${digits.substring(1)}';
+    } else if (digits.startsWith('9')) {
+      digits = '63$digits';
+    } else if (digits.startsWith('0')) {
+      digits = '63${digits.substring(1)}';
+    } else if (digits.startsWith('63')) {
+      // already normalized
+    }
+
+    return digits; // returns "639XXXXXXXXX"
   }
 
-  Future<void> _createAccount({
-    required Map<String, dynamic>? residentAddress,
-    required Map<String, dynamic>? workAddress,
-    required Map<String, dynamic>? homeAddress,
-    required Map<String, dynamic>? schoolAddress,
-  }) async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  final normalizedPhone = normalizePhone(phoneInput);
+
+  bool duplicateEmail = false;
+  bool duplicatePhone = false;
+
+  try {
+    // Check duplicates via Supabase RPC
+    final rpcResult = await supabase.rpc(
+      'check_user_exists',
+      params: {'p_email': email, 'p_phone': normalizedPhone},
+    );
+
+    if (rpcResult != null && rpcResult is Map<String, dynamic>) {
+      duplicateEmail =
+          (rpcResult['auth_email'] == true) || (rpcResult['app_email'] == true);
+      duplicatePhone = (rpcResult['app_phone'] == true);
+    }
+  } catch (e) {
+    debugPrint('RPC duplicate check failed: $e');
+  }
+
+  // Stop registration if duplicate found
+  if (duplicateEmail || duplicatePhone) {
+    String message = '';
+    if (duplicateEmail && duplicatePhone) {
+      message =
+          'This email and phone number are already registered. Please use different credentials.';
+    } else if (duplicateEmail) {
+      message = 'This email is already registered. Please use a different one.';
+    } else if (duplicatePhone) {
+      message =
+          'This phone number is already registered. Please use a different one.';
+    }
+
+    _showErrorDialog(message);
+    return; // Prevent navigation
+  }
+
+  // Continue only if no duplicates
+  final residentAddress = _buildResidentAddress();
+  final workAddress = _buildWorkAddress();
+  final homeAddress = _buildHomeAddress();
+  final schoolAddress = _buildSchoolAddress();
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => VerifyInfoScreen(
+        lastName: _lastNameController.text.trim(),
+        firstName: _firstNameController.text.trim(),
+        middleName: _hasMiddleName ? _middleNameController.text.trim() : "",
+        email: email,
+        phone: phoneInput,
+        password: _passwordController.text,
+        userCategory: _selectedCategory,
+        residentAddress:
+            _selectedCategory == "RESIDENT" ? residentAddress : null,
+        workAddress: _selectedCategory == "EMPLOYEE" ? workAddress : null,
+        homeAddress:
+            (_selectedCategory == "EMPLOYEE" || _selectedCategory == "STUDENT")
+                ? homeAddress
+                : null,
+        schoolAddress:
+            _selectedCategory == "STUDENT" ? schoolAddress : null,
+        onConfirm: () {
+          _createAccount(
+            residentAddress: residentAddress,
+            workAddress: workAddress,
+            homeAddress: homeAddress,
+            schoolAddress: schoolAddress,
+          );
+        },
+        onEdit: () => Navigator.pop(context),
+      ),
+    ),
+  );
+}
+
+Future<void> _createAccount({
+  required Map<String, dynamic>? residentAddress,
+  required Map<String, dynamic>? workAddress,
+  required Map<String, dynamic>? homeAddress,
+  required Map<String, dynamic>? schoolAddress,
+}) async {
+  setState(() {
+    _isLoading = true;
+    _errorMessage = null;
+  });
+
+  try {
+    final email = _emailController.text.trim().toLowerCase();
+    final password = _passwordController.text.trim();
+    final phoneInput = _phoneController.text.trim();
+
+    // Normalize phone number for duplicate checking
+    String normalizePhone(String input) {
+      String digits = input.replaceAll(RegExp(r'\D'), '');
+
+      if (digits.startsWith('09')) {
+        digits = '63${digits.substring(1)}';
+      } else if (digits.startsWith('9')) {
+        digits = '63$digits';
+      } else if (digits.startsWith('0')) {
+        digits = '63${digits.substring(1)}';
+      } else if (digits.startsWith('63')) {
+        // already normalized
+      }
+
+      return digits;
+    }
+
+    final normalizedPhone = normalizePhone(phoneInput);
+    bool duplicateEmail = false;
+    bool duplicatePhone = false;
 
     try {
-      final email = _emailController.text.trim().toLowerCase();
-      final password = _passwordController.text.trim();
-      
-      debugPrint('Starting registration for: $email');
-
-      // ✅ FIXED: Sign up with ALL metadata that the trigger needs
-      final AuthResponse authResponse = await supabase.auth.signUp(
-        email: email,
-        password: password,
-        data: {
-          'type': 'app', // This tells the trigger to create app_users record
-          'first_name': _firstNameController.text.trim(),
-          'last_name': _lastNameController.text.trim(),
-          'middle_name': _hasMiddleName ? _middleNameController.text.trim() : null,
-          'phone': _phoneController.text.trim().isNotEmpty 
-              ? '+63${_phoneController.text.trim()}' 
-              : null,
-          'user_category': _selectedCategory,
-          'resident_address': _selectedCategory == "RESIDENT" ? residentAddress : null,
-          'work_address': _selectedCategory == "EMPLOYEE" ? workAddress : null,
-          'home_address': (_selectedCategory == "EMPLOYEE" || _selectedCategory == "STUDENT")
-              ? homeAddress
-              : null,
-          'school_address': _selectedCategory == "STUDENT" ? schoolAddress : null,
-        },
+      // Use the same RPC
+      final rpcResult = await supabase.rpc(
+        'check_user_exists',
+        params: {'p_email': email, 'p_phone': normalizedPhone},
       );
 
-      if (authResponse.user == null) {
-        throw Exception('Failed to create user account in Auth');
+      if (rpcResult != null && rpcResult is Map<String, dynamic>) {
+        duplicateEmail =
+            (rpcResult['auth_email'] == true) || (rpcResult['app_email'] == true);
+        duplicatePhone = (rpcResult['app_phone'] == true);
       }
-
-      debugPrint('Auth user created: ${authResponse.user!.id}');
-      debugPrint('Session exists: ${authResponse.session != null}');
-      debugPrint('User email: ${authResponse.user!.email}');
-
-      // The trigger should now automatically create the app_users record
-      // Let's wait a moment and verify the record was created
-      await Future.delayed(const Duration(seconds: 2));
-
-      // Verify the app_users record was created by the trigger
-      try {
-        final userRecord = await supabase
-            .from('app_users')
-            .select()
-            .eq('id', authResponse.user!.id)
-            .single();
-
-        debugPrint('app_users record created by trigger: ${userRecord['id']}');
-      } catch (e) {
-        debugPrint('Trigger may not have created app_users record yet: $e');
-      }
-
-      if (!mounted) return;
-      
-      // Show success message
-      _showSuccessDialog();
-
-    } on AuthException catch (e) {
-      debugPrint('AuthException: ${e.message}');
-      final errorMsg = _getAuthErrorMessage(e);
-      setState(() => _errorMessage = errorMsg);
-      _showErrorDialog(errorMsg);
-    } catch (e, stackTrace) {
-      debugPrint('Unexpected error: $e');
-      debugPrint('Stack trace: $stackTrace');
-      
-      // Show generic error
-      _showErrorDialog('Registration failed. Please try again.');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    } catch (rpcError) {
+      debugPrint('check_user_exists RPC failed: $rpcError');
     }
+
+    // Stop if duplicates exist
+    if (duplicateEmail || duplicatePhone) {
+      String message = '';
+      if (duplicateEmail && duplicatePhone) {
+        message =
+            'This email and phone number are already registered. Please use different credentials.';
+      } else if (duplicateEmail) {
+        message = 'This email is already registered. Please use a different one.';
+      } else if (duplicatePhone) {
+        message =
+            'This phone number is already registered. Please use a different one.';
+      }
+
+      setState(() => _errorMessage = message);
+      _showErrorDialog(message);
+      return;
+    }
+
+    // Proceed with account creation
+    final AuthResponse authResponse = await supabase.auth.signUp(
+      email: email,
+      password: password,
+      data: {
+        'type': 'app',
+        'first_name': _firstNameController.text.trim(),
+        'last_name': _lastNameController.text.trim(),
+        'middle_name': _hasMiddleName ? _middleNameController.text.trim() : null,
+        'phone': '+$normalizedPhone', 
+        'user_category': _selectedCategory,
+        'resident_address': _selectedCategory == "RESIDENT" ? residentAddress : null,
+        'work_address': _selectedCategory == "EMPLOYEE" ? workAddress : null,
+        'home_address': (_selectedCategory == "EMPLOYEE" || _selectedCategory == "STUDENT")
+            ? homeAddress
+            : null,
+        'school_address': _selectedCategory == "STUDENT" ? schoolAddress : null,
+      },
+    );
+
+    if (authResponse.user == null) {
+      throw Exception('Failed to create user account in Auth');
+    }
+
+    debugPrint('Auth user created: ${authResponse.user!.id}');
+    _showSuccessDialog();
+  } on AuthException catch (e) {
+    final errorMsg = _getAuthErrorMessage(e);
+    setState(() => _errorMessage = errorMsg);
+    _showErrorDialog(errorMsg);
+  } catch (e, stack) {
+    debugPrint('Unexpected error: $e');
+    debugPrint('Stack trace: $stack');
+    _showErrorDialog('Registration failed. Please try again.');
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
   }
+}
 
   void _showSuccessDialog() {
     showDialog(

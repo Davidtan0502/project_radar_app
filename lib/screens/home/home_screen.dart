@@ -11,8 +11,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:project_radar_app/widgets/capitalize_names.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:project_radar_app/screens/profile/profile%20navigation/account_information.dart';
-
-// Added imports required by the Recent Incidents module:
 import 'package:intl/intl.dart';
 import 'package:project_radar_app/screens/alerts/report_tracker_screen.dart';
 
@@ -1266,28 +1264,38 @@ class _HomeScreenState extends State<HomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Flexible(
+                            fit: FlexFit.loose,
                             child: Text(
                               name.isNotEmpty ? name : 'Unknown User',
                               style: GoogleFonts.poppins(
                                 fontSize: isSmallScreen ? 16 : 17,
                                 fontWeight: FontWeight.w700,
                               ),
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
+                              softWrap: true,
                             ),
                           ),
                           if (shouldShowVerified) ...[
-                            SizedBox(width: isSmallScreen ? 4 : 6),
+                            SizedBox(width: isSmallScreen ? 3 : 3),
                             Icon(
                               Icons.verified,
-                              size: isSmallScreen ? 16 : 18,
+                              size: isSmallScreen ? 15 : 16,
                               color: Colors.blueAccent[400],
                             ),
                           ],
                         ],
                       ),
-                      SizedBox(height: isSmallScreen ? 6 : 8),
+                      SizedBox(height: isSmallScreen ? 1 : 1),
+
+                      // Address container: left padding removed so label + address align with name's left start
                       Container(
-                        padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
+                        padding: EdgeInsets.only(
+                          left: 0,
+                          top: isSmallScreen ? 5 : 5,
+                          right: isSmallScreen ? 10 : 12,
+                          bottom: isSmallScreen ? 10 : 12,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.grey[50],
                           borderRadius: BorderRadius.circular(10),

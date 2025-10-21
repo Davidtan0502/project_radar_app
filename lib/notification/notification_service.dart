@@ -20,6 +20,7 @@ class NotificationService {
   // State management
   final ValueNotifier<int> unreadCount = ValueNotifier<int>(0);
   final Set<String> _processedUpdateKeys = {};
+  final Map<String, String?> _knownIncidentStatus = {}; // <-- NEW: store last-known status per incident id
   String? _currentUserId;
   GlobalKey<NavigatorState>? _navigatorKey;
 
@@ -178,20 +179,74 @@ class NotificationService {
     }
   }
 
+  /// IMPORTANT FIX:
+  /// Before subscribing to the realtime stream, fetch the current incidents for the user
+  /// and populate `_knownIncidentStatus` so the initial snapshot from Supabase will not be treated as new updates.
   void _startIncidentListenerForUser(String userId) {
     _stopIncidentListener();
+    _knownIncidentStatus.clear(); // clear any previous user state
+    _processedUpdateKeys.clear();
 
     try {
-      // Use Supabase Realtime to listen for incident updates for this user
-      _incidentSubscription = _supabase
+      // 1) Fetch current incidents for the user to capture their current status
+      _supabase
           .from('incidents')
-          .stream(primaryKey: ['id'])
+          .select('id, status, last_updated')
           .eq('user_id', userId)
-          .listen((List<Map<String, dynamic>> incidents) {
-        for (final incident in incidents) {
-          _handleIncidentUpdate(incident);
+          .then((response) {
+        try {
+          if (response is List) {
+            for (final row in response) {
+              try {
+                final map = Map<String, dynamic>.from(row as Map);
+                final id = map['id']?.toString();
+                final status = map['status']?.toString();
+                if (id != null) {
+                  _knownIncidentStatus[id] = status;
+                  // Also populate processed key so we don't re-process identical initial state
+                  final key = '$id|${status ?? "null"}';
+                  _processedUpdateKeys.add(key);
+                }
+              } catch (e) {
+                // ignore per-row parse errors
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Error parsing initial incidents snapshot: $e');
         }
-      }, onError: (e) => debugPrint('Incident listener error: $e'));
+
+        // 2) Now subscribe to realtime stream. Incoming events will be compared against _knownIncidentStatus.
+        try {
+          _incidentSubscription = _supabase
+              .from('incidents')
+              .stream(primaryKey: ['id'])
+              .eq('user_id', userId)
+              .listen((List<Map<String, dynamic>> incidents) {
+            for (final incident in incidents) {
+              _handleIncidentUpdate(incident);
+            }
+          }, onError: (e) => debugPrint('Incident listener error: $e'));
+        } catch (e) {
+          debugPrint('Error starting incident listener for user $userId: $e');
+        }
+      }).catchError((e) {
+        debugPrint('Failed to fetch initial incidents for user $userId: $e');
+        // Still attempt to subscribe even if initial fetch failed
+        try {
+          _incidentSubscription = _supabase
+              .from('incidents')
+              .stream(primaryKey: ['id'])
+              .eq('user_id', userId)
+              .listen((List<Map<String, dynamic>> incidents) {
+            for (final incident in incidents) {
+              _handleIncidentUpdate(incident);
+            }
+          }, onError: (e) => debugPrint('Incident listener error: $e'));
+        } catch (err) {
+          debugPrint('Error starting incident listener fallback for user $userId: $err');
+        }
+      });
     } catch (e) {
       debugPrint('Error starting incident listener for user $userId: $e');
     }
@@ -200,6 +255,7 @@ class NotificationService {
   void _stopIncidentListener() {
     _incidentSubscription?.cancel();
     _incidentSubscription = null;
+    _knownIncidentStatus.clear(); // clear known statuses when stopping
   }
 
   Future<void> _joinPresenceChannel(String userId) async {
@@ -305,14 +361,26 @@ class NotificationService {
       final userId = incident['user_id']?.toString();
       final updateKey = '$incidentId|${currentStatus ?? "null"}';
 
-      // Avoid processing duplicates
+      if (incidentId == null) return;
+
+      // If we have a known status for this incident and it's equal to the incoming status, skip it.
+      final knownStatus = _knownIncidentStatus[incidentId];
+      if (knownStatus != null && knownStatus == currentStatus) {
+        // No actual change since the last known state — skip notification.
+        return;
+      }
+
+      // Avoid processing duplicates (still useful for rapid duplicate events)
       if (_processedUpdateKeys.contains(updateKey)) return;
       _processedUpdateKeys.add(updateKey);
-      
+
       // Clean up old keys
       if (_processedUpdateKeys.length > 200) {
         _processedUpdateKeys.remove(_processedUpdateKeys.first);
       }
+
+      // Update our known status map so future duplicates are ignored
+      _knownIncidentStatus[incidentId] = currentStatus;
 
       // Only process if this is for the current user
       if (userId != _currentUserId) return;
@@ -320,7 +388,7 @@ class NotificationService {
       // Handle status changes
       if (previousStatus != currentStatus && currentStatus != null) {
         _sendStatusUpdateNotification(
-          incidentId: incidentId!,
+          incidentId: incidentId,
           incidentType: incident['incident_type']?.toString() ?? 'Incident',
           oldStatus: previousStatus ?? 'Unknown',
           newStatus: currentStatus,
@@ -337,7 +405,7 @@ class NotificationService {
           if (lastUpdated != null &&
               DateTime.now().difference(lastUpdated).inMinutes < 10) {
             _sendAdminNoteNotification(
-              incidentId: incidentId!,
+              incidentId: incidentId,
               incidentType: incident['incident_type']?.toString() ?? 'Incident',
               adminNote: adminNote,
               userId: userId,
@@ -625,6 +693,7 @@ class NotificationService {
       _stopIncidentListener();
       await _removeUserFromPresence(userId);
       _processedUpdateKeys.clear();
+      _knownIncidentStatus.clear();
       _currentUserId = null;
       unreadCount.value = 0;
 
@@ -644,6 +713,7 @@ class NotificationService {
 
   void dispose() {
     _processedUpdateKeys.clear();
+    _knownIncidentStatus.clear();
     unreadCount.dispose();
     _stopIncidentListener();
     _presenceChannel?.unsubscribe();

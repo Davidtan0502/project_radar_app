@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
@@ -21,11 +22,38 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   final SupabaseClient supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _statusUpdates = [];
   bool _loadingStatusUpdates = false;
+  StreamSubscription<dynamic>? _statusStreamSub;
 
   @override
   void initState() {
     super.initState();
     _loadStatusUpdates();
+
+    // Subscribe to realtime updates on incident_status_updates for this incident
+    try {
+      _statusStreamSub = supabase
+          .from('incident_status_updates')
+          .stream(primaryKey: ['id'])
+          .eq('incident_id', widget.report['id'])
+          .listen((payload) {
+        // payload is a List<Map<String, dynamic>> of the current table rows for the filter
+        if (payload != null) {
+          setState(() {
+            _statusUpdates = List<Map<String, dynamic>>.from(payload);
+          });
+        }
+      });
+    } catch (e) {
+      debugPrint('Failed to start status updates stream: $e');
+      // Keep working with manual refresh & initial created fallback
+    }
+  }
+
+  @override
+  void dispose() {
+    _statusStreamSub?.cancel();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadStatusUpdates() async {
@@ -40,10 +68,13 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           .eq('incident_id', widget.report['id'])
           .order('created_at', ascending: true);
 
-      if (response != null) {
+      if (response != null && response is List) {
         setState(() {
           _statusUpdates = List<Map<String, dynamic>>.from(response);
         });
+      } else {
+        // No rows returned -> create fallback initial pending
+        _createInitialStatusUpdate();
       }
     } catch (e) {
       debugPrint("Error loading status updates: $e");
@@ -63,8 +94,9 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
       'note': 'Incident reported',
       'updated_by': widget.report['name'] ?? 'Anonymous',
       'created_at': widget.report['timestamp'] ?? widget.report['created_at'] ?? DateTime.now().toIso8601String(),
+      'is_initial': true,
     };
-    
+
     setState(() {
       _statusUpdates = [initialUpdate];
     });
@@ -82,7 +114,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
       if (response != null) {
         // Reload status updates when refreshing the report
         await _loadStatusUpdates();
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text("Report refreshed successfully"),
@@ -156,12 +188,6 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
   }
 
   @override
@@ -271,17 +297,17 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     if (barangay.isEmpty) {
       return rawAddress;
     }
-    
+
     // Check if barangay is already part of the address
     if (rawAddress.toLowerCase().contains(barangay.toLowerCase())) {
       return rawAddress;
     }
-    
+
     // Check if barangay is the same as city (common when Google Maps doesn't have barangay data)
     if (city.isNotEmpty && barangay.toLowerCase() == city.toLowerCase()) {
       return rawAddress; // Don't add duplicate
     }
-    
+
     // Check if address ends with city and barangay is different
     if (city.isNotEmpty && rawAddress.toLowerCase().endsWith(city.toLowerCase())) {
       // Replace city with barangay if they're different but address contains city
@@ -290,7 +316,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
       }
       return rawAddress;
     }
-    
+
     // Default: add barangay to address
     return '$rawAddress, $barangay';
   }
@@ -299,19 +325,19 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     final String incidentType = data['incident_type'] ?? "Incident";
     final String description = data['description'] ?? "No description provided";
     final String status = data['status'] ?? "Pending";
-    
+
     // Get address components
     final String rawAddress = data['address'] ?? "Unknown address";
     final String barangay = data['barangay'] ?? "";
     final String city = data['city'] ?? "";
-    
+
     // Smart address formatting to avoid duplicates
     final String address = _formatAddress(rawAddress, barangay, city);
-    
+
     final String name = data['name'] ?? "Anonymous";
     final String contactNumber = data['contact_number'] ?? "Not provided";
-    final double? latitude = data['latitude'] as double?;
-    final double? longitude = data['longitude'] as double?;
+    final double? latitude = (data['latitude'] is num) ? (data['latitude'] as num).toDouble() : null;
+    final double? longitude = (data['longitude'] is num) ? (data['longitude'] as num).toDouble() : null;
     final bool requiresReview = data['requires_review'] ?? false;
     final double suspicionScore = (data['suspicion_score'] ?? 0.0).toDouble();
     final List<dynamic> imageUrls = data['image_urls'] ?? [];
@@ -319,7 +345,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     // Handle timestamp conversion from Supabase
     final String formattedDate;
     final String timeDetail;
-    
+
     if (data['timestamp'] != null) {
       DateTime timestamp;
       if (data['timestamp'] is String) {
@@ -352,10 +378,11 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
             requiresReview,
             suspicionScore,
             imageUrls,
+            data, // pass data so timeline can reference the latest row
           ),
         ),
         SliverToBoxAdapter(
-          child: _buildTimeline(),
+          child: _buildTimeline(data),
         ),
         const SliverToBoxAdapter(
           child: SizedBox(height: 20),
@@ -378,7 +405,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     bool requiresReview,
     double suspicionScore,
     List<dynamic> imageUrls,
+    Map<String, dynamic> latestData,
   ) {
+    final String landmark = latestData['landmark'] ?? '';
+
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -431,7 +461,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           const SizedBox(height: 8),
           Text('$formattedDate • $timeDetail',
               style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-          
+
           // Suspicion Score & Review Required
           if (requiresReview || suspicionScore > 0.5) ...[
             const SizedBox(height: 12),
@@ -441,13 +471,13 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                   _buildWarningChip("Requires Review", Icons.warning_amber),
                 if (suspicionScore > 0.5)
                   _buildWarningChip(
-                    "Suspicion: ${(suspicionScore * 100).toStringAsFixed(0)}%", 
-                    Icons.psychology
+                    "Suspicion: ${(suspicionScore * 100).toStringAsFixed(0)}%",
+                    Icons.psychology,
                   ),
               ],
             ),
           ],
-          
+
           const SizedBox(height: 16),
           // Description with expand/collapse
           Column(
@@ -493,17 +523,21 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           _buildInfoRow(Icons.location_on, "Location", address,
               onTap: () => _showLocationOnMap(address),
               onCopy: () => _copyToClipboard(address, "Address copied")),
+          // Landmark row (NEW: displays landmark from incidents table)
+          if (landmark.isNotEmpty)
+            _buildInfoRow(Icons.place, "Landmark", landmark,
+                onCopy: () => _copyToClipboard(landmark, "Landmark copied")),
           _buildInfoRow(Icons.person, "Reported by", name,
               onCopy: () => _copyToClipboard(name, "Name copied")),
           _buildInfoRow(Icons.phone, "Contact", contactNumber,
               onCopy: () => _copyToClipboard(contactNumber, "Number copied")),
-          
+
           // Coordinates if available
           if (latitude != null && longitude != null) ...[
             const SizedBox(height: 8),
             _buildCoordinatesRow(latitude, longitude),
           ],
-          
+
           // Images if available
           if (imageUrls.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -669,7 +703,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     );
   }
 
-  Widget _buildTimeline() {
+  // Combines JSONB in incidents, rows from incident_status_updates table, and a fallback pending
+  Widget _buildTimeline(Map<String, dynamic> latestIncident) {
     if (_loadingStatusUpdates) {
       return Container(
         margin: const EdgeInsets.all(16),
@@ -693,27 +728,60 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
       );
     }
 
-    // Create combined timeline with initial pending status if needed
-    final List<Map<String, dynamic>> allStatusUpdates = [];
-    
-    // Add initial pending status if it's not in the updates and current status is pending
-    final hasInitialPending = _statusUpdates.any((update) => 
-        (update['status'] ?? '').toString().toLowerCase() == 'pending');
-    
-    final currentStatus = widget.report['status']?.toString().toLowerCase() ?? 'pending';
-    
-    if (!hasInitialPending && currentStatus == 'pending') {
-      allStatusUpdates.add({
-        'status': 'pending',
+    // Start with JSONB updates from incidents (if any)
+    final List<Map<String, dynamic>> combined = [];
+
+    final dynamic jsonbRaw = latestIncident['incident_status_updates'];
+    if (jsonbRaw != null) {
+      try {
+        if (jsonbRaw is List) {
+          for (var elem in jsonbRaw) {
+            if (elem is Map) {
+              combined.add(Map<String, dynamic>.from(elem));
+            } else if (elem is Map<String, dynamic>) {
+              combined.add(elem);
+            } else {
+              // ignore non-map entries
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error parsing incident_status_updates JSONB: $e');
+      }
+    }
+
+    // Add rows loaded from the separate table (these come from _statusUpdates)
+    combined.addAll(_statusUpdates);
+
+    // Deduplicate by status + created_at (or status+note if created_at missing)
+    final seen = <String>{};
+    final List<Map<String, dynamic>> deduped = [];
+    for (final item in combined) {
+      final s = (item['status'] ?? '').toString().toLowerCase();
+      final created = item['created_at']?.toString() ?? item['timestamp']?.toString() ?? '';
+      final note = item['note']?.toString() ?? '';
+      final key = '$s|$created|$note';
+      if (!seen.contains(key)) {
+        seen.add(key);
+        deduped.add(item);
+      }
+    }
+
+    // Ensure initial pending is present (from incidents.status / created_at) as earliest if missing
+    final hasPending = deduped.any((u) => (u['status'] ?? '').toString().toLowerCase() == 'pending');
+    final currentStatus = latestIncident['status']?.toString().toLowerCase() ?? widget.report['status']?.toString().toLowerCase() ?? 'pending';
+    if (!hasPending) {
+      // Insert pending before others (we will sort later, but set created_at to incident creation to make it earliest)
+      deduped.insert(0, {
+        'status': 'pending', // always insert an initial "pending" entry
         'note': 'Incident reported',
-        'updated_by': widget.report['name'] ?? 'Anonymous',
-        'created_at': widget.report['timestamp'] ?? widget.report['created_at'] ?? DateTime.now().toIso8601String(),
+        'updated_by': latestIncident['name'] ?? widget.report['name'] ?? 'Anonymous',
+        'created_at': latestIncident['created_at'] ?? latestIncident['timestamp'] ?? widget.report['created_at'] ?? widget.report['timestamp'] ?? DateTime.now().toIso8601String(),
         'is_initial': true,
       });
     }
-    
-    // Add all the actual status updates
-    allStatusUpdates.addAll(_statusUpdates);
+
+    final allStatusUpdates = deduped;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
