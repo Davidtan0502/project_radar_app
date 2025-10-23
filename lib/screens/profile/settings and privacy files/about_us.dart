@@ -26,7 +26,7 @@ class AboutUs extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Container(
-        padding: const EdgeInsets.only(bottom: kBottomNavigationBarHeight + 20), // Added padding at the bottom
+        padding: const EdgeInsets.only(bottom: kBottomNavigationBarHeight + 60), // Added padding at the bottom
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -171,7 +171,7 @@ class AboutUs extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'STI Sta Mesa',
+                          'STI Academic Center, Santa Mesa',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey.shade600,

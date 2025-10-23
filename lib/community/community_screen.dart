@@ -481,6 +481,7 @@ class EvacuationDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white, // Added white background color
       appBar: AppBar(
         backgroundColor: const Color(0xFF3F73A3),
         title: Text(

@@ -295,36 +295,52 @@ class DonationInfoScreen extends StatelessWidget {
   }
 
   Widget _infoCard(IconData icon, String title, List<Widget> children) {
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            CircleAvatar(
-                backgroundColor: const Color(0xFFE8F1FF),
-                child: Icon(icon, color: const Color(0xFF3F73A3))),
-            const SizedBox(width: 12),
-            Expanded(
-                child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
-          ]),
-          const SizedBox(height: 8),
-          ...children,
-        ]), 
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          CircleAvatar(
+              backgroundColor: const Color(0xFFE8F1FF),
+              child: Icon(icon, color: const Color(0xFF3F73A3))),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
+        ]),
+        const SizedBox(height: 8),
+        ...children,
+      ]), 
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Keep the improved scroll layout — SafeArea + LayoutBuilder + ConstrainedBox + IntrinsicHeight
+    const primaryColor = Color(0xFF3F73A3);
+    
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('How to Donate?'),
-        backgroundColor: const Color(0xFF3F73A3),
+        title: const Text(
+          'How to Donate?',
+          style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+        ),
+        centerTitle: true,
         elevation: 0,
+        backgroundColor: primaryColor,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SafeArea(
         child: LayoutBuilder(builder: (context, constraints) {
@@ -372,80 +388,86 @@ class DonationInfoScreen extends StatelessWidget {
 
                     const SizedBox(height: 16),
 
-                    // Contact card (address, phone, email, map)
-                    Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: const [
-                                Icon(Icons.place, color: Color(0xFF3F73A3)),
-                                SizedBox(width: 8),
-                                Text('DSWD Field Office NCR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(_dlswAddress, style: const TextStyle(color: Colors.black87)),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                const Icon(Icons.phone, size: 18, color: Colors.black54),
-                                const SizedBox(width: 8),
-                                Text(_dlswPhone, style: const TextStyle(fontSize: 14)),
-                                const Spacer(),
-                                TextButton(
-                                  onPressed: () => _launchPhone(context),
-                                  child: const Text('Call'),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(Icons.email, size: 18, color: Colors.black54),
-                                const SizedBox(width: 8),
-                                Expanded(child: Text(_dlswEmail, style: const TextStyle(fontSize: 14))),
-                                // CHANGED: Email button now shows an icon only (copy)
-                                TextButton(
-                                  onPressed: () async {
-                                    try {
-                                      await Clipboard.setData(const ClipboardData(text: _dlswEmail));
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Email address copied to clipboard')),
-                                        );
-                                      }
-                                    } catch (e) {
-                                      debugPrint('Error copying email to clipboard: $e');
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Could not copy email')),
-                                        );
-                                      }
+                    // Contact card (address, phone, email, map) - Updated to white background
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.place, color: primaryColor),
+                              const SizedBox(width: 8),
+                              Text('DSWD Field Office NCR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: primaryColor)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(_dlswAddress, style: const TextStyle(color: Colors.black87)),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.phone, size: 18, color: primaryColor),
+                              const SizedBox(width: 8),
+                              Text(_dlswPhone, style: const TextStyle(fontSize: 14)),
+                              const Spacer(),
+                              TextButton(
+                                onPressed: () => _launchPhone(context),
+                                child: const Text('Call'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(Icons.email, size: 18, color: primaryColor),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(_dlswEmail, style: const TextStyle(fontSize: 14))),
+                              TextButton(
+                                onPressed: () async {
+                                  try {
+                                    await Clipboard.setData(const ClipboardData(text: _dlswEmail));
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Email address copied to clipboard')),
+                                      );
                                     }
-                                  },
-                                  child: const Icon(Icons.copy, size: 20),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(Icons.location_on, size: 18, color: Colors.black54),
-                                const SizedBox(width: 8),
-                                const Expanded(child: Text('DSWD Field Office NCR — Manila', style: TextStyle(fontSize: 14))),
-                                TextButton(
-                                  onPressed: () => _launchMaps(context),
-                                  child: const Text('Open map'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                                  } catch (e) {
+                                    debugPrint('Error copying email to clipboard: $e');
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Could not copy email')),
+                                      );
+                                    }
+                                  }
+                                },
+                                child: const Icon(Icons.copy, size: 20),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(Icons.location_on, size: 18, color: primaryColor),
+                              const SizedBox(width: 8),
+                              const Expanded(child: Text('DSWD Field Office NCR — Manila', style: TextStyle(fontSize: 14))),
+                              TextButton(
+                                onPressed: () => _launchMaps(context),
+                                child: const Text('Open map'),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
 
@@ -469,6 +491,8 @@ class DonationInfoScreen extends StatelessWidget {
                       ],
                     ),
 
+                    const SizedBox(height: 16),
+
                     _infoCard(
                       Icons.local_shipping,
                       "For In-Kind Donations via Courier",
@@ -478,6 +502,8 @@ class DonationInfoScreen extends StatelessWidget {
                         const Text("• Arrange Delivery: Use courier services like Grab, Lalamove, or J&T Express to deliver your items."),
                       ],
                     ),
+
+                    const SizedBox(height: 16),
 
                     _infoCard(
                       Icons.description,
@@ -490,6 +516,8 @@ class DonationInfoScreen extends StatelessWidget {
                         const Text("• A plan of distribution endorsed by the relevant DSWD Field Office is necessary."),
                       ],
                     ),
+
+                    const SizedBox(height: 16),
 
                     _infoCard(
                       Icons.info,

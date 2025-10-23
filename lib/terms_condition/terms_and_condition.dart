@@ -20,6 +20,7 @@ class TermsConditionScreen {
         final double dialogMaxHeight = media.size.height * 0.78; // max height to avoid overflow
 
         return Dialog(
+          backgroundColor: Colors.white, // ONLY CHANGE: Added white background
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -110,6 +111,7 @@ class TermsConditionScreen {
                           value: _scrollProgress,
                           minHeight: 4,
                           backgroundColor: Colors.grey.shade200,
+                          valueColor: AlwaysStoppedAnimation<Color>(const Color(0xFF3F73A3)), // Project RADAR blue
                         ),
                       ),
 
@@ -125,6 +127,7 @@ class TermsConditionScreen {
                               controller: _scrollController,
                               child: SingleChildScrollView(
                                 controller: _scrollController,
+                                padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 8.0), // Added padding inside scrollable area
                                 child: SelectableText.rich(
                                   TextSpan(
                                     style: const TextStyle(
@@ -291,19 +294,37 @@ class TermsConditionScreen {
                               child: AnimatedOpacity(
                                 duration: const Duration(milliseconds: 200),
                                 opacity: _canAccept ? 0.0 : 1.0, // hide when already reached bottom
-                                child: FloatingActionButton.small(
-                                  heroTag: 'jump_to_bottom',
-                                  onPressed: () {
-                                    // animate to bottom
-                                    if (_scrollController.hasClients) {
-                                      _scrollController.animateTo(
-                                        _scrollController.position.maxScrollExtent,
-                                        duration: const Duration(milliseconds: 400),
-                                        curve: Curves.easeOut,
-                                      );
-                                    }
-                                  },
-                                  child: const Icon(Icons.arrow_downward),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF3F73A3), // Project RADAR blue
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.blue.withOpacity(0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: FloatingActionButton.small(
+                                    heroTag: 'jump_to_bottom',
+                                    backgroundColor: const Color(0xFF3F73A3), // Project RADAR blue
+                                    onPressed: () {
+                                      // animate to bottom
+                                      if (_scrollController.hasClients) {
+                                        _scrollController.animateTo(
+                                          _scrollController.position.maxScrollExtent,
+                                          duration: const Duration(milliseconds: 400),
+                                          curve: Curves.easeOut,
+                                        );
+                                      }
+                                    },
+                                    child: const Icon(
+                                      Icons.arrow_downward,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -333,41 +354,89 @@ class TermsConditionScreen {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.redAccent,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                                border: Border.all(
+                                  color: Colors.red.shade100,
+                                  width: 1,
                                 ),
                               ),
-                              onPressed: () {
-                                // cleanup then close
-                                _cleanupAndPop(false);
-                              },
-                              child: const Text(
-                                'Decline',
-                                style: TextStyle(color: Colors.black87),
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  foregroundColor: Colors.red,
+                                  elevation: 0,
+                                  shadowColor: Colors.transparent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                ),
+                                onPressed: () {
+                                  // cleanup then close
+                                  _cleanupAndPop(false);
+                                },
+                                child: const Text(
+                                  'Decline',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 12),
                           Expanded(
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.blue.withOpacity(0.15),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                                border: Border.all(
+                                  color: Colors.blue.shade100,
+                                  width: 1,
                                 ),
                               ),
-                              onPressed: _canAccept
-                                  ? () {
-                                      // cleanup, close dialog and navigate to registration
-                                      _cleanupAndPop(true);
-                                    }
-                                  : null, // disabled until scrolled
-                              child: const Text(
-                                'Accept',
-                                style: TextStyle(color: Colors.black87),
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _canAccept ? const Color(0xFF3F73A3) : Colors.grey.shade300,
+                                  foregroundColor: _canAccept ? Colors.white : Colors.grey.shade600,
+                                  elevation: 0,
+                                  shadowColor: Colors.transparent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                ),
+                                onPressed: _canAccept
+                                    ? () {
+                                        // cleanup, close dialog and navigate to registration
+                                        _cleanupAndPop(true);
+                                      }
+                                    : null,
+                                child: const Text(
+                                  'Accept',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
