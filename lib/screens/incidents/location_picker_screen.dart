@@ -136,8 +136,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         _suppressAddressController = true;
 
         _addressController.text = address;
-        _barangayController.text = place.locality ?? '';
-        _streetController.text = place.street ?? '';
+        // _barangayController.text = place.locality ?? '';
+        // _streetController.text = place.street ?? '';
 
         // Release suppression after a short delay to avoid immediate re-trigger
         Future.delayed(const Duration(milliseconds: 150), () {
@@ -240,17 +240,33 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     }
   }
 
-  void _confirmLocation() {
-    if (_selectedLatLng == null) return;
+void _confirmLocation() {
+  if (_selectedLatLng == null) return;
 
-    Navigator.pop(context, {
-      "lat": _selectedLatLng!.latitude,
-      "lng": _selectedLatLng!.longitude,
-      "address": _addressController.text,
-      "barangay": _barangayController.text,
-      "street": _streetController.text,
-    });
+  final street = _streetController.text.trim();
+  final barangay = _barangayController.text.trim();
+  final baseAddress = _addressController.text.trim();
+  
+  String finalAddress;
+  
+  if (street.isNotEmpty || barangay.isNotEmpty) {
+    // User provided manual details - build enhanced address
+    finalAddress = [street, barangay, baseAddress]
+        .where((part) => part.isNotEmpty)
+        .join(', ');
+  } else {
+    // No manual details - use the geocoded address as-is
+    finalAddress = baseAddress;
   }
+
+  Navigator.pop(context, {
+    "lat": _selectedLatLng!.latitude,
+    "lng": _selectedLatLng!.longitude,
+    "address": finalAddress,
+    "barangay": _barangayController.text,
+    "street": _streetController.text,
+  });
+}
 
   // Adjust map padding when sheet is dragged
   // NOTE: older google_maps_flutter versions don't expose setPadding on the controller.
@@ -500,6 +516,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                           decoration: InputDecoration(
                             labelText: "Barangay",
                             labelStyle: const TextStyle(color: Colors.grey),
+                            hintText: "Add barangay", // ADD THIS LINE
                             prefixIcon: const Icon(Icons.location_city_outlined, size: 20),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -523,6 +540,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                           decoration: InputDecoration(
                             labelText: "No. / Building / Street / Zone",
                             labelStyle: const TextStyle(color: Colors.grey),
+                            hintText: "Add building, street, or zone", // ADD THIS LINE
                             prefixIcon: const Icon(Icons.home_outlined, size: 20),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),

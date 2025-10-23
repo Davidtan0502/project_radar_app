@@ -58,6 +58,8 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   final _formKey = GlobalKey<FormState>();
   bool _isFormDirty = false;
   bool _isSaving = false;
+  final Map<TextEditingController, String?> _fieldErrors = {};
+  AutovalidateMode _autoValidateMode = AutovalidateMode.onUserInteraction;
 
   // Basic Controllers
   final _firstNameController = TextEditingController();
@@ -149,6 +151,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     _initializeFormListeners();
     _addAddressCapitalizationListeners();
     _loadUserData();
+    _autoValidateMode = AutovalidateMode.onUserInteraction; //
 
     _bloodTypeController.addListener(() {
       final input = _bloodTypeController.text.toUpperCase();
@@ -805,284 +808,492 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
 }
 
   Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate() || _isSaving) return;
-    setState(() => _isSaving = true);
+  // DEBUG INSTRUMENTATION START
+debugPrint('=== _saveProfile() DEBUG RUN ===');
+debugPrint('_isSaving before start = $_isSaving');
+debugPrint('_autoValidateMode before start = $_autoValidateMode');
+debugPrint('_hasMiddleName = $_hasMiddleName');
+debugPrint('_userCategory = ${_userCategory ?? "<null>"}');
+
+// snapshot of controllers
+debugPrint('controllers snapshot:');
+final controllers = {
+  'First Name': _firstNameController.text,
+  'Middle Name': _middleNameController.text,
+  'Last Name': _lastNameController.text,
+  'Phone Number': _phoneController.text,
+  'Res House': _resHouseController.text,
+  'Res Street': _resStreetController.text,
+  'Res Barangay': _resBarangayController.text,
+  'Res City': _resCityController.text,
+  'Work Street': _workStreetController.text,
+  'Home Street': _homeStreetController.text,
+  'School Name': _schoolNameController.text,
+};
+controllers.forEach((k, v) => debugPrint('  $k => "${v}"'));
+
+// snapshot of _fieldErrors map
+debugPrint('_fieldErrors.keys: ${_fieldErrors.keys.toList()}');
+// human-friendly print for controller-keyed _fieldErrors
+debugPrint('_fieldErrors size: ${_fieldErrors.length}');
+_fieldErrors.forEach((ctrl, msg) {
+  // try to map controller -> label for readable logging
+  String label;
+  if (identical(ctrl, _firstNameController)) label = 'First Name';
+  else if (identical(ctrl, _middleNameController)) label = 'Middle Name';
+  else if (identical(ctrl, _lastNameController)) label = 'Last Name';
+  else if (identical(ctrl, _phoneController)) label = 'Phone Number';
+  else if (identical(ctrl, _resHouseController)) label = 'Res House';
+  else if (identical(ctrl, _resStreetController)) label = 'Res Street';
+  else if (identical(ctrl, _resBarangayController)) label = 'Res Barangay';
+  else if (identical(ctrl, _resCityController)) label = 'Res City';
+  else if (identical(ctrl, _workStreetController)) label = 'Work Street';
+  else if (identical(ctrl, _homeStreetController)) label = 'Home Street';
+  else if (identical(ctrl, _schoolNameController)) label = 'School Name';
+  else label = ctrl.toString(); // fallback
+  debugPrint('  _fieldErrors["$label"] = "$msg"');
+});
+
+// check form validator state quickly
+bool formValid = _formKey.currentState?.validate() ?? true;
+debugPrint('Form validate() returned: $formValid');
+// DEBUG INSTRUMENTATION END
+
+
+  // 2) Phone format guard (must start with 0 and be exactly 11 digits)
+  final phoneVal = _phoneController.text.trim();
+  if (!RegExp(r'^0\d{10}$').hasMatch(phoneVal)) {
+    // trigger phone field validator display (no SnackBar)
+    if (mounted) {
+      setState(() {}); // forces validators / UI update
+      _formKey.currentState!.validate();
+    }
+    return;
+  }
+
+  // 3) Address completeness guard based on category
+  final category = (_userCategory ?? '').toString().toUpperCase();
+
+  String? addressErrorMessage;
+
+  if (category == 'RESIDENT') {
+    if (_resHouseController.text.trim().isEmpty ||
+        _resStreetController.text.trim().isEmpty ||
+        _resBarangayController.text.trim().isEmpty ||
+        _resCityController.text.trim().isEmpty) {
+      addressErrorMessage = 'Please complete your resident address (House, Street, Barangay, City).';
+    }
+  } else if (category == 'EMPLOYEE') {
+    if (_workStreetController.text.trim().isEmpty ||
+        _workBarangayController.text.trim().isEmpty ||
+        _workCityController.text.trim().isEmpty) {
+      addressErrorMessage = 'Please complete your work address (Street, Barangay, City).';
+    } else if (_homeHouseController.text.trim().isEmpty ||
+        _homeStreetController.text.trim().isEmpty ||
+        _homeBarangayController.text.trim().isEmpty ||
+        _homeCityController.text.trim().isEmpty) {
+      addressErrorMessage = 'Please complete your home address (House, Street, Barangay, City).';
+    }
+  } else if (category == 'STUDENT') {
+    if (_schoolNameController.text.trim().isEmpty ||
+        _schoolStreetController.text.trim().isEmpty ||
+        _schoolBarangayController.text.trim().isEmpty ||
+        _schoolCityController.text.trim().isEmpty) {
+      addressErrorMessage = 'Please complete your school address (School name, Street, Barangay, City).';
+    } else if (_homeHouseController.text.trim().isEmpty ||
+        _homeStreetController.text.trim().isEmpty ||
+        _homeBarangayController.text.trim().isEmpty ||
+        _homeCityController.text.trim().isEmpty) {
+      addressErrorMessage = 'Please complete your home address (House, Street, Barangay, City).';
+    }
+  } else {
+    // fallback when category missing or other
+    if (_resHouseController.text.trim().isEmpty ||
+        _resStreetController.text.trim().isEmpty ||
+        _resBarangayController.text.trim().isEmpty ||
+        _resCityController.text.trim().isEmpty) {
+      addressErrorMessage = 'Please complete your address (House, Street, Barangay, City).';
+    }
+  }
+
+  if (addressErrorMessage != null) {
+    // Instead of SnackBar, show field-level errors via validators
+    if (mounted) {
+      setState(() {}); // validators should report empty-field errors under each affected TextFormField
+      _formKey.currentState!.validate();
+    }
+    return;
+  }
+
+  // All guards passed — start saving
+  setState(() => _isSaving = true);
+
+  try {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      setState(() => _isSaving = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Not authenticated'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
+    String? profileUrl;
+    if (_removeProfileImage) {
+      try {
+        await _supabase.storage
+            .from('profiles')
+            .remove(['profile_images/${user.id}.jpg']);
+      } catch (_) {}
+    } else if (_profileImage != null || _profileImageBytes != null) {
+      final img = _profileImage ?? _profileImageBytes!;
+      profileUrl = await _uploadImageToStorage(img, 'profile_images');
+
+      if (profileUrl == null && (img != null)) {
+        debugPrint('Profile upload failed; aborting save.');
+        if (mounted) {
+          Flushbar(
+            message: 'Failed to upload profile photo. Check storage permissions or network.',
+            duration: const Duration(seconds: 3),
+            backgroundColor: Colors.red,
+          ).show(context);
+        }
+        setState(() => _isSaving = false);
+        return;
+      }
+    }
+
+    String? idUrl;
+    if (_removeIdImage) {
+      try {
+        await _supabase.storage
+            .from('profiles')
+            .remove(['id_uploads/${user.id}.jpg']);
+      } catch (_) {}
+    } else if (_idImage != null || _idImageBytes != null) {
+      final img = _idImage ?? _idImageBytes!;
+      idUrl = await _uploadImageToStorage(img, 'id_uploads');
+
+      if (idUrl == null && (img != null)) {
+        debugPrint('ID upload failed; aborting save.');
+        if (mounted) {
+          Flushbar(
+            message: 'Failed to upload ID image. Check storage permissions or network.',
+            duration: const Duration(seconds: 3),
+            backgroundColor: Colors.red,
+          ).show(context);
+        }
+        setState(() => _isSaving = false);
+        return;
+      }
+    }
+
+    final updates = <String, dynamic>{
+      'first_name': _firstNameController.text.trim(),
+      'middle_name': _hasMiddleName ? _middleNameController.text.trim() : '',
+      'last_name': _lastNameController.text.trim(),
+      'email': _emailController.text.trim(),
+      'phone': _phoneController.text.trim(),
+      'dob': _dobController.text.trim(),
+      'blood_type': _bloodTypeController.text.trim(),
+      'height': _heightController.text.trim(),
+      'weight': _weightController.text.trim(),
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    if (profileUrl != null) {
+      updates['photo_url'] = profileUrl;
+      updates['photo_path'] = 'profile_images/${user.id}.jpg';
+    }
+    if (idUrl != null) {
+      updates['id_url'] = idUrl;
+      updates['id_path'] = 'id_uploads/${user.id}.jpg';
+    }
+
+    if (_removeProfileImage) {
+      updates['photo_url'] = null;
+      updates['photo_path'] = null;
+    }
+    if (_removeIdImage) {
+      updates['id_url'] = null;
+      updates['id_path'] = null;
+    }
+
+    if ((_userCategory ?? '').isNotEmpty) {
+      updates['user_category'] = (_userCategory ?? '').toString().toUpperCase();
+    }
+
+    final newCat = (_userCategory ?? '').toString().toUpperCase();
+    final oldCat = (_initialUserCategory ?? '').toString().toUpperCase();
+
+    if (newCat == 'RESIDENT') {
+      final map = _collectAddressMap(
+        house: _resHouseController,
+        street: _resStreetController,
+        barangay: _resBarangayController,
+        townMain: _resTownController,
+        townManual: _resTownManualController,
+        zip: _resZipController,
+        city: _resCityController,
+        country: _resCountryController,
+      );
+      updates['resident_address'] = map;
+      updates['address'] = _composeAddressStringFromMap(map);
+    } else if (newCat == 'EMPLOYEE') {
+      final workMap = _collectAddressMap(
+        house: TextEditingController(),
+        street: _workStreetController,
+        barangay: _workBarangayController,
+        townMain: _workTownController,
+        townManual: _workTownManualController,
+        zip: _workZipController,
+        city: _workCityController,
+        country: _workCountryController,
+      );
+      final homeMap = _collectAddressMap(
+        house: _homeHouseController,
+        street: _homeStreetController,
+        barangay: _homeBarangayController,
+        townMain: _homeTownController,
+        townManual: _homeTownManualController,
+        zip: _homeZipController,
+        city: _homeCityController,
+        country: _homeCountryController,
+      );
+      updates['work_address'] = workMap;
+      updates['home_address'] = homeMap;
+      updates['address'] = _composeAddressStringFromMap(homeMap);
+    } else if (newCat == 'STUDENT') {
+      final schoolMap = {
+        'school_name': _schoolNameController.text.trim(),
+        'street': _schoolStreetController.text.trim(),
+        'barangay': _schoolBarangayController.text.trim(),
+        'town': _getTownValue(_schoolTownController, _schoolTownManualController),
+        'zip': _schoolZipController.text.trim(),
+        'city': _schoolCityController.text.trim(),
+        'country': _schoolCountryController.text.trim(),
+      };
+      final homeMap = _collectAddressMap(
+        house: _homeHouseController,
+        street: _homeStreetController,
+        barangay: _homeBarangayController,
+        townMain: _homeTownController,
+        townManual: _homeTownManualController,
+        zip: _homeZipController,
+        city: _homeCityController,
+        country: _homeCountryController,
+      );
+      updates['school_address'] = schoolMap;
+      updates['home_address'] = homeMap;
+      updates['address'] = _composeAddressStringFromMap(homeMap);
+    }
+
+    if (oldCat != newCat) {
+      if (newCat == 'RESIDENT') {
+        updates['work_address'] = null;
+        updates['home_address'] = null;
+        updates['school_address'] = null;
+      } else if (newCat == 'EMPLOYEE') {
+        updates['resident_address'] = null;
+        updates['school_address'] = null;
+      } else if (newCat == 'STUDENT') {
+        updates['resident_address'] = null;
+        updates['work_address'] = null;
+      } else {
+        updates['resident_address'] = null;
+        updates['work_address'] = null;
+        updates['school_address'] = null;
+        updates['home_address'] = null;
+      }
+    }
+
+    debugPrint('DEBUG: database updates prepared = $updates');
+
+   // ---------- deterministic field-error population (controller-keyed) ----------
+    _fieldErrors.clear(); // clear earlier programmatic errors
+
+    // run the Form validators first
+    final formOk = _formKey.currentState?.validate() ?? true;
+
+    // personal fields
+    if (_firstNameController.text.trim().isEmpty) {
+      _fieldErrors[_firstNameController] = 'Please enter First Name';
+    }
+    if (_lastNameController.text.trim().isEmpty) {
+      _fieldErrors[_lastNameController] = 'Please enter Last Name';
+    }
+    if (_hasMiddleName == true && _middleNameController.text.trim().isEmpty) {
+      _fieldErrors[_middleNameController] = 'Please enter Middle Name';
+    }
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty) {
+      _fieldErrors[_phoneController] = 'Please enter Phone Number';
+    } else if (!RegExp(r'^0\d{10}$').hasMatch(phone)) {
+      _fieldErrors[_phoneController] = 'Enter a valid 11-digit number starting with 0';
+    }
+
+    // Address checks by category — set per-controller keys
+    final category = (_userCategory ?? '').toString().toUpperCase();
+if (category == 'RESIDENT') {
+if (_resHouseController.text.trim().isEmpty) _fieldErrors[_resHouseController] = 'Please enter House/Unit/Building No.';
+if (_resStreetController.text.trim().isEmpty) _fieldErrors[_resStreetController] = 'Please enter Street Name';
+if (_resBarangayController.text.trim().isEmpty) _fieldErrors[_resBarangayController] = 'Please enter Barangay/Subdivision';
+if (_resCityController.text.trim().isEmpty) _fieldErrors[_resCityController] = 'Please enter City/Municipality';
+} else if (category == 'EMPLOYEE') {
+if (_workStreetController.text.trim().isEmpty) _fieldErrors[_workStreetController] = 'Please enter Street/Building No.';
+if (_workBarangayController.text.trim().isEmpty) _fieldErrors[_workBarangayController] = 'Please enter Barangay/Subdivision';
+if (_workCityController.text.trim().isEmpty) _fieldErrors[_workCityController] = 'Please enter City/Municipality';
+if (_homeHouseController.text.trim().isEmpty) _fieldErrors[_homeHouseController] = 'Please enter House/Unit/Building No.';
+if (_homeStreetController.text.trim().isEmpty) _fieldErrors[_homeStreetController] = 'Please enter Street Name';
+if (_homeBarangayController.text.trim().isEmpty) _fieldErrors[_homeBarangayController] = 'Please enter Barangay/Subdivision';
+if (_homeCityController.text.trim().isEmpty) _fieldErrors[_homeCityController] = 'Please enter City/Municipality';
+} else if (category == 'STUDENT') {
+if (_schoolNameController.text.trim().isEmpty) _fieldErrors[_schoolNameController] = 'Please enter Full School Name';
+if (_schoolStreetController.text.trim().isEmpty) _fieldErrors[_schoolStreetController] = 'Please enter Street Name';
+if (_schoolBarangayController.text.trim().isEmpty) _fieldErrors[_schoolBarangayController] = 'Please enter Barangay/Subdivision';
+if (_schoolCityController.text.trim().isEmpty) _fieldErrors[_schoolCityController] = 'Please enter City/Municipality';
+if (_homeHouseController.text.trim().isEmpty) _fieldErrors[_homeHouseController] = 'Please enter House/Unit/Building No.';
+if (_homeStreetController.text.trim().isEmpty) _fieldErrors[_homeStreetController] = 'Please enter Street Name';
+if (_homeBarangayController.text.trim().isEmpty) _fieldErrors[_homeBarangayController] = 'Please enter Barangay/Subdivision';
+if (_homeCityController.text.trim().isEmpty) _fieldErrors[_homeCityController] = 'Please enter City/Municipality';
+} else {
+if (_resHouseController.text.trim().isEmpty) _fieldErrors[_resHouseController] = 'Please enter House/Unit/Building No.';
+if (_resStreetController.text.trim().isEmpty) _fieldErrors[_resStreetController] = 'Please enter Street Name';
+if (_resBarangayController.text.trim().isEmpty) _fieldErrors[_resBarangayController] = 'Please enter Barangay/Subdivision';
+if (_resCityController.text.trim().isEmpty) _fieldErrors[_resCityController] = 'Please enter City/Municipality';
+}
+
+
+if (_fieldErrors.isNotEmpty) {
+if (mounted) {
+setState(() {
+_autoValidateMode = AutovalidateMode.always;
+});
+}
+return;
+}
+
+
+debugPrint('_fieldErrors size: ${_fieldErrors.length}');
+_fieldErrors.forEach((ctrl, msg) {
+debugPrint(' _fieldErrors[${ctrl.hashCode}] = "$msg"');
+});
+
+    // Show errors if any — force form to display them (existing pattern)
+    if (_fieldErrors.isNotEmpty || !formOk) {
+      if (mounted) {
+        setState(() {
+          _autoValidateMode = AutovalidateMode.always;
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _formKey.currentState?.validate();
+            setState(() {}); // ensure controller-keyed errorText is picked up
+          }
+        });
+      }
+      return;
+    }
+    // ---------- end controller-keyed population ----------
+
+    // proceed with DB update
+    Map<String, dynamic>? returnedRow;
 
     try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) return;
+      final resp = await _supabase
+          .from('app_users')
+          .update(updates)
+          .eq('id', user.id)
+          .select()
+          .single();
 
-      String? profileUrl;
-if (_removeProfileImage) {
-  try {
-    await _supabase.storage
-        .from('profiles')
-        .remove(['profile_images/${user.id}.jpg']);
-  } catch (_) {}
-} else if (_profileImage != null || _profileImageBytes != null) {
-  final img = _profileImage ?? _profileImageBytes!;
-  profileUrl = await _uploadImageToStorage(img, 'profile_images');
+      debugPrint('DB update returned: $resp');
 
-  // If upload returned null but we expected an upload, stop and show error
-  if (profileUrl == null && (img != null)) {
-    debugPrint('Profile upload failed; aborting save.');
-    if (mounted) {
-      Flushbar(
-        message: 'Failed to upload profile photo. Check storage permissions or network.',
-        duration: const Duration(seconds: 3),
-        backgroundColor: Colors.red,
-      ).show(context);
-    }
-    setState(() => _isSaving = false);
-    return;
-  }
-}
-
-// same pattern for ID
-String? idUrl;
-if (_removeIdImage) {
-  try {
-    await _supabase.storage
-        .from('profiles')
-        .remove(['id_uploads/${user.id}.jpg']);
-  } catch (_) {}
-} else if (_idImage != null || _idImageBytes != null) {
-  final img = _idImage ?? _idImageBytes!;
-  idUrl = await _uploadImageToStorage(img, 'id_uploads');
-
-  if (idUrl == null && (img != null)) {
-    debugPrint('ID upload failed; aborting save.');
-    if (mounted) {
-      Flushbar(
-        message: 'Failed to upload ID image. Check storage permissions or network.',
-        duration: const Duration(seconds: 3),
-        backgroundColor: Colors.red,
-      ).show(context);
-    }
-    setState(() => _isSaving = false);
-    return;
-  }
-}
-
-      final updates = <String, dynamic>{
-        'first_name': _firstNameController.text.trim(),
-        'middle_name': _hasMiddleName ? _middleNameController.text.trim() : '',
-        'last_name': _lastNameController.text.trim(),
-        'email': _emailController.text.trim(),
-        'phone': _phoneController.text.trim(),
-        'dob': _dobController.text.trim(),
-        'blood_type': _bloodTypeController.text.trim(),
-        'height': _heightController.text.trim(),
-        'weight': _weightController.text.trim(),
-        'updated_at': DateTime.now().toIso8601String(),
-      };
-
-      if (profileUrl != null) {
-        updates['photo_url'] = profileUrl;
-        updates['photo_path'] = 'profile_images/${user.id}.jpg';
-      }
-      if (idUrl != null) {
-        updates['id_url'] = idUrl;
-        updates['id_path'] = 'id_uploads/${user.id}.jpg';
-      }
-
-      if (_removeProfileImage) {
-        updates['photo_url'] = null;
-        updates['photo_path'] = null;
-      }
-      if (_removeIdImage) {
-        updates['id_url'] = null;
-        updates['id_path'] = null;
-      }
-
-      if ((_userCategory ?? '').isNotEmpty) {
-        updates['user_category'] = (_userCategory ?? '').toString().toUpperCase();
-      }
-
-      final newCat = (_userCategory ?? '').toString().toUpperCase();
-      final oldCat = (_initialUserCategory ?? '').toString().toUpperCase();
-
-      if (newCat == 'RESIDENT') {
-        final map = _collectAddressMap(
-          house: _resHouseController,
-          street: _resStreetController,
-          barangay: _resBarangayController,
-          townMain: _resTownController,
-          townManual: _resTownManualController,
-          zip: _resZipController,
-          city: _resCityController,
-          country: _resCountryController,
-        );
-        updates['resident_address'] = map;
-        updates['address'] = _composeAddressStringFromMap(map);
-      } else if (newCat == 'EMPLOYEE') {
-        final workMap = _collectAddressMap(
-          house: TextEditingController(),
-          street: _workStreetController,
-          barangay: _workBarangayController,
-          townMain: _workTownController,
-          townManual: _workTownManualController,
-          zip: _workZipController,
-          city: _workCityController,
-          country: _workCountryController,
-        );
-        final homeMap = _collectAddressMap(
-          house: _homeHouseController,
-          street: _homeStreetController,
-          barangay: _homeBarangayController,
-          townMain: _homeTownController,
-          townManual: _homeTownManualController,
-          zip: _homeZipController,
-          city: _homeCityController,
-          country: _homeCountryController,
-        );
-        updates['work_address'] = workMap;
-        updates['home_address'] = homeMap;
-        updates['address'] = _composeAddressStringFromMap(homeMap);
-      } else if (newCat == 'STUDENT') {
-        final schoolMap = {
-          'school_name': _schoolNameController.text.trim(),
-          'street': _schoolStreetController.text.trim(),
-          'barangay': _schoolBarangayController.text.trim(),
-          'town': _getTownValue(_schoolTownController, _schoolTownManualController),
-          'zip': _schoolZipController.text.trim(),
-          'city': _schoolCityController.text.trim(),
-          'country': _schoolCountryController.text.trim(),
-        };
-        final homeMap = _collectAddressMap(
-          house: _homeHouseController,
-          street: _homeStreetController,
-          barangay: _homeBarangayController,
-          townMain: _homeTownController,
-          townManual: _homeTownManualController,
-          zip: _homeZipController,
-          city: _homeCityController,
-          country: _homeCountryController,
-        );
-        updates['school_address'] = schoolMap;
-        updates['home_address'] = homeMap;
-        updates['address'] = _composeAddressStringFromMap(homeMap);
-      }
-
-      if (oldCat != newCat) {
-        if (newCat == 'RESIDENT') {
-          updates['work_address'] = null;
-          updates['home_address'] = null;
-          updates['school_address'] = null;
-        } else if (newCat == 'EMPLOYEE') {
-          updates['resident_address'] = null;
-          updates['school_address'] = null;
-        } else if (newCat == 'STUDENT') {
-          updates['resident_address'] = null;
-          updates['work_address'] = null;
-        } else {
-          updates['resident_address'] = null;
-          updates['work_address'] = null;
-          updates['school_address'] = null;
-          updates['home_address'] = null;
+      if (resp is Map<String, dynamic>) {
+        returnedRow = resp;
+      } else {
+        try {
+          returnedRow = (resp as dynamic)?['data'] as Map<String, dynamic>?;
+        } catch (_) {
+          returnedRow = null;
         }
       }
 
-      debugPrint('DEBUG: database updates prepared = $updates');
+      debugPrint('Returned row: $returnedRow');
+      debugPrint('DEBUG: Database update completed for user ${user.id}');
 
-      Map<String, dynamic>? returnedRow;
+      _initialUserCategory = _userCategory;
+    } catch (e, st) {
+      debugPrint('======== UPDATE ERROR ========');
+      debugPrint('Error type: ${e.runtimeType}');
+      debugPrint('Error: $e');
+      debugPrint('Stack: $st');
+      if (kIsWeb) {
+        debugPrint('Check browser DevTools Network/Console for CORS errors.');
+      }
 
-try {
-  final resp = await _supabase
-      .from('app_users')
-      .update(updates)
-      .eq('id', user.id)
-      .select() // ask Supabase to return the updated row
-      .single();
+      if (mounted) {
+        Flushbar(
+          message: 'Failed to update profile: $e',
+          duration: const Duration(seconds: 3),
+        ).show(context);
+      }
 
-  debugPrint('DB update returned: $resp');
-
-  // Handle possible shapes of the response
-  if (resp is Map<String, dynamic>) {
-    returnedRow = resp;
-  } else {
-    try {
-      returnedRow = (resp as dynamic)?['data'] as Map<String, dynamic>?;
-    } catch (_) {
-      returnedRow = null;
+      rethrow;
     }
-  }
+    if (mounted) {
+      setState(() {
+        _profileImage = null;
+        _profileImageBytes = null;
+        _profileImageUrl = null;
+        _profileUploadProgress = null;
+        _removeProfileImage = false;
+        _idImage = null;
+        _idImageBytes = null;
+        _idImageUrl = null;
+        _idUploadProgress = null;
+        _removeIdImage = false;
+      });
+    }
 
-  debugPrint('Returned row: $returnedRow');
-  debugPrint('DEBUG: Database update completed for user ${user.id}');
-
-  // Update category after a successful save
-  _initialUserCategory = _userCategory;
-} catch (e, st) {
-  debugPrint('======== UPDATE ERROR ========');
-  debugPrint('Error type: ${e.runtimeType}');
-  debugPrint('Error: $e');
-  debugPrint('Stack: $st');
-  if (kIsWeb) {
-    debugPrint('Check browser DevTools Network/Console for CORS errors.');
-  }
-
-  // Optional: show an error flushbar
-  if (mounted) {
-    Flushbar(
-      message: 'Failed to update profile: $e',
+    if (!mounted) return;
+    await Flushbar(
+      message: 'Profile saved successfully!',
+      backgroundColor: const Color.fromARGB(255, 14, 151, 7),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      borderRadius: BorderRadius.circular(12),
+      flushbarPosition: FlushbarPosition.TOP,
+      icon: const Icon(
+        Icons.check_circle,
+        color: Colors.white,
+      ),
+      messageColor: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      animationDuration: const Duration(milliseconds: 300),
       duration: const Duration(seconds: 3),
     ).show(context);
-  }
 
-  rethrow;
-}
-      if (mounted) {
-        setState(() {
-          _profileImage = null;
-          _profileImageBytes = null;
-          _profileImageUrl = null;
-          _profileUploadProgress = null;
-          _removeProfileImage = false;
-          _idImage = null;
-          _idImageBytes = null;
-          _idImageUrl = null;
-          _idUploadProgress = null;
-          _removeIdImage = false;
-        });
-      }
+    if (!mounted) return;
+    setState(() => _isFormDirty = false);
 
-      if (!mounted) return;
-      await Flushbar(
-        message: 'Profile saved successfully!',
-        backgroundColor: const Color.fromARGB(255, 14, 151, 7),
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        borderRadius: BorderRadius.circular(12),
-        flushbarPosition: FlushbarPosition.TOP,
-        icon: const Icon(
-          Icons.check_circle,
-          color: Colors.white,
+    Navigator.pop(context, true);
+  } catch (e) {
+    debugPrint('Error saving profile: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving profile: $e'),
+          backgroundColor: Colors.red,
         ),
-        messageColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        animationDuration: const Duration(milliseconds: 300),
-        duration: const Duration(seconds: 3),
-      ).show(context);
-
-      if (!mounted) return;
-      setState(() => _isFormDirty = false);
-
-      Navigator.pop(context, true);
-    } catch (e) {
-      debugPrint('Error saving profile: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving profile: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
+      );
     }
+  } finally {
+    if (mounted) setState(() => _isSaving = false);
   }
-  
+}
+
   Future<bool> _confirmUnsavedChanges() async {
     if (!_isFormDirty) return true;
 
@@ -1359,12 +1570,20 @@ try {
                 Checkbox(
                   value: _hasMiddleName,
                   onChanged: (val) {
+                    final bool newVal = val ?? false;
                     setState(() {
-                      _hasMiddleName = val ?? false;
-                      if (!_hasMiddleName) {
+                      _hasMiddleName = newVal;
+                      if (!newVal) {
                         _middleNameController.clear();
+                        _fieldErrors.remove('Middle Name'); // <-- remove any programmatic error
                       }
                       _markFormDirty();
+                    });
+
+                    FocusScope.of(context).unfocus();
+
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _formKey.currentState?.validate();
                     });
                   },
                 ),
@@ -1393,11 +1612,19 @@ try {
             isReadOnly: true,
           ),
           _buildEditableField(
-            'Phone Number',
-            _phoneController,
-            hint: '09123456789',
-            keyboardType: TextInputType.phone,
-          ),
+  'Phone Number',
+  _phoneController,
+  hint: '09123456789',
+  keyboardType: TextInputType.number,
+  validator: (val) {
+    if (val == null || val.trim().isEmpty) return 'Please enter Phone Number';
+    final s = val.trim();
+    if (!RegExp(r'^0\d{10}$').hasMatch(s)) {
+      return 'Enter a valid 11-digit number starting with 0';
+    }
+    return null;
+  },
+),
           _buildEditableField(
             'Date of Birth',
             _dobController,
@@ -1408,37 +1635,42 @@ try {
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: DropdownButtonFormField<String>(
-              value: (_userCategory != null && _userCategory!.isNotEmpty) ? _userCategory!.toUpperCase() : null,
+              value: (_userCategory != null && _userCategory!.isNotEmpty)
+                  ? _userCategory!.toUpperCase()
+                  : null,
+              autovalidateMode: _autoValidateMode, // ✅ add this line
               decoration: InputDecoration(
                 labelText: 'Category',
                 filled: true,
                 fillColor: Colors.grey[50],
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
                 ),
               ),
-              items: <Map<String, String>>[
-                {'value': 'RESIDENT', 'label': 'Resident'},
-                {'value': 'EMPLOYEE', 'label': 'Employee'},
-                {'value': 'STUDENT', 'label': 'Student'},
-              ].map((m) {
-                return DropdownMenuItem<String>(
-                  value: m['value'],
-                  child: Text(m['label'] ?? ''),
-                );
-              }).toList(),
+              items: const [
+                DropdownMenuItem(value: 'RESIDENT', child: Text('Resident')),
+                DropdownMenuItem(value: 'EMPLOYEE', child: Text('Employee')),
+                DropdownMenuItem(value: 'STUDENT', child: Text('Student')),
+              ],
               onChanged: (val) {
                 setState(() {
                   _userCategory = (val ?? '').toString().toUpperCase();
                   _markFormDirty();
+
+                  // ✅ clear red indicator instantly when a valid option is picked
+                  if (_autoValidateMode == AutovalidateMode.always) {
+                    _autoValidateMode = AutovalidateMode.onUserInteraction;
+                  }
                 });
               },
-              validator: (v) {
-                if (v == null || v.isEmpty) return 'Please select a category';
-                return null;
-              },
+            validator: (v) {
+              if ((_userCategory ?? '').isNotEmpty) return null; // already set from DB
+              if (v == null || v.isEmpty) return 'Please select a category';
+              return null;
+            },
             ),
           ),
         ],
@@ -1623,21 +1855,26 @@ try {
             ),
           ),
         ),
-        if (mainController.text.toLowerCase() == 'other')
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: TextFormField(
-              controller: manualController,
-              decoration: InputDecoration(
+       if (mainController.text.toLowerCase() == 'other')
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: TextFormField(
+            controller: manualController,
+                decoration: InputDecoration(
                 labelText: 'Type town name',
                 hintText: 'Enter town',
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 filled: true,
                 fillColor: Colors.grey[50],
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                errorText: _fieldErrors['Type town name'], // <- show programmatic error if set
               ),
-            ),
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) return 'Please enter town name';
+              return null;
+            },
           ),
+        ),
       ],
     );
   }
@@ -1672,32 +1909,56 @@ try {
               ),
               child: Stack(
                 children: [
-                  _idImage != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.file(_idImage!, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
-                      )
-                    : (_idImageBytes != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.memory(_idImageBytes!, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
-                          )
-                        : (_idImageUrl != null
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.network(_idImageUrl!, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
-                              )
-                            : Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.upload_file, size: 40, color: Colors.grey.shade400),
-                                    const SizedBox(height: 8),
-                                    Text('Tap to upload ID', style: TextStyle(color: Colors.grey.shade600)),
-                                  ],
-                                ),
-                              ))),
-                  if (_idImage != null || _idImageBytes != null || (_idImageUrl != null && !_removeIdImage))
+                  if (_idImage != null)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        _idImage!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        errorBuilder: (context, error, stackTrace) => _buildInvalidImagePlaceholder(),
+                      ),
+                    )
+                  else if (_idImageBytes != null)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.memory(
+                        _idImageBytes!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        errorBuilder: (context, error, stackTrace) => _buildInvalidImagePlaceholder(),
+                      ),
+                    )
+                  else if (_idImageUrl != null && _idImageUrl!.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        _idImageUrl!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        loadingBuilder: (context, child, loadingProgress) =>
+                            loadingProgress == null ? child : const Center(child: CircularProgressIndicator()),
+                        errorBuilder: (context, error, stackTrace) => _buildInvalidImagePlaceholder(),
+                      ),
+                    )
+                  else
+                    // Default placeholder when user has not uploaded anything yet
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.upload_file, size: 40, color: Colors.grey.shade400),
+                          const SizedBox(height: 8),
+                          Text('Tap to upload ID', style: TextStyle(color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    ),
+
+                  // Remove button
+                  if (_idImage != null || _idImageBytes != null || (_idImageUrl != null && _idImageUrl!.isNotEmpty && !_removeIdImage))
                     Positioned(
                       top: 8,
                       right: 8,
@@ -1721,6 +1982,8 @@ try {
                         ),
                       ),
                     ),
+
+                  // Upload progress
                   if (_idUploadProgress != null)
                     Positioned.fill(
                       child: Container(
@@ -1767,6 +2030,20 @@ try {
       ),
     );
   }
+
+   Widget _buildInvalidImagePlaceholder() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.broken_image, size: 36, color: Colors.grey.shade500),
+          const SizedBox(height: 6),
+          Text('Invalid image', style: TextStyle(color: Colors.grey.shade600)),
+        ],
+      ),
+    );
+  }
+  
 
   Widget _buildHealthInfoSection() {
     return Container(
@@ -1907,76 +2184,140 @@ try {
     );
   }
 
-  Widget _buildEditableField(
-    String label,
-    TextEditingController controller, {
-    String? hint,
-    TextInputType keyboardType = TextInputType.text,
-    bool isDateField = false,
-    bool isReadOnly = false,
-    String? Function(String?)? validator,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextFormField(
-        controller: controller,
-        keyboardType: keyboardType,
-        readOnly: isDateField || isReadOnly,
-        onTap: isDateField
-            ? () async {
-                FocusScope.of(context).requestFocus(FocusNode());
-                await _selectDate(context);
-              }
-            : null,
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hint,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 14,
-          ),
-          filled: true,
-          fillColor: Colors.grey[50],
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide.none,
-          ),
-          suffixIcon: isDateField ? const Icon(Icons.calendar_today, size: 20) : null,
-        ),
-        validator: (value) {
-          if (validator != null) return validator(value);
-          if (value == null || value.isEmpty) {
-            return 'Please enter $label';
+ Widget _buildEditableField(
+  String label,
+  TextEditingController controller, {
+  String? hint,
+  TextInputType keyboardType = TextInputType.text,
+  bool isDateField = false,
+  bool isReadOnly = false,
+  String? Function(String?)? validator,
+}) {
+  // fields we want to require and show red error text when empty
+  const Set<String> _requiredLabels = {
+    'First Name',
+    'Last Name',
+    'Phone Number',
+    'Date of Birth',
+    // address-related required labels
+    'House/Unit/Building No.',
+    'Street Name',
+    'Barangay/Subdivision',
+    'Street/Building No.',
+    'City/Municipality',
+    'Full School Name',
+  };
+
+ return Padding(
+  padding: const EdgeInsets.only(bottom: 12),
+  child: TextFormField(
+    controller: controller,
+    autovalidateMode: _autoValidateMode, // ✅ add this line
+    keyboardType: keyboardType,
+    readOnly: isDateField || isReadOnly,
+
+    onChanged: (val) {
+      // ✅ clear field-specific errors when user types
+      if (_fieldErrors.containsKey(controller)) {
+        setState(() {
+          _fieldErrors.remove(controller);
+        });
+      }
+
+      // ✅ switch autovalidation mode back to user interaction
+      if (_autoValidateMode == AutovalidateMode.always) {
+        setState(() {
+          _autoValidateMode = AutovalidateMode.onUserInteraction;
+        });
+      }
+
+      _markFormDirty(); // keep your existing logic
+    },
+
+    inputFormatters: label == 'Phone Number'
+        ? [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(11),
+          ]
+        : (keyboardType == TextInputType.number
+            ? [FilteringTextInputFormatter.digitsOnly]
+            : []),
+
+    onTap: isDateField
+        ? () async {
+            FocusScope.of(context).requestFocus(FocusNode());
+            await _selectDate(context);
           }
-          if (isDateField) {
-            try {
-              final parts = value.split('/');
-              if (parts.length != 3) throw FormatException();
-              final m = int.parse(parts[0]);
-              final d = int.parse(parts[1]);
-              final y = int.parse(parts[2]);
-              final dob = DateTime(y, m, d);
-              final today = DateTime.now();
-              int age = today.year - dob.year;
-              if (today.month < dob.month ||
-                  (today.month == dob.month && today.day < dob.day)) {
-                age--;
-              }
-              if (age < 8) {
-                return 'Age must be at least 8 years';
-              }
-              if (age >= 95) {
-                return 'Age must be less than 95 years';
-              }
-            } catch (_) {
-              return 'Invalid date format';
-            }
-          }
-          return null;
-        },
+        : null,
+
+    decoration: InputDecoration(
+      labelText: label,
+      hintText: hint,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      filled: true,
+      fillColor: Colors.grey[50],
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide.none,
       ),
-    );
-  }
+      suffixIcon:
+          isDateField ? const Icon(Icons.calendar_today, size: 20) : null,
+
+      // ✅ show controller-based error under the correct field
+      errorText: _fieldErrors[controller],
+    ),
+
+    validator: (value) {
+      final text = value?.trim() ?? '';
+
+      // (1) Custom validator first
+      if (validator != null) {
+        final result = validator(value);
+        if (result != null) return result;
+      }
+
+      // (2) Required fields
+      if (_requiredLabels.contains(label) && text.isEmpty) {
+        return 'Please enter $label';
+      }
+
+      // (3) Phone field validation
+      if (label == 'Phone Number' && text.isNotEmpty) {
+        final normalized = text.replaceAll(RegExp(r'[^0-9]'), '');
+        final phoneRegex = RegExp(r'^0\d{10}$');
+        if (!phoneRegex.hasMatch(normalized)) {
+          return 'Enter a valid 11-digit number starting with 0';
+        }
+      }
+
+      // (4) DOB validation
+      if (isDateField && text.isNotEmpty) {
+        try {
+          final parts = text.split('/');
+          if (parts.length != 3) throw FormatException();
+          final month = int.parse(parts[0]);
+          final day = int.parse(parts[1]);
+          final year = int.parse(parts[2]);
+          final dob = DateTime(year, month, day);
+          final now = DateTime.now();
+          int age = now.year - dob.year;
+          if (now.month < dob.month ||
+              (now.month == dob.month && now.day < dob.day)) {
+            age--;
+          }
+          if (age < 8) return 'Age must be at least 8 years';
+          if (age > 95) return 'Age must be less than 95 years';
+        } catch (_) {
+          return 'Invalid date format (MM/DD/YYYY)';
+        }
+      }
+
+      return null;
+    },
+  ),
+);
+}
 
   @override
   Widget build(BuildContext context) {
@@ -2012,6 +2353,7 @@ try {
           padding: const EdgeInsets.all(20.0),
           child: Form(
             key: _formKey,
+            autovalidateMode: _autoValidateMode, // <-- add this
             child: ListView(
               children: [
                 _buildProfileImageSection(),

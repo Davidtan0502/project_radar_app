@@ -11,11 +11,6 @@ import 'package:project_radar_app/screens/home/main_navigation.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-class Config {
-  static const String supabaseUrl = 'YOUR_SUPABASE_URL';
-  static const String supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
-}
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -53,26 +48,31 @@ Future<void> _initializeDeepLinking() async {
     final event = data.event;
     final session = data.session;
 
-    debugPrint('[DeepLink] event: $event, session: $session');
-
     if (event == AuthChangeEvent.passwordRecovery) {
-      debugPrint('[DeepLink] Password recovery detected, navigating to reset form...');
-      await Supabase.instance.client.auth.signOut();
-      navigatorKey.currentState?.pushNamed('/reset-password');
-    }
-  });
+      final emailFromLink = session?.user?.email;
 
-    // Optional: check initial session from deep link
-    final initialSession = supabase.auth.currentSession;
-    if (initialSession != null) {
-      debugPrint('Initial session found from deep link');
-    }
+    debugPrint('[DeepLink] Password recovery detected, email: $emailFromLink');
 
-    debugPrint('[DeepLink] Listener attached successfully.');
-  } catch (e) {
-    debugPrint('Error initializing deep linking: $e');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final nav = navigatorKey.currentState;
+      if (nav != null) {
+        nav.pushNamedAndRemoveUntil(
+          '/reset-password',
+          (route) => false,
+          arguments: {
+            'email': emailFromLink, // pass email to screen
+          },
+        );
+      }
+    });
   }
-}
+});
+
+      debugPrint('[DeepLink] Listener attached successfully.');
+    } catch (e) {
+      debugPrint('Error initializing deep linking: $e');
+    }
+  }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -102,7 +102,18 @@ class MyApp extends StatelessWidget {
 
         //reset password route
         '/reset-password': (context) => const ResetPasswordScreen(),
+        // add/login route that reads arguments
+        '/forgot-password': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          return LoginScreen(
+            onTap: () {}, // keep your existing onTap or pass appropriate handler
+            showVerificationMessage: false,
+            initialEmail: args?['email'] as String?,
+            initialShowPasswordStep: true, // ensure Login opens the password step
+          );
+        },
       },
+      
       onGenerateRoute: (settings) {
         // Handle unknown routes or add additional routing logic here
         if (settings.name == '/') {
@@ -137,14 +148,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       // Check if we have a session from a deep link (email verification)
       final session = supabase.auth.currentSession;
       final user = session?.user;
-      
-      if (user != null && user.emailConfirmedAt != null) {
-        // User just verified email via deep link - show verification success
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          navigatorKey.currentState?.pushReplacementNamed('/verify-redirect');
-        });
-        return;
-      }
+
     } catch (e) {
       debugPrint('Error checking initial auth: $e');
     } finally {
@@ -156,57 +160,43 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    if (_checkingInitialAuth) {
-      return _buildLoadingScreen();
-    }
+  if (_checkingInitialAuth) return _buildLoadingScreen();
+
 
     return StreamBuilder<AuthState?>(
-      stream: supabase.auth.onAuthStateChange,
-      builder: (context, snapshot) {
-        // User is still loading
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingScreen();
-        }
+    stream: supabase.auth.onAuthStateChange,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return _buildLoadingScreen();
+      }
 
-        final AuthState? authState = snapshot.data;
-        final User? user = authState?.session?.user;
+        final user = snapshot.data?.session?.user;
+        
+      // Skip auto-login if this is a password recovery
+      final isPasswordRecovery = snapshot.data?.event == AuthChangeEvent.passwordRecovery;
+      if (isPasswordRecovery) {
+        return const ResetPasswordScreen();
+      }
 
-        // Check if this is a new verification via deep link
-        if (authState?.event == AuthChangeEvent.signedIn) {
-          final currentUser = supabase.auth.currentUser;
-          if (currentUser != null && currentUser.emailConfirmedAt != null) {
-            // This might be a fresh verification - could navigate to verification success
-          }
-        }
+      if (user != null && user.emailConfirmedAt != null) {
+        _setCurrentUser(user.id);
+        return const MainNavigation();
+      }
 
-        // If we have a signed-in user with verified email
-        if (user != null && user.emailConfirmedAt != null) {
-          _setCurrentUser(user.id);
-          return const MainNavigation();
-        }
+      if (user != null && user.emailConfirmedAt == null) {
+        return LoginScreen(onTap: () {}, showVerificationMessage: true);
+      }
 
-        // If we have a user but email is not verified
-        if (user != null && user.emailConfirmedAt == null) {
-          // Show login screen with message about email verification
-          return LoginScreen(
-            onTap: () {},
-            showVerificationMessage: true,
-          );
-        }
+      _clearCurrentUser();
+      return LoginScreen(onTap: () {});
+    },
+  );
+}
 
-        // Not logged in -> show login
-        if (user == null) {
-          _clearCurrentUser();
-        }
-
-        return LoginScreen(onTap: () {});
-      },
-    );
-  }
-
-  Widget _buildLoadingScreen() {
-    return const Scaffold(
-      body: Center(
+ Widget _buildLoadingScreen() {
+  return const Scaffold(
+    body: SafeArea(
+      child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -216,8 +206,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _setCurrentUser(String userId) {
     WidgetsBinding.instance.addPostFrameCallback((_) {

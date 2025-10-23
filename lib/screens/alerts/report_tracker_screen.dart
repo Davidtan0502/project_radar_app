@@ -232,7 +232,10 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
                   }
                 },
                 // Show confirmation first; only after confirm do we do optimistic removal + delete
-                onDelete: () => _showDeleteConfirmation(incident['id'].toString()),
+                onDelete: () => _showDeleteConfirmation(
+                  incident['id'].toString(),
+                  incident['status']?.toString(),
+                ),
                 onHighlightRemoved: () {
                   _controller.clearHighlight();
                   _scrolledToHighlight = false;
@@ -489,9 +492,22 @@ class _ReportTrackerScreenState extends State<ReportTrackerScreen> {
     );
   }
 
-    void _showDeleteConfirmation(String docId) {
+    void _showDeleteConfirmation(String docId, [String? status]) {
     // Capture the parent/screen context so we can show SnackBars on the main Scaffold
     final parentContext = context;
+
+    final normalized = (status ?? '').toLowerCase();
+
+    // Defensive check: allow delete only if status == 'pending'
+    if (normalized != 'pending') {
+      ScaffoldMessenger.of(parentContext).showSnackBar(
+        const SnackBar(
+          content: Text('Only pending reports can be deleted.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     showDialog(
       context: context,
@@ -609,17 +625,23 @@ class ReportTrackerController {
   }
 
   DateTime? _parseTimestamp(dynamic timestamp) {
-    if (timestamp == null) return null;
-    if (timestamp is DateTime) return timestamp;
-    if (timestamp is String) {
-      try {
-        return DateTime.parse(timestamp);
-      } catch (_) {
-        return null;
-      }
+  if (timestamp == null) return null;
+  if (timestamp is DateTime) return timestamp;
+  if (timestamp is String) {
+    try {
+      DateTime parsedDate = DateTime.parse(timestamp);
+      // Adjust for Asia/Manila timezone (UTC+8)
+      final manilaOffset = Duration(hours: 8);
+      return parsedDate.add(manilaOffset);
+    } catch (_) {
+      return DateTime.now();
     }
-    return null;
   }
+  if (timestamp is int) {
+    return DateTime.fromMillisecondsSinceEpoch(timestamp);
+  }
+  return null;
+}
 
   /// deleteReport now has callbacks so UI can optimistically hide / restore items.
   Future<void> deleteReport(
@@ -794,18 +816,30 @@ class IncidentCard extends StatelessWidget {
     );
   }
 
-  DateTime? _parseTimestamp(dynamic timestamp) {
-    if (timestamp == null) return null;
-    if (timestamp is DateTime) return timestamp;
-    if (timestamp is String) {
-      try {
-        return DateTime.parse(timestamp);
-      } catch (_) {
-        return null;
-      }
+ DateTime? _parseTimestamp(dynamic timestamp) {
+  if (timestamp == null) return null;
+  if (timestamp is DateTime) return timestamp;
+  if (timestamp is String) {
+    try {
+      // Parse the timestamp string
+      DateTime parsedDate = DateTime.parse(timestamp);
+      
+      // Since your database stores time in Asia/Manila timezone,
+      // we need to manually adjust for the timezone offset
+      // Asia/Manila is UTC+8
+      final manilaOffset = Duration(hours: 8);
+      return parsedDate.add(manilaOffset);
+    } catch (_) {
+      // If parsing fails, return current date as fallback
+      return DateTime.now();
     }
-    return null;
   }
+  if (timestamp is int) {
+    // Handle timestamp as milliseconds
+    return DateTime.fromMillisecondsSinceEpoch(timestamp);
+  }
+  return null;
+}
 
   Widget _buildHeaderRow(String incidentType, String status, bool isHighlighted) {
     return Row(
@@ -880,26 +914,35 @@ class IncidentCard extends StatelessWidget {
   }
 
   Widget _buildActionsRow(bool showDelete, VoidCallback onDelete) {
+    final status = (incident['status'] ?? '').toString().toLowerCase();
+    final canDelete = status == 'pending';
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        if (showDelete) _buildDeleteButton(onDelete),
+        if (showDelete)
+          // show button but toggle enabled/disabled based on status
+          _buildDeleteButton(onDelete, enabled: canDelete),
         _buildViewDetailsButton(),
       ],
     );
   }
 
-  Widget _buildDeleteButton(VoidCallback onDelete) {
+  Widget _buildDeleteButton(VoidCallback onDelete, {bool enabled = true}) {
+    final bgColor = enabled ? Colors.red[50] : Colors.grey[100];
+    final borderColor = enabled ? Colors.red[200] : Colors.grey[300];
+    final iconColor = enabled ? Colors.red[700] : Colors.grey[500];
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.red[50],
+        color: bgColor,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.red[200]!, width: 1.5),
+        border: Border.all(color: borderColor!, width: 1.5),
       ),
       child: IconButton(
-        icon: Icon(Icons.delete_outline, color: Colors.red[700], size: 22),
-        onPressed: onDelete,
-        tooltip: 'Delete Report',
+        icon: Icon(Icons.delete_outline, color: iconColor, size: 22),
+        onPressed: enabled ? onDelete : null,
+        tooltip: enabled ? 'Delete Report' : 'Only pending reports can be deleted',
         splashRadius: 20,
         padding: const EdgeInsets.all(8),
       ),
@@ -1012,17 +1055,29 @@ class ResolvedIncidentCard extends StatelessWidget {
   }
 
   DateTime? _parseTimestamp(dynamic timestamp) {
-    if (timestamp == null) return null;
-    if (timestamp is DateTime) return timestamp;
-    if (timestamp is String) {
-      try {
-        return DateTime.parse(timestamp);
-      } catch (_) {
-        return null;
-      }
+  if (timestamp == null) return null;
+  if (timestamp is DateTime) return timestamp;
+  if (timestamp is String) {
+    try {
+      // Parse the timestamp string
+      DateTime parsedDate = DateTime.parse(timestamp);
+      
+      // Since your database stores time in Asia/Manila timezone,
+      // we need to manually adjust for the timezone offset
+      // Asia/Manila is UTC+8
+      final manilaOffset = Duration(hours: 8);
+      return parsedDate.add(manilaOffset);
+    } catch (_) {
+      // If parsing fails, return current date as fallback
+      return DateTime.now();
     }
-    return null;
   }
+  if (timestamp is int) {
+    // Handle timestamp as milliseconds
+    return DateTime.fromMillisecondsSinceEpoch(timestamp);
+  }
+  return null;
+}
 
   Widget _buildHeaderRow(String incidentType) {
     return Row(

@@ -342,23 +342,26 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     final double suspicionScore = (data['suspicion_score'] ?? 0.0).toDouble();
     final List<dynamic> imageUrls = data['image_urls'] ?? [];
 
-    // Handle timestamp conversion from Supabase
-    final String formattedDate;
-    final String timeDetail;
+    // Handle timestamp conversion from Supabase - FIXED for Philippines timezone
+final String formattedDate;
+final String timeDetail;
 
-    if (data['timestamp'] != null) {
-      DateTime timestamp;
-      if (data['timestamp'] is String) {
-        timestamp = DateTime.parse(data['timestamp']);
-      } else {
-        timestamp = data['timestamp'] as DateTime;
-      }
-      formattedDate = DateFormat('MMMM d, yyyy').format(timestamp);
-      timeDetail = DateFormat('h:mm a').format(timestamp);
-    } else {
-      formattedDate = "Unknown date";
-      timeDetail = "";
-    }
+if (data['timestamp'] != null) {
+  DateTime timestamp;
+  if (data['timestamp'] is String) {
+    timestamp = DateTime.parse(data['timestamp']);
+    // Adjust for Asia/Manila timezone (UTC+8) since database stores in Manila time
+    final manilaOffset = Duration(hours: 8);
+    timestamp = timestamp.add(manilaOffset);
+  } else {
+    timestamp = data['timestamp'] as DateTime;
+  }
+  formattedDate = DateFormat('MMMM d, yyyy').format(timestamp);
+  timeDetail = DateFormat('h:mm a').format(timestamp);
+} else {
+  formattedDate = "Unknown date";
+  timeDetail = "";
+}
 
     return CustomScrollView(
       controller: _scrollController,
@@ -872,15 +875,18 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     final updatedBy = (update['updated_by'] ?? "System").toString();
     DateTime? updateTime;
 
-    // Parse timestamp from various possible fields
-    final timestamp = update['created_at'] ?? update['timestamp'];
-    if (timestamp is String) {
-      try {
-        updateTime = DateTime.parse(timestamp);
-      } catch (_) {}
-    } else if (timestamp is DateTime) {
-      updateTime = timestamp;
-    }
+    // Parse timestamp from various possible fields - FIXED for Philippines timezone
+final timestamp = update['created_at'] ?? update['timestamp'];
+if (timestamp is String) {
+  try {
+    updateTime = DateTime.parse(timestamp);
+    // Adjust for Asia/Manila timezone (UTC+8) since database stores in Manila time
+    final manilaOffset = Duration(hours: 8);
+    updateTime = updateTime.add(manilaOffset);
+  } catch (_) {}
+} else if (timestamp is DateTime) {
+  updateTime = timestamp;
+}
 
     final timeStr = updateTime != null ? DateFormat('MMM d').format(updateTime) : "";
     final timeDetail = updateTime != null ? DateFormat('h:mm a').format(updateTime) : "";
@@ -985,17 +991,20 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   }
 
   DateTime? _parseTimestamp(dynamic timestamp) {
-    if (timestamp == null) return null;
-    if (timestamp is DateTime) return timestamp;
-    if (timestamp is String) {
-      try {
-        return DateTime.parse(timestamp);
-      } catch (_) {
-        return null;
-      }
+  if (timestamp == null) return null;
+  if (timestamp is DateTime) return timestamp;
+  if (timestamp is String) {
+    try {
+      DateTime parsedDate = DateTime.parse(timestamp);
+      // Adjust for Asia/Manila timezone (UTC+8)
+      final manilaOffset = Duration(hours: 8);
+      return parsedDate.add(manilaOffset);
+    } catch (_) {
+      return null;
     }
-    return null;
   }
+  return null;
+}
 
   Future<void> _shareReport() async {
     // Implement share functionality

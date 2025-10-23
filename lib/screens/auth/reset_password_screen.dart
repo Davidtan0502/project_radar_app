@@ -15,13 +15,27 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   bool _obscure = true;
   bool _obscureConfirm = true;
   final SupabaseClient supabase = Supabase.instance.client;
+  String? _cachedEmail; // ✅ add this line
 
   @override
   void initState() {
     super.initState();
-    debugPrint('[ResetPasswordScreen] initState - currentUser: ${supabase.auth.currentUser}');
-    debugPrint('[ResetPasswordScreen] initState - currentSession: ${supabase.auth.currentSession}');
-  }
+  debugPrint('[ResetPasswordScreen] initState - currentUser: ${supabase.auth.currentUser}');
+}
+
+@override
+void didChangeDependencies() {
+  super.didChangeDependencies();
+
+  final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
+  /// Preserve email from arguments or current user
+_cachedEmail ??= args?['email'] as String? ?? supabase.auth.currentUser?.email;
+
+debugPrint('[ResetPasswordScreen] cachedEmail: $_cachedEmail');
+
+}
+
 
   @override
   void dispose() {
@@ -50,6 +64,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     }
 
     final currentUser = supabase.auth.currentUser;
+    _cachedEmail ??= currentUser?.email; // ✅ always preserve the user's email
     if (currentUser == null) {
       _showError(
         'No active password reset session found. '
@@ -58,21 +73,29 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+      setState(() => _isLoading = true);
     try {
-      final res = await supabase.auth.updateUser(
-        UserAttributes(password: newPw),
-      );
+    final res = await supabase.auth.updateUser(UserAttributes(password: newPw));
+    await supabase.auth.signOut();
 
-      if (res.user != null) {
-        _showInfo('Password updated. Please log in with your new password.');
-        if (!mounted) return;
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      } else {
-        _showInfo('Password updated. Please log in with your new password.');
-        if (!mounted) return;
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      }
+    _showInfo(
+      'Password updated. Please log in with your new password.',
+      onOk: () {
+        final emailToPass = _cachedEmail;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            '/forgot-password',
+            (r) => false,
+            arguments: {
+              'email': emailToPass,
+              'showPasswordStep': true,
+            },
+          );
+        });
+      },
+    );
+
     } on AuthException catch (e) {
       debugPrint('[updatePassword] AuthException: ${e.message}');
       _showError('Auth error: ${e.message}');
@@ -98,7 +121,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     );
   }
 
-  void _showInfo(String msg) {
+  // Modified _showInfo to accept an optional onOk callback so we can navigate after dismiss.
+  void _showInfo(String msg, {VoidCallback? onOk}) {
     if (!mounted) return;
     showDialog(
       context: context,
@@ -106,7 +130,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         title: const Text('Info'),
         content: Text(msg),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // dismiss dialog
+              if (onOk != null) onOk();
+            },
+            child: const Text('OK'),
+          ),
         ],
       ),
     );
@@ -320,14 +350,20 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     const SizedBox(height: 16),
                     // Back to Login
                     TextButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-                              Navigator.of(context).pop();
+                        onPressed: _isLoading ? null : () async {
+                          final emailToPass = _cachedEmail;
+                          await supabase.auth.signOut();
+                          Navigator.of(context).pushNamedAndRemoveUntil(
+                            '/forgot-password',
+                            (r) => false,
+                            arguments: {
+                              'email': emailToPass,
+                              'showPasswordStep': emailToPass != null,
                             },
+                          );
+                        },
                       style: TextButton.styleFrom(
                         foregroundColor: const Color(0xFF336699),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       ),
                       child: const Text(
                         'Back to Login',

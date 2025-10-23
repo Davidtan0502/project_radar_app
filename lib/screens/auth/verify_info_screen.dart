@@ -159,80 +159,106 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
     return val.toString();
   }
 
-  Widget _buildAddressBlock(String title, Map<String, dynamic> map) {
-    final parts = <String>[];
+ Widget _buildAddressBlock(String title, Map<String, dynamic> map) {
+  final parts = <String>[];
 
-    // School name (for student)
-    final schoolName = _addr(map, 'school_name');
-    if (schoolName.isNotEmpty) parts.add(_capitalizeEachWord(schoolName));
+  // School name (for student)
+  final schoolName = _addr(map, 'school_name');
+  if (schoolName.isNotEmpty) parts.add(_capitalizeEachWord(schoolName));
 
-    // House and street
-    final house = _addr(map, 'house');
-    final street = _addr(map, 'street');
-    if (house.isNotEmpty && street.isNotEmpty) {
-      parts.add('${_capitalizeEachWord(house)}, ${_capitalizeEachWord(street)} Street');
-    } else if (house.isNotEmpty) {
-      parts.add(_capitalizeEachWord(house));
-    } else if (street.isNotEmpty) {
-      parts.add('${_capitalizeEachWord(street)} Street');
+  // House and street
+  final house = _addr(map, 'house');
+  final street = _addr(map, 'street');
+  if (house.isNotEmpty && street.isNotEmpty) {
+    final streetText = _capitalizeEachWord(street);
+    // Check if "Street" is already in the street field
+    if (streetText.toLowerCase().contains('street')) {
+      parts.add('${_capitalizeEachWord(house)}, $streetText');
+    } else {
+      parts.add('${_capitalizeEachWord(house)}, ${streetText} Street');
     }
-
-    // Barangay
-    final barangay = _addr(map, 'barangay');
-    if (barangay.isNotEmpty) {
-      parts.add('Barangay ${_capitalizeEachWord(barangay)}');
+  } else if (house.isNotEmpty) {
+    parts.add(_capitalizeEachWord(house));
+  } else if (street.isNotEmpty) {
+    final streetText = _capitalizeEachWord(street);
+    // Check if "Street" is already in the street field
+    if (streetText.toLowerCase().contains('street')) {
+      parts.add(streetText);
+    } else {
+      parts.add('${streetText} Street');
     }
-
-    // Town
-    final town = _addr(map, 'town');
-    if (town.isNotEmpty) parts.add(_capitalizeEachWord(town));
-
-    // ZIP
-    final zip = _addr(map, 'zip');
-    if (zip.isNotEmpty) parts.add('ZIP: $zip');
-
-    // City
-    final city = _addr(map, 'city');
-    if (city.isNotEmpty) parts.add(_capitalizeEachWord(city));
-
-    // Country
-    final country = _addr(map, 'country');
-    if (country.isNotEmpty) parts.add(_capitalizeEachWord(country));
-
-    final inline = parts.isNotEmpty ? parts.join(', ') : '-';
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 16,
-              color: _primaryColor,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            inline,
-            style: const TextStyle(
-              color: Color.fromARGB(221, 11, 11, 11),
-              fontSize: 14,
-            ),
-            softWrap: true,
-          ),
-        ],
-      ),
-    );
   }
+
+  // Barangay
+  final barangay = _addr(map, 'barangay');
+  if (barangay.isNotEmpty) {
+    final barangayText = _capitalizeEachWord(barangay);
+    // Check if "Barangay" is already in the barangay field
+    if (barangayText.toLowerCase().contains('barangay')) {
+      parts.add(barangayText);
+    } else {
+      parts.add('Barangay $barangayText');
+    }
+  }
+
+  // Town
+  final town = _addr(map, 'town');
+  if (town.isNotEmpty) parts.add(_capitalizeEachWord(town));
+
+  // ZIP
+  final zip = _addr(map, 'zip');
+  if (zip.isNotEmpty) parts.add('$zip');
+
+  // City
+  final city = _addr(map, 'city');
+  if (city.isNotEmpty) {
+    final cityText = _capitalizeEachWord(city);
+    // Check if "City" is already in the city field
+    if (cityText.toLowerCase().contains('city')) {
+      parts.add(cityText);
+    } else {
+      parts.add('${cityText} City');
+    }
+  }
+
+  // Country
+  final country = _addr(map, 'country');
+  if (country.isNotEmpty) parts.add(_capitalizeEachWord(country));
+
+  final inline = parts.isNotEmpty ? parts.join(', ') : '-';
+
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.grey.shade50,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.grey.shade200),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+            color: _primaryColor,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          inline,
+          style: const TextStyle(
+            color: Color.fromARGB(221, 11, 11, 11),
+            fontSize: 14,
+          ),
+          softWrap: true,
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildInfoTile(String label, String value) {
     return Container(

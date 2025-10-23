@@ -10,6 +10,11 @@ import 'dart:typed_data';
 
 import 'location_picker_screen.dart';
 
+class AlwaysDisabledFocusNode extends FocusNode {
+  @override
+  bool get hasFocus => false;
+}
+
 class IncidentReportPage extends StatefulWidget {
   const IncidentReportPage({super.key});
 
@@ -782,27 +787,37 @@ Future<void> _submitForm() async {
           ],
         ),
         const SizedBox(height: 16),
-        TextFormField(
-          controller: _addressController,
-          readOnly: true,
-          maxLines: 2,
-          decoration: InputDecoration(
-            labelText: 'Address',
-            prefixIcon: Icon(Icons.location_on_outlined, color: _primaryColor),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: _primaryColor, width: 2),
-            ),
-            contentPadding:
-                const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-            labelStyle: TextStyle(color: Colors.grey.shade600),
-          ),
-          validator: (v) => v == null || v.isEmpty ? 'Address is required' : null,
+    TextFormField(
+      controller: _addressController,
+      readOnly: true,
+      maxLines: 2,
+      decoration: InputDecoration(
+        labelText: 'Address',
+        prefixIcon: Icon(Icons.location_on_outlined, color: _primaryColor),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
         ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: _primaryColor, width: 2),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        contentPadding:
+            const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        labelStyle: TextStyle(color: Colors.grey.shade600),
+        hintText: "Select location on map",
+      ),
+      validator: (v) => v == null || v.isEmpty ? 'Address is required' : null,
+      // ADD THESE TO COMPLETELY DISABLE INTERACTION:
+      enableInteractiveSelection: false,
+      focusNode: AlwaysDisabledFocusNode(),
+    ),
         SizedBox(
             height: 0,
             width: 0,

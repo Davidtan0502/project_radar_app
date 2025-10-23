@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:project_radar_app/screens/profile/account%20management%20files/edit_account_info.dart';
@@ -6,6 +9,86 @@ import 'package:project_radar_app/screens/profile/profile%20navigation/settings&
 import 'package:project_radar_app/services/navigation.dart';
 import 'package:project_radar_app/screens/auth/login_screen.dart';
 import 'package:project_radar_app/notification/notification_service.dart';
+
+// Replace with your actual Supabase project URL (example: https://xyz.supabase.co)
+const String PROJECT_URL = 'https://zqfcmpewoernuorvxzle.supabase.co/functions/v1/smart-responder';
+
+/// Live-updating progress dialog used during deletion.
+/// Provide a ValueNotifier<String> to update the shown message during the flow.
+class DeleteProgressDialog extends StatefulWidget {
+  final ValueNotifier<String> message;
+  final Duration dotInterval;
+  const DeleteProgressDialog({
+    Key? key,
+    required this.message,
+    this.dotInterval = const Duration(milliseconds: 500),
+  }) : super(key: key);
+
+  @override
+  State<DeleteProgressDialog> createState() => _DeleteProgressDialogState();
+}
+
+class _DeleteProgressDialogState extends State<DeleteProgressDialog> {
+  int _dotCount = 0;
+  Timer? _dotTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.message.addListener(_onMessage);
+    _dotTimer = Timer.periodic(widget.dotInterval, (_) {
+      setState(() => _dotCount = (_dotCount + 1) % 4);
+    });
+  }
+
+  void _onMessage() => setState(() {});
+
+  @override
+  void dispose() {
+    widget.message.removeListener(_onMessage);
+    _dotTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dots = '.' * _dotCount;
+    final msg = widget.message.value;
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 28),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12)],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 56,
+              height: 56,
+              child: Stack(
+                alignment: Alignment.center,
+                children: const [
+                  CircularProgressIndicator(strokeWidth: 3, color: Colors.red),
+                  Icon(Icons.delete_outline, size: 24, color: Colors.red),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '$msg$dots',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class AccountManagementScreen extends StatelessWidget {
   const AccountManagementScreen({super.key});
@@ -71,6 +154,7 @@ class AccountManagementScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: OutlinedButton(
+                      // Cancel must simply close the dialog
                       onPressed: () => Navigator.of(dialogContext).pop(),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -90,156 +174,136 @@ class AccountManagementScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
+                    // DELETE button — this runs the server-side delete and only signs out on success
                     child: ElevatedButton(
                       onPressed: () async {
                         try {
+                          // 1) close confirmation dialog first
                           Navigator.of(dialogContext).pop();
+
+                          // 2) create and show live-updating progress dialog (use page context)
+                          final progressNotifier = ValueNotifier<String>('Preparing to delete');
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (_) => DeleteProgressDialog(message: progressNotifier),
+                          );
 
                           final supabase = Supabase.instance.client;
                           final user = supabase.auth.currentUser;
+                          final session = supabase.auth.currentSession;
 
-                          if (user != null) {
-                            final uid = user.id;
-
-                            // ---------- 0) Read user data for storage paths ----------
-                            Map<String, dynamic>? userData;
-                            try {
-                              final response = await supabase
-                                  .from('app_users')
-                                  .select()
-                                  .eq('id', uid)
-                                  .single();
-                              userData = response;
-                            } catch (e) {
-                              debugPrint('Failed to read user data before deletion: $e');
-                              userData = null;
+                          if (user == null) {
+                            // close progress dialog and inform user
+                            try { Navigator.of(context).pop(); } catch (_) {}
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No user found.")));
                             }
+                            return;
+                          }
 
-                            // ---------- Optional helper: delete storage object ----------
-                            Future<void> _tryDeleteStorageObject(String? filePath) async {
-                              if (filePath == null || filePath.isEmpty) return;
+                          final uid = user.id;
+                          final token = session?.accessToken;
+                          debugPrint('Delete invoked for uid: $uid');
+                          debugPrint('accessToken present: ${token != null}');
+                          if (token != null && token.length > 20) {
+                            debugPrint('accessToken (trunc): ${token.substring(0, 20)}...');
+                          }
 
-                              try {
-                                // Extract filename from full URL or path
-                                // If it's a full URL, extract the path after the bucket name
-                                String path = filePath;
-                                if (filePath.contains('storage/v1/object/public/avatars/')) {
-                                  path = filePath.split('avatars/').last;
-                                } else if (filePath.contains('/')) {
-                                  // If it's already a path, use it as is
-                                  path = filePath;
-                                }
-                                
-                                if (path.isNotEmpty) {
-                                  await supabase.storage.from('avatars').remove([path]);
-                                  debugPrint('Deleted storage object: $path');
-                                }
-                              } catch (e) {
-                                debugPrint('Storage delete failed for "$filePath": $e');
+                          // 1) attempt normal supabase.functions.invoke
+                          Map? efBody;
+                          int status = 0;
+                          dynamic efData;
+
+                          // Update UI: starting storage removal step
+                          progressNotifier.value = 'Removing files';
+
+                          try {
+                            final efResponse = await supabase.functions.invoke(
+                              'delete-user-account',
+                              body: {'userId': uid},
+                              headers: {'Authorization': 'Bearer ${token ?? ''}'},
+                            );
+                            status = efResponse.status ?? 0;
+                            efData = efResponse.data;
+                            efBody = efData is Map ? Map<String, dynamic>.from(efData) : {'data': efData};
+                          } catch (e) {
+                            debugPrint('supabase.functions.invoke failed: $e');
+                            // network fallback: try raw HTTP to see exact status/body (helps diagnose network issues)
+                            try {
+                              // Update UI: using raw HTTP fallback
+                              progressNotifier.value = 'Contacting server';
+
+                              // Use explicit PROJECT_URL instead of supabase.options
+                              final uri = Uri.parse('$PROJECT_URL/functions/v1/delete-user-account');
+                              final resp = await http.post(
+                                uri,
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': 'Bearer ${token ?? ''}',
+                                },
+                                body: jsonEncode({'userId': uid}),
+                              );
+                              status = resp.statusCode;
+                              efData = resp.body;
+                              efBody = {'http_body': resp.body};
+                              debugPrint('raw http fallback status: $status body: ${resp.body}');
+                            } catch (rawErr) {
+                              // close progress dialog
+                              try { Navigator.of(context).pop(); } catch (_) {}
+                              debugPrint('raw HTTP fallback failed: $rawErr');
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text("Delete failed (network): $rawErr"), backgroundColor: Colors.red),
+                                );
                               }
+                              return;
                             }
+                          }
 
-                            // ---------- 1) Delete emergency contacts ----------
+                          // close progress dialog before showing result
+                          try { Navigator.of(context).pop(); } catch (_) {}
+
+                          // Final status messages
+                          if (status >= 200 && status < 300) {
+                            // success: sign out and clear notification state
                             try {
-                              await supabase
-                                  .from('emergency_contacts')
-                                  .delete()
-                                  .eq('user_id', uid);
-                            } catch (e) {
-                              debugPrint('Failed to delete emergency contacts: $e');
-                            }
-
-                            // ---------- 2) Try to delete photo & id files from storage ----------
-                            try {
-                              final photoUrl = userData != null ? (userData['photo_url'] ?? '').toString() : '';
-                              final idUrl = userData != null ? (userData['id_url'] ?? '').toString() : '';
-
-                              await _tryDeleteStorageObject(photoUrl);
-                              await _tryDeleteStorageObject(idUrl);
-                            } catch (e) {
-                              debugPrint('Storage deletion encountered an error: $e');
-                            }
-
-                            // ---------- 3) Clear photo_url/id_url fields (best-effort) ----------
-                            try {
-                              await supabase
-                                  .from('app_users')
-                                  .update({'photo_url': null, 'id_url': null})
-                                  .eq('id', uid);
-                            } catch (e) {
-                              debugPrint('Failed to clear photo_url/id_url fields: $e');
-                            }
-
-                            // ---------- 4) Delete user record ----------
-                            try {
-                              await supabase
-                                  .from('app_users')
-                                  .delete()
-                                  .eq('id', uid);
-                            } catch (e) {
-                              debugPrint('Failed to delete user record: $e');
-                            }
-
-                            // ---------- 4.5) Clean up notification tokens & local prefs ----------
-                            try {
-                              await NotificationService().cleanupOnAccountDelete(userId: uid);
-                            } catch (e) {
-                              debugPrint('Notification cleanup failed (best-effort): $e');
-                            }
-
-                            // ---------- 5) Delete Auth account ----------
-                            try {
-                              // Option 1: Simple approach - just delete data and sign out
-                              // This removes all user data but leaves the auth user inactive
                               await supabase.auth.signOut();
-                              
-                              // Option 2: If you have an Edge Function set up
-                              // final response = await supabase.functions.invoke('delete-user-account');
-                              // debugPrint('Edge function response: ${response.data}');
-                              
                             } catch (e) {
-                              debugPrint('Auth cleanup failed: $e');
-                              // Still sign out even if there are errors
-                              await supabase.auth.signOut();
+                              debugPrint('signOut failed: $e');
                             }
-
-                            // --- Clear NotificationService internal state ----------
                             try {
                               await NotificationService().setCurrentUser(null);
                             } catch (e) {
-                              debugPrint('Failed to clear NotificationService current user: $e');
+                              debugPrint('NotificationService cleanup failed: $e');
                             }
-
-                            // Final navigation
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text("Your account was deleted."),
-                                  backgroundColor: Colors.green,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
+                                const SnackBar(content: Text("Your account was deleted."), backgroundColor: Colors.green),
                               );
-
                               Navigator.of(context).pushAndRemoveUntil(
                                 MaterialPageRoute(builder: (_) => LoginScreen(onTap: () {})),
                                 (route) => false,
                               );
                             }
                           } else {
+                            final msg = efBody != null ? efBody.toString() : 'Unknown server error (status $status)';
+                            debugPrint('Delete failed: status=$status body=$efBody');
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text("Account deletion failed: $msg"), backgroundColor: Colors.red),
+                              );
+                            }
+                          }
+                        } catch (e, st) {
+                          // ensure any progress dialog is closed
+                          try { Navigator.of(context).pop(); } catch (_) {}
+                          debugPrint('Unexpected delete exception: $e\n$st');
+                          if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("No user found.")),
+                              SnackBar(content: Text("Delete failed: $e"), backgroundColor: Colors.red),
                             );
                           }
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text("Error deleting account: $e"),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
                         }
                       },
                       style: ElevatedButton.styleFrom(
@@ -470,6 +534,73 @@ class AccountManagementScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small, animated deleting dialog used while the account deletion runs.
+/// Non-dismissible by the user; stops animation when popped.
+class _DeletingDialog extends StatefulWidget {
+  const _DeletingDialog({Key? key}) : super(key: key);
+
+  @override
+  State<_DeletingDialog> createState() => _DeletingDialogState();
+}
+
+class _DeletingDialogState extends State<_DeletingDialog> {
+  final List<String> _messages = [
+    'Removing files…',
+    'Cleaning records…',
+    'Finalizing deletion…',
+  ];
+
+  int _msgIndex = 0;
+  int _dotCount = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Animate message + dot count every 600ms
+    _timer = Timer.periodic(const Duration(milliseconds: 600), (t) {
+      setState(() {
+        _dotCount = (_dotCount + 1) % 4;
+        if (_dotCount == 0) {
+          _msgIndex = (_msgIndex + 1) % _messages.length;
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dots = '.' * _dotCount;
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.symmetric(horizontal: 24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 12),
+            Text(
+              '${_messages[_msgIndex]}$dots',
+              style: const TextStyle(fontSize: 14),
+            ),
+          ],
         ),
       ),
     );

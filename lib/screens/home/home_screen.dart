@@ -39,6 +39,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final SupabaseClient supabase = Supabase.instance.client;
 
+  String _formatTimestampForDisplay(dynamic timestamp) {
+  if (timestamp == null) return 'Unknown time';
+  
+  try {
+    DateTime dateTime;
+    if (timestamp is String) {
+      dateTime = DateTime.parse(timestamp);
+      // Adjust for Asia/Manila timezone (UTC+8) since database stores in Manila time
+      final manilaOffset = Duration(hours: 8);
+      dateTime = dateTime.add(manilaOffset);
+    } else if (timestamp is DateTime) {
+      dateTime = timestamp;
+    } else {
+      return 'Invalid time';
+    }
+    
+    return DateFormat('MMM d, h:mm a').format(dateTime);
+  } catch (_) {
+    return 'Invalid time';
+  }
+}
+
   @override
   void initState() {
     super.initState();
@@ -916,8 +938,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     final address = data['address'] ?? 'Unknown address';
                     final timestamp = data['timestamp'];
                     final time = timestamp != null
-                        ? DateFormat('MMM d, h:mm a').format(DateTime.parse(timestamp))
-                        : 'Unknown time';
+                    ? _formatTimestampForDisplay(timestamp)
+                    : 'Unknown time';
 
                     IconData icon;
                     Color color;

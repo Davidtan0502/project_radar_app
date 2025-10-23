@@ -8,6 +8,7 @@ class TermsConditionScreen {
     bool _listenerAttached = false;
     VoidCallback? _listener;
     bool _canAccept = false;
+    double _scrollProgress = 0.0;
 
     showDialog(
       context: context,
@@ -36,8 +37,16 @@ class TermsConditionScreen {
                     _listenerAttached = true;
                     _listener = () {
                       try {
+                        if (!_scrollController.hasClients) return;
                         final maxScroll = _scrollController.position.maxScrollExtent;
                         final offset = _scrollController.offset;
+
+                        // Update progress safely
+                        final progress = (maxScroll <= 0) ? 1.0 : (offset / maxScroll).clamp(0.0, 1.0);
+                        if ((progress - _scrollProgress).abs() > 0.01) {
+                          setState(() => _scrollProgress = progress);
+                        }
+
                         // Consider some tolerance in case of floating point rounding
                         if (offset >= maxScroll - 2.0) {
                           if (!_canAccept) {
@@ -78,51 +87,232 @@ class TermsConditionScreen {
                     mainAxisSize: MainAxisSize.max,
                     children: [
                       const Icon(
-                        Icons.assignment,
-                        size: 50,
+                        Icons.assignment, // terms icon
+                        size: 48,
                         color: Colors.blueAccent,
                       ),
-                      const SizedBox(height: 15),
+                      const SizedBox(height: 12),
                       const Text(
                         'Terms and Conditions',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 22,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
                         ),
                       ),
-                      const SizedBox(height: 15),
+                      const SizedBox(height: 12),
+
+                      // Scroll progress indicator (thin) — non-blocking and informative
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                        child: LinearProgressIndicator(
+                          value: _scrollProgress,
+                          minHeight: 4,
+                          backgroundColor: Colors.grey.shade200,
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
 
                       // Expanded scroll area that respects maxHeight from the parent ConstrainedBox
                       Expanded(
-                        child: Scrollbar(
-                          thumbVisibility: true,
-                          controller: _scrollController,
-                          child: SingleChildScrollView(
-                            controller: _scrollController,
-                            child: Text(
-                              'By registering, you agree to our Terms and Conditions and acknowledge our compliance with the Data Privacy Act of 2012 (RA 10173).\n\n'
-                              'We collect and process the following personal data: full name, age, date of birth, home address, email address, current location, cellphone Number, and profile image. These will be used only for:\n\n'
-                              '• Account creation and verification\n'
-                              '• Providing emergency services for response\n'
-                              '• Maintaining system security and functionality\n\n'
-                              'Your data will be kept secure, accessed only by authorized personnel, and will not be shared with third parties without your consent, except when required by law or for emergency purposes.\n\n'
-                              'You have the right to access of deletion of your personal information.\n\n'
-                              'By proceeding, you agree to use this application responsibly and understand that it supports emergency response but does not replace professional responders.\n\n',
-                              style: TextStyle(
-                                fontSize: 16, // kept larger for readability
-                                color: Colors.black87,
-                                fontWeight: FontWeight.bold,
-                                height: 1.45, // slightly tighter line height to reduce length
+                        child: Stack(
+                          children: [
+                            // The main scrollable content
+                            Scrollbar(
+                              thumbVisibility: true,
+                              controller: _scrollController,
+                              child: SingleChildScrollView(
+                                controller: _scrollController,
+                                child: SelectableText.rich(
+                                  TextSpan(
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      color: Colors.black87,
+                                      height: 1.5,
+                                    ),
+                                    children: [
+                                      const TextSpan(
+                                        text: '1. Acceptance of Terms\n',
+                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                      const TextSpan(
+                                        text:
+                                            'By registering for and using this mobile application, you acknowledge that you have read, understood, and agree to be legally bound by these Terms and Conditions. If you do not agree to these terms, you must not proceed with registration or use the RADAR Mobile App.\n\n',
+                                      ),
+
+                                      const TextSpan(
+                                        text: '2. Governing Laws\n',
+                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                      const TextSpan(
+                                        text:
+                                            'This App operates in compliance with Republic Act No. 10173 (Data Privacy Act of 2012) and is aligned with the principles of Republic Act No. 10121 (Philippine Disaster Risk Reduction and Management Act of 2010).\n\n',
+                                      ),
+
+                                      const TextSpan(
+                                        text: '3. Data We Collect\n',
+                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                      const TextSpan(
+                                        text:
+                                            'For the purposes of account creation, verification, and providing emergency response services, we collect and process the following personal information:\n\n',
+                                      ),
+                                      const TextSpan(text: '• Full Name\n'),
+                                      const TextSpan(text: '• Age and Date of Birth\n'),
+                                      const TextSpan(text: '• Home Address\n'),
+                                      const TextSpan(text: '• Email Address\n'),
+                                      const TextSpan(text: '• Current Location\n'),
+                                      const TextSpan(text: '• Cellphone Number\n'),
+                                      const TextSpan(text: '• Profile Image\n\n'),
+
+                                      const TextSpan(
+                                        text: '4. Use of Your Information\n',
+                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                      const TextSpan(
+                                        text:
+                                            'Your personal data will be used strictly for the following purposes:\n\n',
+                                      ),
+                                      const TextSpan(text: '• To create and verify your user account.\n'),
+                                      const TextSpan(text: '• To provide and facilitate emergency services and disaster response.\n'),
+                                      const TextSpan(text: '• To maintain the security and functionality of the system.\n\n'),
+                                      const TextSpan(
+                                        text:
+                                            'Your data will be kept confidential and secure, accessed only by authorized personnel. It will not be shared with any third party without your express consent, except as required by law or for essential emergency response purposes.\n\n',
+                                      ),
+
+                                      const TextSpan(
+                                        text: '5. Your Data Privacy Rights\n',
+                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                      const TextSpan(
+                                        text:
+                                            'In accordance with the Data Privacy Act, you have the right to access, correct, and request the deletion of your personal information held by us. You may contact us to exercise these rights.\n\n',
+                                      ),
+
+                                      const TextSpan(
+                                        text: '6. User Responsibility and Prohibited Acts\n',
+                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                      const TextSpan(
+                                        text:
+                                            'You agree to use this App responsibly and solely for its intended purpose of reporting legitimate incidents.\n\n',
+                                      ),
+
+                                      const TextSpan(
+                                        text: '6.1. Disclaimer on Emergency Response\n',
+                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                      const TextSpan(
+                                        text:
+                                            'You understand and acknowledge that this App is a support tool and does not replace professional emergency responders. The service facilitates reporting but does not guarantee a specific response time or outcome.\n\n',
+                                      ),
+
+                                      const TextSpan(
+                                        text: '6.2. Prohibition on False Reporting\n',
+                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                      const TextSpan(
+                                        text:
+                                            'Pursuant to PRESIDENTIAL DECREE NO. 1727-A, it is unlawful to willfully communicate or maliciously disseminate false information regarding an attempt to damage or destroy property using explosives or similar means.\n\n',
+                                      ),
+
+                                      const TextSpan(
+                                        text: '7. Penalties for Violation\n',
+                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                      const TextSpan(
+                                        text:
+                                            'Any user found to be in violation of these Terms, particularly the provision on false reporting under P.D. 1727-A, may be subject to legal prosecution. Penalties for violation can include:\n\n',
+                                      ),
+                                      const TextSpan(text: '• Imprisonment of up to five (5) years;\n'),
+                                      const TextSpan(text: '• A fine of up to Forty Thousand Pesos (₱40,000.00); or\n'),
+                                      const TextSpan(text: '• Both, at the discretion of the court.\n\n'),
+
+                                      const TextSpan(
+                                        text: '8. Consent\n',
+                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                      const TextSpan(
+                                        text:
+                                            'By proceeding with the registration and clicking "I Agree," you provide your explicit consent to the collection, use, and processing of your personal data as described herein, and you agree to abide by all the terms and conditions set forth in this document.\n',
+                                      ),
+                                    ],
+                                  ),
+                                  showCursor: false,
+                                ),
                               ),
-                              textAlign: TextAlign.justify,
                             ),
-                          ),
+
+                            // Non-blocking top/bottom gradient to subtly indicate scrollability
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              top: 0,
+                              height: 18,
+                              child: IgnorePointer(
+                                ignoring: true,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [Colors.white, Colors.white.withOpacity(0.0)],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              height: 18,
+                              child: IgnorePointer(
+                                ignoring: true,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                      colors: [Colors.white, Colors.white.withOpacity(0.0)],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // Small floating 'Jump to bottom' button — does not block reading because it's small and tucked
+                            Positioned(
+                              right: 6,
+                              bottom: 6,
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 200),
+                                opacity: _canAccept ? 0.0 : 1.0, // hide when already reached bottom
+                                child: FloatingActionButton.small(
+                                  heroTag: 'jump_to_bottom',
+                                  onPressed: () {
+                                    // animate to bottom
+                                    if (_scrollController.hasClients) {
+                                      _scrollController.animateTo(
+                                        _scrollController.position.maxScrollExtent,
+                                        duration: const Duration(milliseconds: 400),
+                                        curve: Curves.easeOut,
+                                      );
+                                    }
+                                  },
+                                  child: const Icon(Icons.arrow_downward),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 
                       const SizedBox(height: 12),
+
                       // small hint (optional) — only visible while Accept still disabled
                       if (!_canAccept)
                         Padding(
@@ -135,7 +325,10 @@ class TermsConditionScreen {
                             ),
                           ),
                         ),
+
                       const SizedBox(height: 8),
+
+                      // Sticky action row — will always be visible and does not overlap the content
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [

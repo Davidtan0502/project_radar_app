@@ -10,10 +10,15 @@ class LoginScreen extends StatefulWidget {
     super.key, 
     required this.onTap,
     this.showVerificationMessage = false,
+    this.initialEmail,                // NEW
+    this.initialShowPasswordStep = false, // NEW
   });
   
   final VoidCallback onTap;
   final bool showVerificationMessage;
+
+  final String? initialEmail;
+  final bool initialShowPasswordStep;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -52,74 +57,19 @@ class _LoginScreenState extends State<LoginScreen>
     super.initState();
     _initializeAnimations();
 
-    // subscribe to auth state changes so we can detect password recovery event
-    try {
-      // supabase.auth.onAuthStateChange is a Stream in supabase_flutter 2.x
-      _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
-        try {
-          // `data` shape can vary between SDK versions. handle common shapes safely
-          // Avoid using data[...] indexing (AuthState doesn't implement []), access properties instead.
-          dynamic event;
-          dynamic session;
-
-          // Prefer property access; many SDK versions provide `event` and `session` fields
-          try {
-            event = (data as dynamic).event;
-            session = (data as dynamic).session;
-          } catch (_) {
-            // If property access fails, fall back to treating the whole object as the event
-            event = data;
-            session = null;
-          }
-
-          debugPrint('[AuthState] event: $event, session: $session');
-
-         final ev = event?.toString().toLowerCase() ?? '';
-final bool isRecoveryEvent = ev.contains('password') ||
-                             ev.contains('recover') ||
-                             ev.contains('recovery') ||
-                             ev.contains('password_recovery');
-
-// if it's a recovery-like event, ensure the SDK actually has a session/user
-if (isRecoveryEvent) {
-  // prefer session from the event if provided, otherwise check SDK
-  final dynamic eventSession = session;
-  final currentUser = supabase.auth.currentUser;
-  final currentSession = eventSession ?? supabase.auth.currentSession;
-
-  debugPrint('[AuthState] recovery event detected. eventSession: $eventSession, currentSession: $currentSession, currentUser: $currentUser');
-
-  // If there's no authenticated user or session -> don't navigate (likely link not handled by app)
-  if (currentUser == null && (currentSession == null || (currentSession as dynamic)?.accessToken == null)) {
-    debugPrint('[AuthState] No active recovery session/user found; not navigating to reset screen.');
-    return;
-  }
-
-  if (!mounted) return;
-
-  // Prevent opening multiple reset screens
-  if (_isResetScreenOpen) {
-    debugPrint('[AuthState] Reset screen already open; skipping push.');
-    return;
-  }
-
-  _isResetScreenOpen = true;
-
-  Navigator.push(
-    context,
-    MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
-  ).then((_) {
-    // Reset the flag when the reset screen is popped
-    _isResetScreenOpen = false;
-  });
-}
-
-        } catch (e, st) {
-          debugPrint('[authListener] handler error: $e\n$st');
-        }
+    // Apply optional initial arguments (prefill email / open password step)
+    if (widget.initialEmail != null && widget.initialEmail!.isNotEmpty) {
+      _emailController.text = widget.initialEmail!;
+    }
+    if (widget.initialShowPasswordStep) {
+      // Give a short delay so widget is mounted before changing focus/UI
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _showPasswordStep = true;
+        });
+        _focusPasswordField();
       });
-    } catch (e, st) {
-      debugPrint('[initState] Failed to subscribe auth changes: $e\n$st');
     }
   }
 
@@ -489,9 +439,9 @@ Future<void> _verifyEmail() async {
       final redirectUrl = 'com.projectradar://reset-password';
 
       await supabase.auth.resetPasswordForEmail(
-        email,
-        redirectTo: redirectUrl,
-      );
+  email,
+  redirectTo: 'com.projectradar://reset-password',
+);
 
       if (!mounted) return;
       _showDialog('Password reset instructions have been sent to $email');
