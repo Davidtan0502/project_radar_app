@@ -837,208 +837,257 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildRecentIncidents(bool isSmallScreen) {
-    return _cardContainer(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.orange[50],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.warning_amber,
-                      color: Colors.orange[600],
-                      size: isSmallScreen ? 18 : 20,
-                    ),
+Widget _buildRecentIncidents(bool isSmallScreen) {
+  return _cardContainer(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  SizedBox(width: isSmallScreen ? 8 : 10),
-                  Text(
-                    "Recent Incidents",
-                    style: GoogleFonts.poppins(
-                      fontSize: isSmallScreen ? 16 : 17,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ReportTrackerScreen(initialTab: 0),
-                      ),
-                    );
-                  },
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isSmallScreen ? 12 : 16,
-                      vertical: isSmallScreen ? 6 : 8,
-                    ),
-                  ),
-                  child: Text(
-                    "See all",
-                    style: TextStyle(
-                      fontSize: isSmallScreen ? 13 : 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.blue[700],
-                    ),
+                  child: Icon(
+                    Icons.warning_amber,
+                    color: Colors.orange[600],
+                    size: isSmallScreen ? 18 : 20,
                   ),
                 ),
-              ),
-            ],
-          ),
-          SizedBox(height: isSmallScreen ? 10 : 12),
-          SizedBox(
-            height: isSmallScreen ? 160 : 170,
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: supabase
-                  .from('incidents')
-                  .stream(primaryKey: ['id'])
-                  .order('timestamp', ascending: false)
-                  .limit(8), // Reduced limit for smaller screens
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return _buildErrorState(isSmallScreen);
-                }
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return _buildLoadingState(isSmallScreen);
-                }
-
-                final incidents = snapshot.data ?? [];
-                final filteredIncidents = incidents
-                    .where((incident) =>
-                        (incident['status'] ?? '').toString().toLowerCase() != 'declined')
-                    .toList();
-
-                if (filteredIncidents.isEmpty) {
-                  return _buildEmptyState(isSmallScreen);
-                }
-
-                return ListView.separated(
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: filteredIncidents.length,
-                  separatorBuilder: (_, __) => SizedBox(height: isSmallScreen ? 8 : 10),
-                  itemBuilder: (context, index) {
-                    final data = filteredIncidents[index];
-                    final incidentType = data['incident_type'] ?? 'Unknown type';
-                    final address = data['address'] ?? 'Unknown address';
-                    final timestamp = data['timestamp'];
-                    final time = timestamp != null
-                    ? _formatTimestampForDisplay(timestamp)
-                    : 'Unknown time';
-
-                    IconData icon;
-                    Color color;
-
-                    switch (incidentType.toString().toLowerCase()) {
-                      case 'fire':
-                        icon = Icons.local_fire_department;
-                        color = Colors.redAccent;
-                        break;
-                      case 'flood':
-                        icon = Icons.water_drop;
-                        color = Colors.blueAccent;
-                        break;
-                      case 'accident':
-                        icon = Icons.car_crash;
-                        color = Colors.orangeAccent;
-                        break;
-                      default:
-                        icon = Icons.warning;
-                        color = Colors.green;
-                    }
-
-                    return Container(
-                      padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey[200]!),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.03),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: isSmallScreen ? 38 : 40,
-                            height: isSmallScreen ? 38 : 40,
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              icon, 
-                              color: color, 
-                              size: isSmallScreen ? 18 : 20
-                            ),
-                          ),
-                          SizedBox(width: isSmallScreen ? 10 : 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  incidentType.toString(),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: isSmallScreen ? 14 : 15,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                SizedBox(height: isSmallScreen ? 2 : 4),
-                                Text(
-                                  address,
-                                  style: TextStyle(
-                                    color: Colors.grey[700],
-                                    fontSize: isSmallScreen ? 12 : 13,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                SizedBox(height: isSmallScreen ? 2 : 4),
-                                Text(
-                                  time,
-                                  style: TextStyle(
-                                    color: Colors.grey[500],
-                                    fontSize: isSmallScreen ? 11 : 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
+                SizedBox(width: isSmallScreen ? 8 : 10),
+                Text(
+                  "Recent Incidents",
+                  style: GoogleFonts.poppins(
+                    fontSize: isSmallScreen ? 16 : 17,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ReportTrackerScreen(initialTab: 0),
+                    ),
+                  );
+                },
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isSmallScreen ? 12 : 16,
+                    vertical: isSmallScreen ? 6 : 8,
+                  ),
+                ),
+                child: Text(
+                  "See all",
+                  style: TextStyle(
+                    fontSize: isSmallScreen ? 13 : 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.blue[700],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: isSmallScreen ? 10 : 12),
+        SizedBox(
+          height: isSmallScreen ? 160 : 170,
+          child: StreamBuilder<List<Map<String, dynamic>>>(
+            stream: supabase
+                .from('incidents')
+                .stream(primaryKey: ['id'])
+                .order('timestamp', ascending: false)
+                .limit(8),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return _buildErrorState(isSmallScreen);
+              }
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return _buildLoadingState(isSmallScreen);
+              }
+
+              final incidents = snapshot.data ?? [];
+              
+              // Filter incidents to show only resolved ones from today in Manila timezone
+              final now = DateTime.now().toUtc().add(Duration(hours: 8)); // Convert to Manila time (UTC+8)
+              final todayStart = DateTime(now.year, now.month, now.day);
+              final todayEnd = todayStart.add(Duration(days: 1));
+
+              final filteredIncidents = incidents
+                  .where((incident) {
+                    final status = (incident['status'] ?? '').toString().toLowerCase();
+                    final timestamp = incident['timestamp'];
+                    
+                    if (timestamp == null) return false;
+                    
+                    // Parse timestamp and adjust to Manila timezone
+                    DateTime incidentTime;
+                    if (timestamp is String) {
+                      incidentTime = DateTime.parse(timestamp);
+                    } else if (timestamp is DateTime) {
+                      incidentTime = timestamp;
+                    } else {
+                      return false;
+                    }
+                    
+                    // Convert incident time to Manila timezone (UTC+8)
+                    final incidentTimeManila = incidentTime.add(Duration(hours: 8));
+                    
+                    // Check if incident is resolved and from today
+                    final isResolved = status == 'resolved';
+                    final isToday = incidentTimeManila.isAfter(todayStart) && 
+                                    incidentTimeManila.isBefore(todayEnd);
+                    
+                    return isResolved && isToday;
+                  })
+                  .toList();
+
+              if (filteredIncidents.isEmpty) {
+                return _buildEmptyState(isSmallScreen);
+              }
+
+              return ListView.separated(
+                physics: const BouncingScrollPhysics(),
+                itemCount: filteredIncidents.length,
+                separatorBuilder: (_, __) => SizedBox(height: isSmallScreen ? 8 : 10),
+                itemBuilder: (context, index) {
+                  final data = filteredIncidents[index];
+                  final incidentType = data['incident_type'] ?? 'Unknown type';
+                  final address = data['address'] ?? 'Unknown address';
+                  final timestamp = data['timestamp'];
+                  final time = timestamp != null
+                      ? _formatTimestampForDisplay(timestamp)
+                      : 'Unknown time';
+
+                  IconData icon;
+                  Color color;
+
+                  switch (incidentType.toString().toLowerCase()) {
+                    case 'fire':
+                      icon = Icons.local_fire_department;
+                      color = Colors.redAccent;
+                      break;
+                    case 'flood':
+                      icon = Icons.water_drop;
+                      color = Colors.blueAccent;
+                      break;
+                    case 'accident':
+                      icon = Icons.car_crash;
+                      color = Colors.orangeAccent;
+                      break;
+                    default:
+                      icon = Icons.warning;
+                      color = Colors.green;
+                  }
+
+                  return Container(
+                    padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[200]!),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: isSmallScreen ? 38 : 40,
+                          height: isSmallScreen ? 38 : 40,
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            icon, 
+                            color: color, 
+                            size: isSmallScreen ? 18 : 20
+                          ),
+                        ),
+                        SizedBox(width: isSmallScreen ? 10 : 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                incidentType.toString(),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: isSmallScreen ? 14 : 15,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              SizedBox(height: isSmallScreen ? 2 : 4),
+                              Text(
+                                address,
+                                style: TextStyle(
+                                  color: Colors.grey[700],
+                                  fontSize: isSmallScreen ? 12 : 13,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              SizedBox(height: isSmallScreen ? 2 : 4),
+                              Text(
+                                time,
+                                style: TextStyle(
+                                  color: Colors.grey[500],
+                                  fontSize: isSmallScreen ? 11 : 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(height: isSmallScreen ? 2 : 4),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isSmallScreen ? 6 : 8,
+                                  vertical: isSmallScreen ? 2 : 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.green[50],
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'RESOLVED',
+                                  style: TextStyle(
+                                    color: Colors.green[700],
+                                    fontSize: isSmallScreen ? 10 : 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildErrorState(bool isSmallScreen) {
     return Center(
