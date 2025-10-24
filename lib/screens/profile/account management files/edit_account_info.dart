@@ -95,6 +95,834 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     "San Andres Bukid",
     "Sampaloc",
   ];
+  // ZIP code mapping
+final Map<String, List<String>> _zipCodeMap = {
+  "Tondo": ["1012", "1013"],
+  "Binondo": ["1006"],
+  "Quiapo": ["1001"],
+  "Intramuros": ["1002"],
+  "Ermita": ["1000"],
+  "Malate": ["1004"],
+  "Paco": ["1007"],
+  "Pandacan": ["1011"],
+  "Port Area": ["1018", "1019"],
+  "San Nicolas": ["1010"],
+  "Santa Ana": ["1009"],
+  "Santa Cruz": ["1003"],
+  "Santa Mesa": ["1016"],
+  "San Miguel": ["1005"],
+  "San Andres Bukid": ["1017"],
+  "Sampaloc": ["1008"],
+};
+
+List<String> _getZipCodesForTown(String? town) {
+  if (town == null) return [];
+  return _zipCodeMap[town] ?? [];
+}
+
+String? _getFirstZipCodeForTown(String? town) {
+  final zipCodes = _getZipCodesForTown(town);
+  return zipCodes.isNotEmpty ? zipCodes.first : null;
+}
+
+  //barangay
+  final String _barangayCsv = r'''
+district,barangay
+Tondo,Barangay 1
+Tondo,Barangay 2
+Tondo,Barangay 3
+Tondo,Barangay 4
+Tondo,Barangay 5
+Tondo,Barangay 6
+Tondo,Barangay 7
+Tondo,Barangay 8
+Tondo,Barangay 9
+Tondo,Barangay 10
+Tondo,Barangay 11
+Tondo,Barangay 12
+Tondo,Barangay 13
+Tondo,Barangay 14
+Tondo,Barangay 15
+Tondo,Barangay 16
+Tondo,Barangay 17
+Tondo,Barangay 18
+Tondo,Barangay 19
+Tondo,Barangay 20
+Tondo,Barangay 21
+Tondo,Barangay 22
+Tondo,Barangay 23
+Tondo,Barangay 24
+Tondo,Barangay 25
+Tondo,Barangay 26
+Tondo,Barangay 27
+Tondo,Barangay 28
+Tondo,Barangay 29
+Tondo,Barangay 30
+Tondo,Barangay 31
+Tondo,Barangay 32
+Tondo,Barangay 33
+Tondo,Barangay 34
+Tondo,Barangay 35
+Tondo,Barangay 36
+Tondo,Barangay 37
+Tondo,Barangay 38
+Tondo,Barangay 39
+Tondo,Barangay 40
+Tondo,Barangay 41
+Tondo,Barangay 42
+Tondo,Barangay 43
+Tondo,Barangay 44
+Tondo,Barangay 45
+Tondo,Barangay 46
+Tondo,Barangay 47
+Tondo,Barangay 48
+Tondo,Barangay 49
+Tondo,Barangay 50
+Tondo,Barangay 51
+Tondo,Barangay 52
+Tondo,Barangay 53
+Tondo,Barangay 54
+Tondo,Barangay 55
+Tondo,Barangay 56
+Tondo,Barangay 57
+Tondo,Barangay 58
+Tondo,Barangay 59
+Tondo,Barangay 60
+Tondo,Barangay 61
+Tondo,Barangay 62
+Tondo,Barangay 63
+Tondo,Barangay 64
+Tondo,Barangay 65
+Tondo,Barangay 66
+Tondo,Barangay 67
+Tondo,Barangay 68
+Tondo,Barangay 69
+Tondo,Barangay 70
+Tondo,Barangay 71
+Tondo,Barangay 72
+Tondo,Barangay 73
+Tondo,Barangay 74
+Tondo,Barangay 75
+Tondo,Barangay 76
+Tondo,Barangay 77
+Tondo,Barangay 78
+Tondo,Barangay 79
+Tondo,Barangay 80
+Tondo,Barangay 81
+Tondo,Barangay 82
+Tondo,Barangay 83
+Tondo,Barangay 84
+Tondo,Barangay 85
+Tondo,Barangay 86
+Tondo,Barangay 87
+Tondo,Barangay 88
+Tondo,Barangay 89
+Tondo,Barangay 90
+Tondo,Barangay 91
+Tondo,Barangay 92
+Tondo,Barangay 93
+Tondo,Barangay 94
+Tondo,Barangay 95
+Tondo,Barangay 96
+Tondo,Barangay 97
+Tondo,Barangay 98
+Tondo,Barangay 99
+Tondo,Barangay 100
+Tondo,Barangay 101
+Tondo,Barangay 102
+Tondo,Barangay 103
+Tondo,Barangay 104
+Tondo,Barangay 105
+Tondo,Barangay 106
+Tondo,Barangay 107
+Tondo,Barangay 108
+Tondo,Barangay 109
+Tondo,Barangay 110
+Tondo,Barangay 111
+Tondo,Barangay 112
+Tondo,Barangay 113
+Tondo,Barangay 114
+Tondo,Barangay 115
+Tondo,Barangay 116
+Tondo,Barangay 117
+Tondo,Barangay 118
+Tondo,Barangay 119
+Tondo,Barangay 120
+Tondo,Barangay 121
+Tondo,Barangay 122
+Tondo,Barangay 123
+Tondo,Barangay 124
+Tondo,Barangay 125
+Tondo,Barangay 126
+Tondo,Barangay 127
+Tondo,Barangay 128
+Tondo,Barangay 129
+Tondo,Barangay 130
+Tondo,Barangay 131
+Tondo,Barangay 132
+Tondo,Barangay 133
+Tondo,Barangay 134
+Tondo,Barangay 135
+Tondo,Barangay 136
+Tondo,Barangay 137
+Tondo,Barangay 138
+Tondo,Barangay 139
+Tondo,Barangay 140
+Tondo,Barangay 141
+Tondo,Barangay 142
+Tondo,Barangay 143
+Tondo,Barangay 144
+Tondo,Barangay 145
+Tondo,Barangay 146
+Tondo,Barangay 147
+Tondo,Barangay 148
+Tondo,Barangay 149
+Tondo,Barangay 150
+Tondo,Barangay 151
+Tondo,Barangay 152
+Tondo,Barangay 153
+Tondo,Barangay 154
+Tondo,Barangay 155
+Tondo,Barangay 156
+Tondo,Barangay 157
+Tondo,Barangay 158
+Tondo,Barangay 159
+Tondo,Barangay 160
+Tondo,Barangay 161
+Tondo,Barangay 162
+Tondo,Barangay 163
+Tondo,Barangay 164
+Tondo,Barangay 165
+Tondo,Barangay 166
+Tondo,Barangay 167
+Tondo,Barangay 168
+Tondo,Barangay 169
+Tondo,Barangay 170
+Tondo,Barangay 171
+Tondo,Barangay 172
+Tondo,Barangay 173
+Tondo,Barangay 174
+Tondo,Barangay 175
+Tondo,Barangay 176
+Tondo,Barangay 177
+Tondo,Barangay 178
+Tondo,Barangay 179
+Tondo,Barangay 180
+Tondo,Barangay 181
+Tondo,Barangay 182
+Tondo,Barangay 183
+Tondo,Barangay 184
+Tondo,Barangay 185
+Tondo,Barangay 186
+Tondo,Barangay 187
+Tondo,Barangay 188
+Tondo,Barangay 189
+Tondo,Barangay 190
+Tondo,Barangay 191
+Tondo,Barangay 192
+Tondo,Barangay 193
+Tondo,Barangay 194
+Tondo,Barangay 195
+Tondo,Barangay 196
+Tondo,Barangay 197
+Tondo,Barangay 198
+Tondo,Barangay 199
+Tondo,Barangay 200
+Tondo,Barangay 201
+Tondo,Barangay 202
+Tondo,Barangay 203
+Tondo,Barangay 204
+Tondo,Barangay 205
+Tondo,Barangay 206
+Tondo,Barangay 207
+Tondo,Barangay 208
+Tondo,Barangay 209
+Tondo,Barangay 210
+Tondo,Barangay 211
+Tondo,Barangay 212
+Tondo,Barangay 213
+Tondo,Barangay 214
+Tondo,Barangay 215
+Tondo,Barangay 216
+Tondo,Barangay 217
+Tondo,Barangay 218
+Tondo,Barangay 219
+Tondo,Barangay 220
+Tondo,Barangay 221
+Tondo,Barangay 222
+Tondo,Barangay 223
+Tondo,Barangay 224
+Tondo,Barangay 225
+Tondo,Barangay 226
+Tondo,Barangay 227
+Tondo,Barangay 228
+Tondo,Barangay 229
+Tondo,Barangay 230
+Tondo,Barangay 231
+Tondo,Barangay 232
+Tondo,Barangay 233
+Tondo,Barangay 234
+Tondo,Barangay 235
+Tondo,Barangay 236
+Tondo,Barangay 237
+Tondo,Barangay 238
+Tondo,Barangay 239
+Tondo,Barangay 240
+Tondo,Barangay 241
+Tondo,Barangay 242
+Tondo,Barangay 243
+Tondo,Barangay 244
+Tondo,Barangay 245
+Tondo,Barangay 246
+Tondo,Barangay 247
+Tondo,Barangay 248
+Tondo,Barangay 249
+Tondo,Barangay 250
+Tondo,Barangay 251
+Tondo,Barangay 252
+Tondo,Barangay 253
+Tondo,Barangay 254
+Tondo,Barangay 255
+Tondo,Barangay 256
+Tondo,Barangay 257
+Tondo,Barangay 258
+Tondo,Barangay 259
+Tondo,Barangay 260
+Tondo,Barangay 261
+Tondo,Barangay 262
+Tondo,Barangay 263
+Tondo,Barangay 264
+Tondo,Barangay 265
+Tondo,Barangay 266
+Tondo,Barangay 267
+Binondo,Barangay 287
+Binondo,Barangay 288
+Binondo,Barangay 289
+Binondo,Barangay 290
+Binondo,Barangay 291
+Binondo,Barangay 292
+Binondo,Barangay 293
+Binondo,Barangay 294
+Binondo,Barangay 295
+Binondo,Barangay 296
+Quiapo,Barangay 306
+Quiapo,Barangay 307
+Quiapo,Barangay 308
+Quiapo,Barangay 309
+Quiapo,Barangay 383
+Quiapo,Barangay 384
+Quiapo,Barangay 385
+Quiapo,Barangay 386
+Quiapo,Barangay 387
+Quiapo,Barangay 388
+Quiapo,Barangay 389
+Quiapo,Barangay 390
+Quiapo,Barangay 391
+Quiapo,Barangay 392
+Quiapo,Barangay 393
+Quiapo,Barangay 394
+Intramuros,Barangay 654
+Intramuros,Barangay 655
+Intramuros,Barangay 656
+Intramuros,Barangay 657
+Intramuros,Barangay 658
+Ermita,Barangay 659
+Ermita,Barangay 659-A
+Ermita,Barangay 660
+Ermita,Barangay 660-A
+Ermita,Barangay 661
+Ermita,Barangay 663
+Ermita,Barangay 663-A
+Ermita,Barangay 664
+Ermita,Barangay 666
+Ermita,Barangay 667
+Ermita,Barangay 668
+Ermita,Barangay 669
+Ermita,Barangay 670
+Malate,Barangay 688
+Malate,Barangay 689
+Malate,Barangay 690
+Malate,Barangay 691
+Malate,Barangay 692
+Malate,Barangay 693
+Malate,Barangay 694
+Malate,Barangay 695
+Malate,Barangay 696
+Malate,Barangay 697
+Malate,Barangay 698
+Malate,Barangay 699
+Malate,Barangay 700
+Malate,Barangay 701
+Malate,Barangay 702
+Malate,Barangay 703
+Malate,Barangay 704
+Malate,Barangay 705
+Malate,Barangay 706
+Malate,Barangay 707
+Malate,Barangay 708
+Malate,Barangay 709
+Malate,Barangay 710
+Malate,Barangay 711
+Malate,Barangay 712
+Malate,Barangay 713
+Malate,Barangay 714
+Malate,Barangay 715
+Malate,Barangay 716
+Malate,Barangay 717
+Malate,Barangay 718
+Malate,Barangay 719
+Malate,Barangay 720
+Malate,Barangay 722
+Malate,Barangay 723
+Malate,Barangay 724
+Malate,Barangay 725
+Malate,Barangay 726
+Malate,Barangay 727
+Malate,Barangay 728
+Malate,Barangay 729
+Malate,Barangay 730
+Malate,Barangay 731
+Malate,Barangay 732
+Malate,Barangay 733
+Malate,Barangay 734
+Malate,Barangay 735
+Malate,Barangay 736
+Malate,Barangay 737
+Malate,Barangay 738
+Malate,Barangay 739
+Malate,Barangay 740
+Malate,Barangay 741
+Malate,Barangay 742
+Malate,Barangay 743
+Malate,Barangay 744
+Paco,Barangay 662
+Paco,Barangay 664-A
+Paco,Barangay 671
+Paco,Barangay 672
+Paco,Barangay 673
+Paco,Barangay 674
+Paco,Barangay 675
+Paco,Barangay 676
+Paco,Barangay 677
+Paco,Barangay 678
+Paco,Barangay 679
+Paco,Barangay 680
+Paco,Barangay 681
+Paco,Barangay 682
+Paco,Barangay 683
+Paco,Barangay 684
+Paco,Barangay 685
+Paco,Barangay 686
+Paco,Barangay 686
+Paco,Barangay 687
+Paco,Barangay 809
+Paco,Barangay 810
+Paco,Barangay 811
+Paco,Barangay 812
+Paco,Barangay 813
+Paco,Barangay 814
+Paco,Barangay 815
+Paco,Barangay 816
+Paco,Barangay 817
+Paco,Barangay 818
+Paco,Barangay 819
+Paco,Barangay 820
+Paco,Barangay 821
+Paco,Barangay 822
+Paco,Barangay 823
+Paco,Barangay 824
+Paco,Barangay 825
+Paco,Barangay 826
+Paco,Barangay 827
+Paco,Barangay 828
+Pandacan,Barangay 833
+Pandacan,Barangay 834
+Pandacan,Barangay 835
+Pandacan,Barangay 836
+Pandacan,Barangay 837
+Pandacan,Barangay 838
+Pandacan,Barangay 839
+Pandacan,Barangay 840
+Pandacan,Barangay 841
+Pandacan,Barangay 842
+Pandacan,Barangay 843
+Pandacan,Barangay 844
+Pandacan,Barangay 845
+Pandacan,Barangay 846
+Pandacan,Barangay 847
+Pandacan,Barangay 848
+Pandacan,Barangay 849
+Pandacan,Barangay 850
+Pandacan,Barangay 851
+Pandacan,Barangay 852
+Pandacan,Barangay 853
+Pandacan,Barangay 854
+Pandacan,Barangay 855
+Pandacan,Barangay 856
+Pandacan,Barangay 857
+Pandacan,Barangay 858
+Pandacan,Barangay 859
+Pandacan,Barangay 860
+Pandacan,Barangay 861
+Pandacan,Barangay 862
+Pandacan,Barangay 863
+Pandacan,Barangay 864
+Pandacan,Barangay 865
+Pandacan,Barangay 867
+Pandacan,Barangay 868
+Pandacan,Barangay 869
+Pandacan,Barangay 870
+Pandacan,Barangay 871
+Pandacan,Barangay 872
+Port Area,Barangay 649
+Port Area,Barangay 650
+Port Area,Barangay 651
+Port Area,Barangay 652
+Port Area,Barangay 653
+San Nicolas,Barangay 268
+San Nicolas,Barangay 269
+San Nicolas,Barangay 270
+San Nicolas,Barangay 271
+San Nicolas,Barangay 272
+San Nicolas,Barangay 273
+San Nicolas,Barangay 274
+San Nicolas,Barangay 275
+San Nicolas,Barangay 276
+San Nicolas,Barangay 281
+San Nicolas,Barangay 282
+San Nicolas,Barangay 283
+San Nicolas,Barangay 284
+San Nicolas,Barangay 285
+San Nicolas,Barangay 286
+Santa Ana,Barangay 866
+Santa Ana,Barangay 873
+Santa Ana,Barangay 874
+Santa Ana,Barangay 875
+Santa Ana,Barangay 876
+Santa Ana,Barangay 877
+Santa Ana,Barangay 878
+Santa Ana,Barangay 879
+Santa Ana,Barangay 880
+Santa Ana,Barangay 881
+Santa Ana,Barangay 882
+Santa Ana,Barangay 883
+Santa Ana,Barangay 884
+Santa Ana,Barangay 885
+Santa Ana,Barangay 886
+Santa Ana,Barangay 887
+Santa Ana,Barangay 888
+Santa Ana,Barangay 889
+Santa Ana,Barangay 890
+Santa Ana,Barangay 891
+Santa Ana,Barangay 892
+Santa Ana,Barangay 893
+Santa Ana,Barangay 894
+Santa Ana,Barangay 895
+Santa Ana,Barangay 896
+Santa Ana,Barangay 897
+Santa Ana,Barangay 898
+Santa Ana,Barangay 899
+Santa Ana,Barangay 900
+Santa Ana,Barangay 901
+Santa Ana,Barangay 902
+Santa Ana,Barangay 903
+Santa Ana,Barangay 904
+Santa Ana,Barangay 905
+Santa Cruz,Barangay 297
+Santa Cruz,Barangay 298
+Santa Cruz,Barangay 299
+Santa Cruz,Barangay 300
+Santa Cruz,Barangay 301
+Santa Cruz,Barangay 302
+Santa Cruz,Barangay 303
+Santa Cruz,Barangay 304
+Santa Cruz,Barangay 305
+Santa Cruz,Barangay 310
+Santa Cruz,Barangay 311
+Santa Cruz,Barangay 312
+Santa Cruz,Barangay 313
+Santa Cruz,Barangay 314
+Santa Cruz,Barangay 315
+Santa Cruz,Barangay 316
+Santa Cruz,Barangay 317
+Santa Cruz,Barangay 318
+Santa Cruz,Barangay 319
+Santa Cruz,Barangay 320
+Santa Cruz,Barangay 321
+Santa Cruz,Barangay 322
+Santa Cruz,Barangay 323
+Santa Cruz,Barangay 324
+Santa Cruz,Barangay 325
+Santa Cruz,Barangay 326
+Santa Cruz,Barangay 327
+Santa Cruz,Barangay 328
+Santa Cruz,Barangay 329
+Santa Cruz,Barangay 330
+Santa Cruz,Barangay 331
+Santa Cruz,Barangay 332
+Santa Cruz,Barangay 333
+Santa Cruz,Barangay 334
+Santa Cruz,Barangay 335
+Santa Cruz,Barangay 336
+Santa Cruz,Barangay 337
+Santa Cruz,Barangay 338
+Santa Cruz,Barangay 339
+Santa Cruz,Barangay 340
+Santa Cruz,Barangay 341
+Santa Cruz,Barangay 342
+Santa Cruz,Barangay 343
+Santa Cruz,Barangay 344
+Santa Cruz,Barangay 345
+Santa Cruz,Barangay 346
+Santa Cruz,Barangay 347
+Santa Cruz,Barangay 348
+Santa Cruz,Barangay 349
+Santa Cruz,Barangay 350
+Santa Cruz,Barangay 351
+Santa Cruz,Barangay 352
+Santa Cruz,Barangay 353
+Santa Cruz,Barangay 354
+Santa Cruz,Barangay 355
+Santa Cruz,Barangay 356
+Santa Cruz,Barangay 357
+Santa Cruz,Barangay 358
+Santa Cruz,Barangay 359
+Santa Cruz,Barangay 360
+Santa Cruz,Barangay 361
+Santa Cruz,Barangay 362
+Santa Mesa,Barangay 587
+Santa Mesa,Barangay 588
+Santa Mesa,Barangay 589
+Santa Mesa,Barangay 590
+Santa Mesa,Barangay 591
+Santa Mesa,Barangay 592
+Santa Mesa,Barangay 593
+Santa Mesa,Barangay 594
+Santa Mesa,Barangay 595
+Santa Mesa,Barangay 596
+Santa Mesa,Barangay 597
+Santa Mesa,Barangay 598
+Santa Mesa,Barangay 599
+Santa Mesa,Barangay 600
+Santa Mesa,Barangay 601
+Santa Mesa,Barangay 602
+Santa Mesa,Barangay 603
+Santa Mesa,Barangay 604
+Santa Mesa,Barangay 605
+Santa Mesa,Barangay 606
+Santa Mesa,Barangay 607
+Santa Mesa,Barangay 608
+Santa Mesa,Barangay 609
+Santa Mesa,Barangay 610
+Santa Mesa,Barangay 611
+Santa Mesa,Barangay 612
+Santa Mesa,Barangay 613
+Santa Mesa,Barangay 614
+Santa Mesa,Barangay 615
+Santa Mesa,Barangay 616
+Santa Mesa,Barangay 617
+Santa Mesa,Barangay 618
+Santa Mesa,Barangay 619
+Santa Mesa,Barangay 620
+Santa Mesa,Barangay 621
+Santa Mesa,Barangay 622
+Santa Mesa,Barangay 623
+Santa Mesa,Barangay 624
+Santa Mesa,Barangay 625
+Santa Mesa,Barangay 626
+Santa Mesa,Barangay 627
+Santa Mesa,Barangay 628
+Santa Mesa,Barangay 629
+Santa Mesa,Barangay 630
+Santa Mesa,Barangay 631
+Santa Mesa,Barangay 632
+Santa Mesa,Barangay 633
+Santa Mesa,Barangay 634
+Santa Mesa,Barangay 635
+Santa Mesa,Barangay 636
+San Miguel,Barangay 637
+San Miguel,Barangay 638
+San Miguel,Barangay 639
+San Miguel,Barangay 640
+San Miguel,Barangay 641
+San Miguel,Barangay 642
+San Miguel,Barangay 643
+San Miguel,Barangay 644
+San Miguel,Barangay 645
+San Miguel,Barangay 646
+San Miguel,Barangay 647
+San Miguel,Barangay 648
+San Andres Bukid,Barangay 745
+San Andres Bukid,Barangay 746
+San Andres Bukid,Barangay 747
+San Andres Bukid,Barangay 748
+San Andres Bukid,Barangay 749
+San Andres Bukid,Barangay 750
+San Andres Bukid,Barangay 751
+San Andres Bukid,Barangay 752
+San Andres Bukid,Barangay 753
+San Andres Bukid,Barangay 754
+San Andres Bukid,Barangay 755
+San Andres Bukid,Barangay 756
+San Andres Bukid,Barangay 757
+San Andres Bukid,Barangay 758
+San Andres Bukid,Barangay 759
+San Andres Bukid,Barangay 760
+San Andres Bukid,Barangay 761
+San Andres Bukid,Barangay 762
+San Andres Bukid,Barangay 763
+San Andres Bukid,Barangay 764
+San Andres Bukid,Barangay 765
+San Andres Bukid,Barangay 766
+San Andres Bukid,Barangay 767
+San Andres Bukid,Barangay 768
+San Andres Bukid,Barangay 769
+San Andres Bukid,Barangay 770
+San Andres Bukid,Barangay 771
+San Andres Bukid,Barangay 772
+San Andres Bukid,Barangay 773
+San Andres Bukid,Barangay 774
+San Andres Bukid,Barangay 775
+San Andres Bukid,Barangay 776
+San Andres Bukid,Barangay 777
+San Andres Bukid,Barangay 778
+San Andres Bukid,Barangay 779
+San Andres Bukid,Barangay 780
+San Andres Bukid,Barangay 781
+San Andres Bukid,Barangay 782
+San Andres Bukid,Barangay 783
+San Andres Bukid,Barangay 784
+San Andres Bukid,Barangay 785
+San Andres Bukid,Barangay 786
+San Andres Bukid,Barangay 787
+San Andres Bukid,Barangay 788
+Sampaloc,Barangay 395
+Sampaloc,Barangay 396
+Sampaloc,Barangay 397
+Sampaloc,Barangay 398
+Sampaloc,Barangay 399
+Sampaloc,Barangay 400
+Sampaloc,Barangay 401
+Sampaloc,Barangay 402
+Sampaloc,Barangay 403
+Sampaloc,Barangay 404
+Sampaloc,Barangay 405
+Sampaloc,Barangay 406
+Sampaloc,Barangay 407
+Sampaloc,Barangay 408
+Sampaloc,Barangay 409
+Sampaloc,Barangay 410
+Sampaloc,Barangay 411
+Sampaloc,Barangay 412
+Sampaloc,Barangay 413
+Sampaloc,Barangay 414
+Sampaloc,Barangay 415
+Sampaloc,Barangay 416
+Sampaloc,Barangay 417
+Sampaloc,Barangay 418
+Sampaloc,Barangay 419
+Sampaloc,Barangay 420
+Sampaloc,Barangay 421
+Sampaloc,Barangay 422
+Sampaloc,Barangay 423
+Sampaloc,Barangay 424
+Sampaloc,Barangay 425
+Sampaloc,Barangay 426
+Sampaloc,Barangay 427
+Sampaloc,Barangay 428
+Sampaloc,Barangay 429
+Sampaloc,Barangay 430
+Sampaloc,Barangay 431
+Sampaloc,Barangay 432
+Sampaloc,Barangay 433
+Sampaloc,Barangay 434
+Sampaloc,Barangay 435
+Sampaloc,Barangay 436
+Sampaloc,Barangay 437
+Sampaloc,Barangay 438
+Sampaloc,Barangay 439
+Sampaloc,Barangay 440
+Sampaloc,Barangay 441
+Sampaloc,Barangay 442
+Sampaloc,Barangay 443
+Sampaloc,Barangay 444
+Sampaloc,Barangay 445
+Sampaloc,Barangay 446
+Sampaloc,Barangay 447
+Sampaloc,Barangay 448
+Sampaloc,Barangay 449
+Sampaloc,Barangay 450
+Sampaloc,Barangay 451
+Sampaloc,Barangay 452
+Sampaloc,Barangay 453
+Sampaloc,Barangay 454
+Sampaloc,Barangay 455
+Sampaloc,Barangay 456
+Sampaloc,Barangay 457
+Sampaloc,Barangay 458
+Sampaloc,Barangay 459
+Sampaloc,Barangay 460
+Sampaloc,Barangay 461
+Sampaloc,Barangay 462
+Sampaloc,Barangay 463
+Sampaloc,Barangay 464
+Sampaloc,Barangay 465
+Sampaloc,Barangay 466
+Sampaloc,Barangay 467
+Sampaloc,Barangay 468
+Sampaloc,Barangay 469
+Sampaloc,Barangay 470
+Sampaloc,Barangay 471
+Sampaloc,Barangay 472
+Sampaloc,Barangay 473
+Sampaloc,Barangay 474
+Sampaloc,Barangay 475
+Sampaloc,Barangay 476
+Sampaloc,Barangay 477
+Sampaloc,Barangay 478
+Sampaloc,Barangay 479
+Sampaloc,Barangay 480
+Sampaloc,Barangay 481
+Sampaloc,Barangay 482
+Sampaloc,Barangay 483
+Sampaloc,Barangay 484
+Sampaloc,Barangay 485
+Sampaloc,Barangay 486
+''';
+
+  late Map<String, List<String>> _barangayMap;
+
+  List<String> _getBarangaysForTown(String? town) {
+    if (town == null) return [];
+    return _barangayMap[town] ?? [];
+  }
+
+  // call this during initState to populate _barangayMap (see note below)
+void _initializeBarangayMapFromCsv() {
+  _barangayMap = {};
+  final lines = _barangayCsv
+    .split('\n')
+    .map((l) => l.trim())
+    .where((l) => l.isNotEmpty)
+    .toList();
+  if (lines.isNotEmpty && lines.first.toLowerCase().startsWith('district')) {
+    lines.removeAt(0); // drop header if present
+  }
+  for (final line in lines) {
+    final parts = line.split(',');
+    if (parts.length >= 2) {
+      final town = parts[0].trim();
+      final barangay = parts.sublist(1).join(',').trim();
+      if (town.isEmpty || barangay.isEmpty) continue;
+      _barangayMap.putIfAbsent(town, () => <String>[]).add(barangay);
+    }
+  }
+  // keep consistent ordering
+  for (final k in _barangayMap.keys) {
+    _barangayMap[k]!.sort((a, b) => a.compareTo(b));
+  }
+}
+// --- END: copy from Registration ---
 
   // New: address controllers for Resident
   final _resHouseController = TextEditingController();
@@ -150,6 +978,7 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     super.initState();
     _initializeFormListeners();
     _addAddressCapitalizationListeners();
+    _initializeBarangayMapFromCsv(); // << add this
     _loadUserData();
     _autoValidateMode = AutovalidateMode.onUserInteraction; //
 
@@ -271,12 +1100,14 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   }
 
   void _normalizeLoadedTownValue(TextEditingController main, TextEditingController manual) {
-    final val = main.text.trim();
-    if (val.isNotEmpty && !_towns.contains(val)) {
-      manual.text = val;
-      main.text = 'Other';
-    }
+  final val = main.text.trim();
+  if (val.isNotEmpty && !_towns.contains(val)) {
+    // keep the actual town value in main controller (so it can be shown)
+    // clear manual controller — we no longer use 'Other' flow
+    manual.text = '';
+    // main.text left as the actual value (no 'Other' sentinel)
   }
+}
 
   void _initializeFormListeners() {
     for (final ctrl in [
@@ -434,64 +1265,45 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     return sizeInMB <= maxSizeMB;
   }
 
-  /// Uploads [image] to the `profiles` bucket under the given [folder] (e.g. 'profile_images' or 'id_uploads').
-  /// Returns the public URL string on success, otherwise null.
-  Future<String?> _uploadImageToStorage(dynamic image, String folder) async {
-  final user = _supabase.auth.currentUser;
-  if (user == null) return null;
-
-  final fileName = '${user.id}.jpg';
-  final fullPath = '$folder/$fileName';
-
+  Future<String?> _uploadImageToStorage(dynamic imageFileOrBytes, String folder) async {
   try {
-    // Try to remove existing file first (ignore errors)
+    final user = _supabase.auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final fileName = '${user.id}.jpg';
+    final fullPath = '$folder/${user.id}/$fileName';
+
+    // Step 1: Remove any existing file (ignore if missing)
     try {
       await _supabase.storage.from('profiles').remove([fullPath]);
     } catch (e) {
-      debugPrint('Notice: could not remove existing file (may not exist): $e');
+      debugPrint('No existing file to remove (that’s fine): $e');
     }
 
-    // Upload (mobile File vs web Uint8List)
-    if (image is File) {
-      // upsert: true ensures re-uploads succeed even if file previously existed
-      await _supabase.storage.from('profiles').upload(
-        fullPath,
-        image,
-        fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
-      );
-    } else if (image is Uint8List) {
-      // uploadBinary exists in many supabase_flutter versions for web
-      try {
-        await _supabase.storage.from('profiles').uploadBinary(fullPath, image);
-      } catch (e) {
-        // if uploadBinary isn't available or fails, rethrow to be handled below
-        debugPrint('uploadBinary failed: $e');
-        rethrow;
-      }
+    // Step 2: Upload file
+    final fileOptions = FileOptions(cacheControl: '3600', upsert: true);
+    final bucket = _supabase.storage.from('profiles');
+
+    if (kIsWeb && imageFileOrBytes is Uint8List) {
+      // Web upload
+      await bucket.uploadBinary(fullPath, imageFileOrBytes, fileOptions: fileOptions);
+    } else if (imageFileOrBytes is File) {
+      // Mobile upload
+      await bucket.upload(fullPath, imageFileOrBytes, fileOptions: fileOptions);
     } else {
-      throw ArgumentError('Unsupported image type for upload');
+      throw Exception('Unsupported image format');
     }
 
-    // Get public URL (SDK versions differ on return shape)
-    final publicUrl = _supabase.storage.from('profiles').getPublicUrl(fullPath);
-    if (publicUrl is String) return publicUrl;
-    try {
-      // some SDKs return an object with a data/publicUrl field or similar
-      final candidate = (publicUrl as dynamic);
-      if (candidate != null) {
-        // Try common fields
-        if (candidate is Map && candidate['publicUrl'] != null) return candidate['publicUrl'] as String;
-        if (candidate?.data != null && candidate.data['publicUrl'] != null) return candidate.data['publicUrl'] as String;
-      }
-    } catch (_) {}
-    return publicUrl?.toString();
-  } catch (e, st) {
-    debugPrint('uploadToProfilesBucket failed: $e\n$st');
+    // Step 3: Get the public URL
+    final publicUrl = bucket.getPublicUrl(fullPath);
+    debugPrint('✅ Uploaded successfully: $publicUrl');
+    return publicUrl;
+  } catch (e) {
+    debugPrint('uploadToProfilesBucket failed: $e');
     return null;
   }
 }
 
-  /// Delete a file from the 'profiles' storage bucket.
   /// Returns true if remove succeeded (or file didn't exist), false on error.
   Future<bool> _deleteFileFromStorage(String folder, String userId) async {
     final path = '$folder/$userId.jpg';
@@ -587,67 +1399,87 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
     }
   }
 
-  Future<void> _pickImage(ImageSource source, bool isProfile) async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: source);
-    if (picked == null) return;
+ Future<void> _pickImage(ImageSource source, bool isProfile) async {
+  final picker = ImagePicker();
+  final picked = await picker.pickImage(source: source);
+  if (picked == null) return;
 
-    Uint8List? bytes;
-    File? file;
-    try {
-      if (kIsWeb) {
-        bytes = await picked.readAsBytes();
-        debugPrint('DEBUG: picked image (web) bytes=${bytes.lengthInBytes}');
-      } else {
-        file = File(picked.path);
-        debugPrint('DEBUG: picked image (mobile) path=${picked.path}');
-      }
-    } catch (e) {
-      debugPrint('Error reading picked image: $e');
-      return;
+  Uint8List? bytes;
+  File? file;
+  try {
+    if (kIsWeb) {
+      bytes = await picked.readAsBytes();
+      debugPrint('DEBUG: picked image (web) bytes=${bytes.lengthInBytes}');
+    } else {
+      file = File(picked.path);
+      debugPrint('DEBUG: picked image (mobile) path=${picked.path}');
     }
+  } catch (e) {
+    debugPrint('Error reading picked image: $e');
+    return;
+  }
 
-    if (bytes != null) {
-      final sizeInMB = bytes.lengthInBytes / (1024 * 1024);
-      if (sizeInMB > 5) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Image size too large (max 5MB)'), backgroundColor: Colors.red),
-        );
-        return;
-      }
-    } else if (file != null && !_isFileSizeValid(file)) {
+  // 🔹 Check file size
+  if (bytes != null) {
+    final sizeInMB = bytes.lengthInBytes / (1024 * 1024);
+    if (sizeInMB > 5) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Image size too large (max 5MB)'), backgroundColor: Colors.red),
       );
       return;
     }
-
-    final action = await _showImagePreviewBeforeSave(bytes ?? file!, isProfile);
+  } else if (file != null && !_isFileSizeValid(file)) {
     if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Image size too large (max 5MB)'), backgroundColor: Colors.red),
+    );
+    return;
+  }
 
-    if (action == 'use') {
+  final action = await _showImagePreviewBeforeSave(bytes ?? file!, isProfile);
+  if (!mounted) return;
+
+  if (action == 'use') {
+    setState(() {
+      if (isProfile) {
+        _profileImage = file;
+        _profileImageBytes = bytes;
+        _removeProfileImage = false;
+        _profileImageUrl = null;
+      } else {
+        _idImage = file;
+        _idImageBytes = bytes;
+        _removeIdImage = false;
+        _idImageUrl = null;
+      }
+      _markFormDirty();
+    });
+
+    // 🔹 Upload immediately after user confirms
+    final imageToUpload = file ?? bytes;
+    final folder = isProfile ? 'profile_images' : 'id_uploads';
+
+    final newUrl = await _uploadImageToStorage(imageToUpload, folder);
+
+    if (newUrl != null && mounted) {
       setState(() {
         if (isProfile) {
-          _profileImage = file;
-          _profileImageBytes = bytes;
-          _removeProfileImage = false;
-          _profileImageUrl = null;
+          _profileImageUrl = newUrl;
         } else {
-          _idImage = file;
-          _idImageBytes = bytes;
-          _removeIdImage = false;
-          _idImageUrl = null;
+          _idImageUrl = newUrl;
         }
-        _markFormDirty();
       });
-    } else if (action == 'retake') {
-      await _pickImage(ImageSource.camera, isProfile);
-    } else if (action == 'gallery') {
-      await _pickImage(ImageSource.gallery, isProfile);
+      debugPrint('✅ Image updated: $newUrl');
+    } else {
+      debugPrint('⚠️ Upload failed or returned null URL');
     }
+  } else if (action == 'retake') {
+    await _pickImage(ImageSource.camera, isProfile);
+  } else if (action == 'gallery') {
+    await _pickImage(ImageSource.gallery, isProfile);
   }
+}
 
   Future<String?> _showImagePreviewBeforeSave(dynamic image, bool isProfile) {
     return showDialog<String>(
@@ -939,6 +1771,7 @@ debugPrint('Form validate() returned: $formValid');
       }
       return;
     }
+    
 
     String? profileUrl;
     if (_removeProfileImage) {
@@ -949,7 +1782,10 @@ debugPrint('Form validate() returned: $formValid');
       } catch (_) {}
     } else if (_profileImage != null || _profileImageBytes != null) {
       final img = _profileImage ?? _profileImageBytes!;
-      profileUrl = await _uploadImageToStorage(img, 'profile_images');
+      profileUrl = await _uploadImageToStorage(
+    _profileImage ?? _profileImageBytes,
+    'profile_images',
+  );
 
       if (profileUrl == null && (img != null)) {
         debugPrint('Profile upload failed; aborting save.');
@@ -974,7 +1810,7 @@ debugPrint('Form validate() returned: $formValid');
       } catch (_) {}
     } else if (_idImage != null || _idImageBytes != null) {
       final img = _idImage ?? _idImageBytes!;
-      idUrl = await _uploadImageToStorage(img, 'id_uploads');
+      idUrl = await _uploadImageToStorage(_idImage ?? _idImageBytes,'id_uploads',);
 
       if (idUrl == null && (img != null)) {
         debugPrint('ID upload failed; aborting save.');
@@ -1710,23 +2546,107 @@ debugPrint(' _fieldErrors[${ctrl.hashCode}] = "$msg"');
       return Column(
         children: [
           _buildAddressCard('Work Address', [
-            _buildEditableField('Street/Building No.', _workStreetController, hint: 'Street / Building'),
-            _buildEditableField('Barangay/Subdivision', _workBarangayController, hint: 'Barangay / Subdivision'),
-            _buildTownDropdown(_workTownController, _workTownManualController, 'Town (optional)'),
-            _buildEditableField('ZIP Code', _workZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
-              if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
-              if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
-              return null;
-            }),
-            _buildEditableField('City/Municipality', _workCityController, hint: 'City', isReadOnly: false),
-            _buildEditableField('Country', _workCountryController, hint: 'Philippines', isReadOnly: true),
-          ]),
+            // Work Address children — Town -> Barangay -> ZIP dropdowns
+              _buildEditableField('Street/Building No.', _workStreetController, hint: 'Street / Building'),
+
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: DropdownButtonFormField<String>(
+                  value: (_workTownController.text.isNotEmpty && _towns.contains(_workTownController.text))
+                      ? _workTownController.text
+                      : (_workTownController.text.isNotEmpty ? _workTownController.text : null),
+                  items: [
+                    ..._towns.map((t) => DropdownMenuItem(value: t, child: Text(t))),
+                    if (_workTownController.text.isNotEmpty && !_towns.contains(_workTownController.text))
+                      DropdownMenuItem(value: _workTownController.text, child: Text(_workTownController.text)),
+                  ],
+                  onChanged: (val) {
+                    setState(() {
+                      _workTownController.text = val ?? '';
+                      _workBarangayController.text = '';
+                      final zip = _getFirstZipCodeForTown(_workTownController.text);
+                      if (zip != null) _workZipController.text = zip;
+                      _markFormDirty();
+                    });
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Town',
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                  ),
+                  validator: (val) {
+                    if ((_workTownController.text ?? '').trim().isEmpty && (val == null || val.trim().isEmpty)) return 'Select town';
+                    return null;
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: DropdownButtonFormField<String>(
+                  value: _getBarangaysForTown(_workTownController.text).contains(_workBarangayController.text) ? _workBarangayController.text : null,
+                  items: _getBarangaysForTown(_workTownController.text).map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
+                  onChanged: _getBarangaysForTown(_workTownController.text).isEmpty
+                      ? null
+                      : (val) {
+                          setState(() {
+                            _workBarangayController.text = val ?? '';
+                            _markFormDirty();
+                          });
+                        },
+                  decoration: InputDecoration(
+                    labelText: "Barangay/Subdivision",
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: DropdownButtonFormField<String>(
+                  value: _getZipCodesForTown(_workTownController.text).contains(_workZipController.text) ? _workZipController.text : _getFirstZipCodeForTown(_workTownController.text),
+                  items: _getZipCodesForTown(_workTownController.text).map((zip) => DropdownMenuItem(value: zip, child: Text(zip))).toList(),
+                  onChanged: _getZipCodesForTown(_workTownController.text).isEmpty
+                      ? null
+                      : (val) {
+                          setState(() {
+                            _workZipController.text = val ?? '';
+                            _markFormDirty();
+                          });
+                        },
+                  decoration: InputDecoration(
+                    labelText: "ZIP Code",
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'ZIP code is required';
+                    return null;
+                  },
+                ),
+              ),
+
+              _buildEditableField('City/Municipality', _workCityController, hint: 'City', isReadOnly: false),
+              _buildEditableField('Country', _workCountryController, hint: 'Philippines', isReadOnly: true),
+            ]),
           const SizedBox(height: 16),
+          
           _buildAddressCard('Home Address', [
             _buildEditableField('House/Unit/Building No.', _homeHouseController, hint: 'House/Unit'),
             _buildEditableField('Street Name', _homeStreetController, hint: 'Street Name'),
             _buildEditableField('Barangay/Subdivision', _homeBarangayController, hint: 'Barangay Name'),
-            _buildTownDropdown(_homeTownController, _homeTownManualController, 'Town (optional)'),
+            _buildEditableField('Town (Optional)', _homeTownController, hint: 'Town Name', validator: (val) { return null; }),
             _buildEditableField('ZIP Code', _homeZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
               if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
               if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
@@ -1741,17 +2661,110 @@ debugPrint(' _fieldErrors[${ctrl.hashCode}] = "$msg"');
       return Column(
         children: [
           _buildAddressCard('School Address', [
-            _buildEditableField('Full School Name', _schoolNameController, hint: 'Full School Name'),
-            _buildEditableField('Street Name', _schoolStreetController, hint: 'Street Name'),
-            _buildEditableField('Barangay/Subdivision', _schoolBarangayController, hint: 'Barangay Name'),
-            _buildTownDropdown(_schoolTownController, _schoolTownManualController, 'Town'),
-            _buildEditableField('ZIP Code', _schoolZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
-              if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
-              if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
-              return null;
-            }),
-            _buildEditableField('City/Municipality', _schoolCityController, hint: 'City', isReadOnly: false),
-            _buildEditableField('Country', _schoolCountryController, hint: 'Philippines', isReadOnly: true),
+            // School Address children replacement
+            // School Address
+_buildEditableField('Full School Name', _schoolNameController, hint: 'Full School Name'),
+_buildEditableField('Street Name', _schoolStreetController, hint: 'Street Name'),
+
+Padding(
+  padding: const EdgeInsets.only(bottom: 12),
+  child: DropdownButtonFormField<String>(
+    value: (_schoolTownController.text.isNotEmpty && _towns.contains(_schoolTownController.text))
+        ? _schoolTownController.text
+        : (_schoolTownController.text.isNotEmpty ? _schoolTownController.text : null),
+    items: [
+      ..._towns.map((t) => DropdownMenuItem(value: t, child: Text(t))),
+      if (_schoolTownController.text.isNotEmpty && !_towns.contains(_schoolTownController.text))
+        DropdownMenuItem(value: _schoolTownController.text, child: Text(_schoolTownController.text)),
+    ],
+    onChanged: (val) {
+      setState(() {
+        _schoolTownController.text = val ?? '';
+        _schoolBarangayController.text = '';
+        final zip = _getFirstZipCodeForTown(_schoolTownController.text);
+        if (zip != null) _schoolZipController.text = zip;
+        _markFormDirty();
+      });
+    },
+    decoration: InputDecoration(
+      labelText: 'Town',
+      filled: true,
+      fillColor: Colors.grey[50],
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+    ),
+    validator: (val) {
+      if ((_schoolTownController.text ?? '').trim().isEmpty && (val == null || val.trim().isEmpty)) return 'Select town';
+      return null;
+    },
+  ),
+),
+
+const SizedBox(height: 12),
+
+Padding(
+  padding: const EdgeInsets.only(bottom: 12),
+  child: DropdownButtonFormField<String>(
+    value: _getBarangaysForTown(_schoolTownController.text).contains(_schoolBarangayController.text) ? _schoolBarangayController.text : null,
+    items: _getBarangaysForTown(_schoolTownController.text).map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
+    onChanged: _getBarangaysForTown(_schoolTownController.text).isEmpty
+        ? null
+        : (val) {
+            setState(() {
+              _schoolBarangayController.text = val ?? '';
+              _markFormDirty();
+            });
+          },
+    decoration: InputDecoration(
+      labelText: "Barangay/Subdivision",
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+    validator: (val) {
+      if (_getBarangaysForTown(_schoolTownController.text).isNotEmpty) {
+        if (val == null || val.trim().isEmpty) return 'Enter school barangay/subdivision';
+      } else {
+        if (_schoolBarangayController.text.trim().isEmpty) return 'Enter school barangay/subdivision';
+      }
+      return null;
+    },
+  ),
+),
+
+const SizedBox(height: 12),
+
+Padding(
+  padding: const EdgeInsets.only(bottom: 12),
+  child: DropdownButtonFormField<String>(
+    value: _getZipCodesForTown(_schoolTownController.text).contains(_schoolZipController.text) ? _schoolZipController.text : _getFirstZipCodeForTown(_schoolTownController.text),
+    items: _getZipCodesForTown(_schoolTownController.text).map((zip) => DropdownMenuItem(value: zip, child: Text(zip))).toList(),
+    onChanged: _getZipCodesForTown(_schoolTownController.text).isEmpty
+        ? null
+        : (val) {
+            setState(() {
+              _schoolZipController.text = val ?? '';
+              _markFormDirty();
+            });
+          },
+    decoration: InputDecoration(
+      labelText: "ZIP Code",
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+    validator: (val) {
+      if (val == null || val.trim().isEmpty) return 'ZIP code is required';
+      return null;
+    },
+  ),
+),
+
+_buildEditableField('City/Municipality', _schoolCityController, hint: 'City', isReadOnly: false),
+_buildEditableField('Country', _schoolCountryController, hint: 'Philippines', isReadOnly: true),
+
           ]),
           const SizedBox(height: 16),
           _buildAddressCard('Home Address', [
@@ -1759,21 +2772,6 @@ debugPrint(' _fieldErrors[${ctrl.hashCode}] = "$msg"');
             _buildEditableField('Street Name', _homeStreetController, hint: 'Street Name'),
             _buildEditableField('Barangay/Subdivision', _homeBarangayController, hint: 'Barangay Name'),
             _buildEditableField('Town (Optional)', _homeTownController, hint: 'Town Name', validator: (val) {return null;}),
-            if (_homeTownController.text.toLowerCase() == 'other')
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: TextFormField(
-                  controller: _homeTownManualController,
-                  decoration: InputDecoration(
-                    labelText: 'Type town name',
-                    hintText: 'Enter town',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                  ),
-                ),
-              ),
             _buildEditableField('ZIP Code', _homeZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
               if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
               if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
@@ -1785,99 +2783,141 @@ debugPrint(' _fieldErrors[${ctrl.hashCode}] = "$msg"');
         ],
       );
     } else {
-      final List<DropdownMenuItem<String>> residentTownItems = [
-        ..._towns.map((town) => DropdownMenuItem(value: town, child: Text(town))),
-      ];
-      final currentResTown = _resTownController.text.trim();
-      if (currentResTown.isNotEmpty && !_towns.contains(currentResTown)) {
-        residentTownItems.add(DropdownMenuItem(value: currentResTown, child: Text(currentResTown)));
-      }
 
-      return _buildAddressCard('Address', [
-        _buildEditableField('House/Unit/Building No.', _resHouseController, hint: 'House/Unit'),
-        _buildEditableField('Street Name', _resStreetController, hint: 'Street Name'),
-        _buildEditableField('Barangay/Subdivision', _resBarangayController, hint: 'Barangay Name'),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: DropdownButtonFormField<String>(
-            value: _resTownController.text.isNotEmpty ? _resTownController.text : null,
-            items: residentTownItems,
-            onChanged: (val) {
+      // ===== Replace resident branch with this chunk =====
+final List<DropdownMenuItem<String>> residentTownItems = _towns
+    .map((town) => DropdownMenuItem(value: town, child: Text(town)))
+    .toList();
+
+final currentResTown = _resTownController.text.trim();
+if (currentResTown.isNotEmpty && !_towns.contains(currentResTown)) {
+  residentTownItems.add(DropdownMenuItem(value: currentResTown, child: Text(currentResTown)));
+}
+
+return _buildAddressCard('Address', [
+  _buildEditableField('House/Unit/Building No.', _resHouseController, hint: 'House/Unit'),
+  _buildEditableField('Street Name', _resStreetController, hint: 'Street Name'),
+
+Padding(
+  padding: const EdgeInsets.only(bottom: 12),
+  child: DropdownButtonFormField<String>(
+    // effective current town (keep DB-only towns visible)
+    value: _resTownController.text.isNotEmpty ? _resTownController.text : null,
+    items: [
+      ..._towns.map((t) => DropdownMenuItem(value: t, child: Text(t))),
+      if (_resTownController.text.isNotEmpty && !_towns.contains(_resTownController.text))
+        DropdownMenuItem(value: _resTownController.text, child: Text(_resTownController.text)),
+    ],
+    onChanged: (val) {
+      setState(() {
+        _resTownController.text = val ?? '';
+        // when town changes: clear barangay & auto-set ZIP
+        _resBarangayController.text = '';
+        final zip = _getFirstZipCodeForTown(_resTownController.text);
+        if (zip != null) _resZipController.text = zip;
+        _markFormDirty();
+      });
+    },
+    decoration: InputDecoration(
+      labelText: 'Town',
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      filled: true,
+      fillColor: Colors.grey[50],
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+    ),
+    validator: (val) {
+      if (_resTownController.text.trim().isEmpty && (val == null || val.trim().isEmpty)) return 'Select town';
+      return null;
+    },
+  ),
+),
+
+  const SizedBox(height: 12),
+
+  // Barangay (dependent on effective town)
+  Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: DropdownButtonFormField<String>(
+      value: _getBarangaysForTown(_resTownController.text)
+          .contains(_resBarangayController.text) ? _resBarangayController.text : null,
+      items: _getBarangaysForTown(_resTownController.text)
+          .map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
+      onChanged: _getBarangaysForTown(_resTownController.text).isEmpty
+          ? null
+          : (val) {
               setState(() {
-                _resTownController.text = val ?? '';
+                _resBarangayController.text = val ?? '';
                 _markFormDirty();
               });
             },
-            decoration: InputDecoration(
-              labelText: 'Town',
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              filled: true,
-              fillColor: Colors.grey[50],
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-            ),
-          ),
-        ),
-        _buildEditableField('ZIP Code', _resZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
-          if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
-          if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
-          return null;
-        }),
-        _buildEditableField('City/Municipality', _resCityController, hint: 'Manila', isReadOnly: true),
-        _buildEditableField('Country', _resCountryController, hint: 'Philippines', isReadOnly: true),
-      ]);
-    }
-  }
+      decoration: InputDecoration(
+        labelText: "Barangay/Subdivision",
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    ),
+  ),
 
-  Widget _buildTownDropdown(TextEditingController mainController, TextEditingController manualController, String label) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: DropdownButtonFormField<String>(
-            value: mainController.text.isNotEmpty ? mainController.text : null,
-            items: [
-              ..._towns.map((town) => DropdownMenuItem(value: town, child: Text(town))),
-              const DropdownMenuItem(value: 'Other', child: Text('Other (type manually)')),
-            ],
-            onChanged: (val) {
+  const SizedBox(height: 12),
+
+  Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: DropdownButtonFormField<String>(
+      value: _getZipCodesForTown((_resTownController.text != 'Other') ? _resTownController.text : (_resTownManualController.text.isNotEmpty ? _resTownManualController.text : null))
+          .contains(_resZipController.text) ? _resZipController.text : (_getFirstZipCodeForTown((_resTownController.text != 'Other') ? _resTownController.text : (_resTownManualController.text.isNotEmpty ? _resTownManualController.text : null))),
+      items: _getZipCodesForTown((_resTownController.text != 'Other') ? _resTownController.text : (_resTownManualController.text.isNotEmpty ? _resTownManualController.text : null))
+          .map((zip) => DropdownMenuItem(value: zip, child: Text(zip))).toList(),
+      onChanged: _getZipCodesForTown((_resTownController.text != 'Other') ? _resTownController.text : (_resTownManualController.text.isNotEmpty ? _resTownManualController.text : null)).isEmpty
+          ? null
+          : (val) {
               setState(() {
-                mainController.text = val ?? '';
-                if (val != 'Other') manualController.clear();
-                _markFormDirty();
+                _resZipController.text = val ?? '';
               });
             },
-            decoration: InputDecoration(
-              labelText: label,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              filled: true,
-              fillColor: Colors.grey[50],
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-            ),
-          ),
-        ),
-       if (mainController.text.toLowerCase() == 'other')
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: TextFormField(
-            controller: manualController,
-                decoration: InputDecoration(
-                labelText: 'Type town name',
-                hintText: 'Enter town',
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                filled: true,
-                fillColor: Colors.grey[50],
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                errorText: _fieldErrors['Type town name'], // <- show programmatic error if set
-              ),
-            validator: (val) {
-              if (val == null || val.trim().isEmpty) return 'Please enter town name';
-              return null;
-            },
-          ),
-        ),
-      ],
-    );
+      decoration: InputDecoration(
+        labelText: "ZIP Code",
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      validator: (val) {
+        if (val == null || val.trim().isEmpty) return 'ZIP code is required';
+        return null;
+      },
+    ),
+  ),
+
+  _buildEditableField('City/Municipality', _resCityController, hint: 'Manila', isReadOnly: true),
+  _buildEditableField('Country', _resCountryController, hint: 'Philippines', isReadOnly: true),
+  ]);
   }
+  }
+
+    Widget _buildTownDropdown(TextEditingController mainController, TextEditingController manualController, String label) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: DropdownButtonFormField<String>(
+      value: mainController.text.isNotEmpty ? mainController.text : null,
+      items: _towns.map((town) => DropdownMenuItem(value: town, child: Text(town))).toList(),
+      onChanged: (val) {
+        setState(() {
+          mainController.text = val ?? '';
+          _markFormDirty();
+        });
+      },
+      decoration: InputDecoration(
+        labelText: label,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        filled: true,
+        fillColor: Colors.grey[50],
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+      ),
+    ),
+  );
+}
 
   Widget _buildIdUploadSection() {
     return Container(
