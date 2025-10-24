@@ -548,7 +548,7 @@ Future<void> _submitForm() async {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(successMessage),
-          backgroundColor: (aiAnalysis['ai_service_available'] == true) ? Colors.green : Colors.orange,
+          backgroundColor: (aiAnalysis['ai_service_available'] == true) ? Colors.green : const Color.fromARGB(255, 76, 175, 80),
           duration: const Duration(seconds: 5),
         ),
       );
