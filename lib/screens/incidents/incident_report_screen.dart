@@ -467,23 +467,28 @@ Future<void> _submitForm() async {
     final user = supabase.auth.currentUser;
     if (user == null) throw Exception('User not authenticated');
 
-    // Run AI analysis silently
+    // Run AI analysis with fallback support
     final aiAnalysis = await DeepSeekService.analyzeIncidentReport(description);
     
-    // Submit directly - no interruption
+    // Log the analysis method used
+    final analysisMethod = aiAnalysis['analysis_method'] ?? 'unknown';
+    
+    print('🔍 Analysis completed using: $analysisMethod');
+    if (aiAnalysis['ai_service_available'] == false) {
+      print('⚠️ Using fallback analysis due to: ${aiAnalysis['fallback_reason']}');
+    }
+    
+    // Submit to database
     final incidentId = 'incident_${DateTime.now().millisecondsSinceEpoch}_${user.id}';
     
-    // Upload images and submit to database
+    // Upload images
     List<String> imageUrls = [];
     if (_selectedImages.isNotEmpty) {
       imageUrls = await _uploadImages(incidentId);
     }
 
-// In your _submitForm method in incident_report_screen.dart
-final response = await supabase
-    .from('incidents')
-    .insert({
-      // Your existing fields
+    // Prepare data for insertion
+    final Map<String, dynamic> incidentData = {
       'name': _nameController.text.trim(),
       'address': _addressController.text.trim(),
       'landmark': _landmarkController.text.trim(),
@@ -493,7 +498,7 @@ final response = await supabase
           : _incidentType,
       'description': _concernController.text.trim(),
       'timestamp': DateTime.now().toIso8601String(),
-      'status': 'Pending',
+      'status': 'pending', // ← CHANGED: Use lowercase 'pending'
       'latitude': double.tryParse(_latitudeController.text) ?? 0.0,
       'longitude': double.tryParse(_longitudeController.text) ?? 0.0,
       'barangay': _barangayController.text.trim(),
@@ -502,33 +507,40 @@ final response = await supabase
       'image_urls': imageUrls,
       
       // AI Analysis Results
-      'suspicion_score': aiAnalysis['suspicion_score'],
-      'requires_review': aiAnalysis['requires_review'],
-      'ai_analysis': aiAnalysis['explanation'],
-      'matched_patterns': aiAnalysis['matched_patterns'],
-      'analysis_method': aiAnalysis['analysis_method'] ?? 'deepseek_ai',
+      'suspicion_score': (aiAnalysis['suspicion_score'] as num).toDouble(),
+      'requires_review': aiAnalysis['requires_review'] ?? false,
+      'ai_analysis': aiAnalysis['explanation'] ?? 'Analysis completed',
+      'matched_patterns': aiAnalysis['matched_patterns'] ?? [],
+      'analysis_method': analysisMethod,
       
-      // Initialize spam fields for web compatibility
+      // Initialize spam fields
       'is_spam': false,
       'spam_score': 0,
-      'spam_reasons': [],
-      'ai_spam_score': 0,
-      'rule_based_spam_score': 0,
-      'combined_analysis': false,
-    })
-    .select();
+    };
 
-if (response.isNotEmpty) {
-  final createdIncident = response.first;
-  print('✅ Incident created with ID: ${createdIncident['id']}');
-  
-  // Trigger web spam filter sync
-  _triggerWebSpamAnalysis(createdIncident['id'].toString());
-}
+    // Remove any fields that might not exist in your table
+    incidentData.removeWhere((key, value) => value == null);
+
+    print('📦 Submitting incident data: ${incidentData.keys.toList()}');
+
+    final response = await supabase
+        .from('incidents')
+        .insert(incidentData)
+        .select();
+
+    if (response.isNotEmpty) {
+      final createdIncident = response.first;
+      print('✅ Incident created with ID: ${createdIncident['id']}');
+      
+      // Trigger web spam filter sync
+      _triggerWebSpamAnalysis(createdIncident['id'].toString());
+    }
 
     // Show appropriate success message
     String successMessage = 'Incident report submitted successfully!';
-    if (aiAnalysis['requires_review'] == true) {
+    if (aiAnalysis['ai_service_available'] == false) {
+      successMessage += ' (Note: AI analysis temporarily unavailable - using basic checks)';
+    } else if (aiAnalysis['requires_review'] == true) {
       successMessage += ' It will be reviewed by admin due to content analysis.';
     }
 
@@ -536,7 +548,8 @@ if (response.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(successMessage),
-          backgroundColor: Colors.green,
+          backgroundColor: (aiAnalysis['ai_service_available'] == true) ? Colors.green : Colors.orange,
+          duration: const Duration(seconds: 5),
         ),
       );
     }
@@ -545,7 +558,16 @@ if (response.isNotEmpty) {
     if (mounted) Navigator.pop(context);
     
   } catch (e) {
-    // Error handling
+    print('❌ Error submitting incident: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to submit report: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
   } finally {
     if (mounted) setState(() => _isSubmitting = false);
   }
