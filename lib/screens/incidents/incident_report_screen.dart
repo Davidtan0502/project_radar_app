@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:project_radar_app/screens/incidents/deepseek_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import 'dart:io';
@@ -438,24 +439,25 @@ Future<List<String>> _uploadImages(String incidentId) async {
       _isConfirmed = false; // NEW: Reset checkbox state
     });
   }
+Future<void> _triggerWebSpamAnalysis(String incidentId) async {
+  try {
+    // This will trigger the web spam filter to re-analyze with AI data
+    await supabase
+        .from('incident_analysis_triggers')
+        .insert({
+          'incident_id': incidentId,
+          'trigger_type': 'ai_analysis_sync',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+    
+    print('🔄 Triggered web spam analysis for incident: $incidentId');
+  } catch (e) {
+    print('⚠️ Could not trigger web spam analysis: $e');
+  }
+}
 
 Future<void> _submitForm() async {
-  // NEW: Check if checkbox is checked before proceeding
-  if (!_isConfirmed) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please confirm that all information is true and accurate'),
-          backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
-    }
-    return;
-  }
-
+  if (!_isConfirmed) return;
   if (!(_formKey.currentState?.validate() ?? false)) return;
 
   setState(() => _isSubmitting = true);
@@ -463,110 +465,87 @@ Future<void> _submitForm() async {
   try {
     final description = _concernController.text.trim();
     final user = supabase.auth.currentUser;
+    if (user == null) throw Exception('User not authenticated');
 
-    if (user == null) {
-      throw Exception('User not authenticated');
-    }
-
-    print('=== DEBUG: Starting form submission ===');
-
-    // Generate a unique incident ID first
-    final incidentId = 'incident_${DateTime.now().millisecondsSinceEpoch}_${user.id}';
-    print('🆔 Generated incident ID: $incidentId');
-
-    // Upload images first to get URLs
-    List<String> imageUrls = [];
+    // Run AI analysis silently
+    final aiAnalysis = await DeepSeekService.analyzeIncidentReport(description);
     
+    // Submit directly - no interruption
+    final incidentId = 'incident_${DateTime.now().millisecondsSinceEpoch}_${user.id}';
+    
+    // Upload images and submit to database
+    List<String> imageUrls = [];
     if (_selectedImages.isNotEmpty) {
-      print('📸 Starting image upload for ${_selectedImages.length} images');
       imageUrls = await _uploadImages(incidentId);
-      print('✅ Image upload completed: ${imageUrls.length} URLs obtained');
-    } else {
-      print('ℹ️ No images to upload');
     }
 
-    // Insert incident record
-    print('💾 Inserting incident record into database...');
-    final response = await supabase
-        .from('incidents')
-        .insert({
-          'name': _nameController.text.trim(),
-          'address': _addressController.text.trim(),
-          'landmark': _landmarkController.text.trim(),
-          'contact_number': _cellphoneController.text.trim(),
-          'incident_type': _incidentType == 'Other'
-              ? _otherIncidentTypeController.text.trim()
-              : _incidentType,
-          'description': description,
-          'timestamp': DateTime.now().toIso8601String(),
-          'status': 'Pending',
-          'latitude': double.tryParse(_latitudeController.text) ?? 0.0,
-          'longitude': double.tryParse(_longitudeController.text) ?? 0.0,
-          'barangay': _barangayController.text.trim(),
-          'street': _streetController.text.trim(),
-          'suspicion_score': 0.0,
-          'requires_review': false,
-          'user_id': user.id,
-          'ai_analysis': 'No AI analysis - manual admin review',
-          'matched_patterns': [],
-          'image_urls': imageUrls, // This should now contain the URLs
-        })
-        .select();
+// In your _submitForm method in incident_report_screen.dart
+final response = await supabase
+    .from('incidents')
+    .insert({
+      // Your existing fields
+      'name': _nameController.text.trim(),
+      'address': _addressController.text.trim(),
+      'landmark': _landmarkController.text.trim(),
+      'contact_number': _cellphoneController.text.trim(),
+      'incident_type': _incidentType == 'Other'
+          ? _otherIncidentTypeController.text.trim()
+          : _incidentType,
+      'description': _concernController.text.trim(),
+      'timestamp': DateTime.now().toIso8601String(),
+      'status': 'Pending',
+      'latitude': double.tryParse(_latitudeController.text) ?? 0.0,
+      'longitude': double.tryParse(_longitudeController.text) ?? 0.0,
+      'barangay': _barangayController.text.trim(),
+      'street': _streetController.text.trim(),
+      'user_id': user.id,
+      'image_urls': imageUrls,
+      
+      // AI Analysis Results
+      'suspicion_score': aiAnalysis['suspicion_score'],
+      'requires_review': aiAnalysis['requires_review'],
+      'ai_analysis': aiAnalysis['explanation'],
+      'matched_patterns': aiAnalysis['matched_patterns'],
+      'analysis_method': aiAnalysis['analysis_method'] ?? 'deepseek_ai',
+      
+      // Initialize spam fields for web compatibility
+      'is_spam': false,
+      'spam_score': 0,
+      'spam_reasons': [],
+      'ai_spam_score': 0,
+      'rule_based_spam_score': 0,
+      'combined_analysis': false,
+    })
+    .select();
 
-    if (response.isEmpty) {
-      throw Exception('Failed to create incident record');
-    }
+if (response.isNotEmpty) {
+  final createdIncident = response.first;
+  print('✅ Incident created with ID: ${createdIncident['id']}');
+  
+  // Trigger web spam filter sync
+  _triggerWebSpamAnalysis(createdIncident['id'].toString());
+}
 
-    final createdIncident = response.first;
-    print('✅ Incident created with ID: ${createdIncident['id']}');
-
-    // Rest of your code remains the same...
-    // Create initial status update
-    try {
-      await supabase
-          .from('incident_status_updates')
-          .insert({
-            'incident_id': createdIncident['id'],
-            'status': 'Pending',
-            'timestamp': DateTime.now().toIso8601String(),
-            'note': 'Initial report submitted',
-            'user_id': user.id,
-          });
-      print('✅ Status update created');
-    } catch (e) {
-      print('⚠️ Could not create status update: $e');
+    // Show appropriate success message
+    String successMessage = 'Incident report submitted successfully!';
+    if (aiAnalysis['requires_review'] == true) {
+      successMessage += ' It will be reviewed by admin due to content analysis.';
     }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Incident report submitted successfully! Admin will review it shortly.'),
+          content: Text(successMessage),
           backgroundColor: Colors.green,
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       );
     }
 
     _resetForm();
-    await Future.delayed(const Duration(seconds: 2));
     if (mounted) Navigator.pop(context);
     
   } catch (e) {
-    print('❌ Error submitting form: $e');
-    print('❌ Stack trace: ${e.toString()}');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to submit report: ${e.toString()}'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
-    }
+    // Error handling
   } finally {
     if (mounted) setState(() => _isSubmitting = false);
   }

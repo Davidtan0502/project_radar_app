@@ -45,34 +45,34 @@ Future<void> _initializeDeepLinking() async {
 
     // Listen for Supabase auth events (handles password recovery link)
     supabase.auth.onAuthStateChange.listen((data) async {
-    final event = data.event;
-    final session = data.session;
+      final event = data.event;
+      final session = data.session;
 
-    if (event == AuthChangeEvent.passwordRecovery) {
-      final emailFromLink = session?.user?.email;
+      if (event == AuthChangeEvent.passwordRecovery) {
+        final emailFromLink = session?.user?.email;
 
-    debugPrint('[DeepLink] Password recovery detected, email: $emailFromLink');
+        debugPrint('[DeepLink] Password recovery detected, email: $emailFromLink');
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final nav = navigatorKey.currentState;
-      if (nav != null) {
-        nav.pushNamedAndRemoveUntil(
-          '/reset-password',
-          (route) => false,
-          arguments: {
-            'email': emailFromLink, // pass email to screen
-          },
-        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final nav = navigatorKey.currentState;
+          if (nav != null) {
+            nav.pushNamedAndRemoveUntil(
+              '/reset-password',
+              (route) => false,
+              arguments: {
+                'email': emailFromLink, // pass email to screen
+              },
+            );
+          }
+        });
       }
     });
-  }
-});
 
-      debugPrint('[DeepLink] Listener attached successfully.');
-    } catch (e) {
-      debugPrint('Error initializing deep linking: $e');
-    }
+    debugPrint('[DeepLink] Listener attached successfully.');
+  } catch (e) {
+    debugPrint('Error initializing deep linking: $e');
   }
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -136,6 +136,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   // Get Supabase client instance
   final SupabaseClient supabase = Supabase.instance.client;
   bool _checkingInitialAuth = true;
+  bool _isCheckingSuspended = false;
 
   @override
   void initState() {
@@ -143,14 +144,84 @@ class _AuthWrapperState extends State<AuthWrapper> {
     _checkInitialAuth();
   }
 
+  // ENHANCED: Check if mobile app user is suspended
+  Future<bool> _checkUserSuspended(String userId) async {
+    try {
+      debugPrint('🔍 Checking mobile user suspension status for: $userId');
+      
+      final userData = await supabase
+          .from('app_users')
+          .select('status, suspended_at, suspended_by, email')
+          .eq('id', userId)
+          .single();
+
+      final status = userData['status'] as String?;
+      final isSuspended = status == 'suspended';
+      
+      debugPrint('📊 Mobile user suspension status: $status');
+      
+      if (isSuspended) {
+        final suspendedAt = userData['suspended_at'];
+        final suspendedBy = userData['suspended_by'];
+        final userEmail = userData['email'];
+        
+        debugPrint('🚫 Mobile user is suspended:');
+        debugPrint('   - User: $userEmail');
+        debugPrint('   - Suspended at: $suspendedAt');
+        debugPrint('   - Suspended by: $suspendedBy');
+        
+        return true; // User is suspended
+      }
+      
+      return false; // User is active
+    } catch (e) {
+      debugPrint('⚠️ Error checking mobile user suspension status: $e');
+      // If we can't check suspension status, allow login (fail-safe)
+      return false;
+    }
+  }
+
+  // ENHANCED: Safe sign out method
+  Future<void> _safeSignOut() async {
+    try {
+      await supabase.auth.signOut();
+      debugPrint('✅ User signed out successfully');
+    } catch (e) {
+      debugPrint('❌ Error during sign out: $e');
+    }
+  }
+
+  // ENHANCED: Check initial auth with suspension validation
   Future<void> _checkInitialAuth() async {
     try {
-      // Check if we have a session from a deep link (email verification)
       final session = supabase.auth.currentSession;
       final user = session?.user;
 
+      if (user != null) {
+        debugPrint('🔍 Found existing session for: ${user.email}');
+        
+        // STEP 1: Check if user is suspended
+        final isSuspended = await _checkUserSuspended(user.id);
+        if (isSuspended) {
+          debugPrint('🚫 User is suspended - forcing sign out');
+          await _safeSignOut();
+          _showSuspendedSnackbar();
+          return;
+        }
+
+        // STEP 2: Check email verification
+        if (user.emailConfirmedAt == null) {
+          debugPrint('📧 Email not verified - showing verification message');
+          // User stays on login screen with verification message
+        } else {
+          debugPrint('✅ User authenticated and verified - proceeding to main app');
+          // User will be automatically navigated to main app
+        }
+      } else {
+        debugPrint('🔍 No existing session found');
+      }
     } catch (e) {
-      debugPrint('Error checking initial auth: $e');
+      debugPrint('❌ Error checking initial auth: $e');
     } finally {
       setState(() {
         _checkingInitialAuth = false;
@@ -158,57 +229,118 @@ class _AuthWrapperState extends State<AuthWrapper> {
     }
   }
 
+  void _showSuspendedSnackbar() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = navigatorKey.currentContext;
+      if (context != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Your account has been suspended. Please contact administrator.'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-  if (_checkingInitialAuth) return _buildLoadingScreen();
-
+    if (_checkingInitialAuth) return _buildLoadingScreen();
 
     return StreamBuilder<AuthState?>(
-    stream: supabase.auth.onAuthStateChange,
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return _buildLoadingScreen();
-      }
+      stream: supabase.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingScreen();
+        }
 
         final user = snapshot.data?.session?.user;
+        final authEvent = snapshot.data?.event;
         
-      // Skip auto-login if this is a password recovery
-      final isPasswordRecovery = snapshot.data?.event == AuthChangeEvent.passwordRecovery;
-      if (isPasswordRecovery) {
-        return const ResetPasswordScreen();
-      }
+        // Skip auto-login if this is a password recovery
+        final isPasswordRecovery = authEvent == AuthChangeEvent.passwordRecovery;
+        if (isPasswordRecovery) {
+          return const ResetPasswordScreen();
+        }
 
-      if (user != null && user.emailConfirmedAt != null) {
-        _setCurrentUser(user.id);
-        return const MainNavigation();
-      }
+        // ENHANCED: Handle suspended users in real-time
+        if (user != null && authEvent == AuthChangeEvent.signedIn) {
+          // Check suspension status for new sign-ins
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            final isSuspended = await _checkUserSuspended(user.id);
+            if (isSuspended) {
+              debugPrint('🚫 Newly signed-in user is suspended - forcing sign out');
+              await _safeSignOut();
+              _showSuspendedSnackbar();
+            }
+          });
+        }
 
-      if (user != null && user.emailConfirmedAt == null) {
-        return LoginScreen(onTap: () {}, showVerificationMessage: true);
-      }
+        // ENHANCED: Navigation logic with suspension protection
+        if (user != null && user.emailConfirmedAt != null) {
+          // Final suspension check before navigation
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            final isSuspended = await _checkUserSuspended(user.id);
+            if (!isSuspended) {
+              _setCurrentUser(user.id);
+            }
+          });
+          
+          return const MainNavigation();
+        }
 
-      _clearCurrentUser();
-      return LoginScreen(onTap: () {});
-    },
-  );
-}
+        if (user != null && user.emailConfirmedAt == null) {
+          return LoginScreen(
+            onTap: () {}, 
+            showVerificationMessage: true,
+            initialEmail: user.email,
+          );
+        }
 
- Widget _buildLoadingScreen() {
-  return const Scaffold(
-    body: SafeArea(
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Loading...'),
-          ],
+        _clearCurrentUser();
+        return LoginScreen(onTap: () {});
+      },
+    );
+  }
+
+  Widget _buildLoadingScreen() {
+    return Scaffold(
+      backgroundColor: Colors.blue.shade50,
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                strokeWidth: 3,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'PROJECT RADAR',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade800,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Checking authentication...',
+                style: TextStyle(
+                  color: Colors.blue.shade600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   void _setCurrentUser(String userId) {
     WidgetsBinding.instance.addPostFrameCallback((_) {

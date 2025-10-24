@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:project_radar_app/screens/home/main_navigation.dart';
@@ -10,13 +11,12 @@ class LoginScreen extends StatefulWidget {
     super.key, 
     required this.onTap,
     this.showVerificationMessage = false,
-    this.initialEmail,                // NEW
-    this.initialShowPasswordStep = false, // NEW
+    this.initialEmail,
+    this.initialShowPasswordStep = false,
   });
   
   final VoidCallback onTap;
   final bool showVerificationMessage;
-
   final String? initialEmail;
   final bool initialShowPasswordStep;
 
@@ -42,15 +42,10 @@ class _LoginScreenState extends State<LoginScreen>
   bool _obscurePassword = true;
   String? _emailError;
   String? _passwordError;
+  bool _showSuspendedPopup = false;
 
-  // Prevent opening multiple reset screens
-  bool _isResetScreenOpen = false;
-  
   // Supabase client
   final SupabaseClient supabase = Supabase.instance.client;
-
-  // Auth subscription (StreamSubscription for supabase_flutter 2.x)
-  StreamSubscription<dynamic>? _authSubscription;
 
   @override
   void initState() {
@@ -92,125 +87,137 @@ class _LoginScreenState extends State<LoginScreen>
     _passwordController.dispose();
     _emailFocusNode.dispose();
     _passwordFocusNode.dispose();
-
-    // cancel auth subscription if available (StreamSubscription.cancel())
-    try {
-      _authSubscription?.cancel();
-    } catch (e, st) {
-      debugPrint('[dispose] error cancelling auth subscription: $e\n$st');
-    }
-
     super.dispose();
   }
 
-  // Email verification step
-Future<void> _verifyEmail() async {
-  if (!mounted) return;
+  // ENHANCED: Check if mobile app user is suspended
+  Future<bool> _checkUserSuspended(String userId) async {
+    try {
+      debugPrint('🔍 Checking mobile user suspension status for: $userId');
+      
+      final userData = await supabase
+          .from('app_users')
+          .select('status, suspended_at, suspended_by, email')
+          .eq('id', userId)
+          .single();
 
-  setState(() {
-    _emailError = null;
-    _passwordError = null;
-    _isLoading = true;
-  });
-
-  final rawEmail = _emailController.text.trim();
-  if (!_validateEmail(rawEmail)) {
-    // _validateEmail will set _isLoading = false for invalid input
-    return;
+      final status = userData['status'] as String?;
+      final isSuspended = status == 'suspended';
+      
+      debugPrint('📊 Mobile user suspension status: $status');
+      
+      if (isSuspended) {
+        final suspendedAt = userData['suspended_at'];
+        final suspendedBy = userData['suspended_by'];
+        final userEmail = userData['email'];
+        
+        debugPrint('🚫 Mobile user is suspended:');
+        debugPrint('   - User: $userEmail');
+        debugPrint('   - Suspended at: $suspendedAt');
+        debugPrint('   - Suspended by: $suspendedBy');
+        
+        return true; // User is suspended
+      }
+      
+      return false; // User is active
+    } catch (e) {
+      debugPrint('⚠️ Error checking mobile user suspension status: $e');
+      // If we can't check suspension status, allow login (fail-safe)
+      return false;
+    }
   }
 
-  final email = rawEmail.toLowerCase();
-
-  try {
-    debugPrint('[verifyEmail] attempting RPC rpc_check_email for: $email');
-
-    // Try RPC first (works even with strict RLS if function is security definer)
-    dynamic rpcResult;
-    try {
-      // supabase.rpc usually returns a dynamic object (Map/List) depending on function result
-      rpcResult = await supabase.rpc('rpc_check_email', params: {'_email': email});
-      debugPrint('[verifyEmail] rpc result: $rpcResult (type: ${rpcResult?.runtimeType})');
-    } catch (rpcError) {
-      debugPrint('[verifyEmail] rpc call failed or not available: $rpcError');
-      rpcResult = null;
-    }
-
-    bool exists = false;
-    dynamic finalResult;
-
-    if (rpcResult != null) {
-      // rpc may return a List (Postgres rows) or Map (single row) depending on client/SDK version
-      if (rpcResult is List) {
-        if (rpcResult.isNotEmpty) {
-          finalResult = rpcResult.first;
-          exists = true;
-        }
-      } else if (rpcResult is Map) {
-        finalResult = rpcResult;
-        exists = true;
-      } else {
-        // any other truthy return treat as exists
-        finalResult = rpcResult;
-        exists = true;
-      }
-    }
-
-    // If RPC not available/found, fallback to client-side check (case-insensitive)
-    if (!exists) {
-      debugPrint('[verifyEmail] falling back to client query (ilike)');
-      final dynamic maybeResult = await supabase
-          .from('app_users')
-          .select('id, email')
-          .ilike('email', email)
-          .maybeSingle();
-
-      debugPrint('[verifyEmail] maybeSingle (ilike) returned: $maybeResult (type: ${maybeResult?.runtimeType})');
-      dynamic fallbackResult = maybeResult;
-
-      if (fallbackResult == null) {
-        debugPrint('[verifyEmail] ilike returned null, trying exact eq fallback');
-        fallbackResult = await supabase
-            .from('app_users')
-            .select('id, email')
-            .eq('email', email)
-            .maybeSingle();
-        debugPrint('[verifyEmail] maybeSingle (eq) returned: $fallbackResult (type: ${fallbackResult?.runtimeType})');
-      }
-
-      finalResult = fallbackResult;
-      exists = finalResult != null;
-    }
-
+  // ENHANCED: Email verification step with suspension check
+  Future<void> _verifyEmail() async {
     if (!mounted) return;
 
-    if (!exists) {
-      setState(() {
-        _isLoading = false;
-        _showPasswordStep = false;
-        _passwordController.clear();
-        _emailError = 'No account found with this email. Please register first.';
-      });
-      _emailFocusNode.requestFocus();
+    setState(() {
+      _emailError = null;
+      _passwordError = null;
+      _isLoading = true;
+    });
+
+    final rawEmail = _emailController.text.trim();
+    if (!_validateEmail(rawEmail)) {
       return;
     }
 
-    // Pag nahanap na sa record proceed sa password step
-    setState(() {
-      _isLoading = false;
-      _showPasswordStep = true;
-    });
-    _focusPasswordField();
-  } catch (e, st) {
-    debugPrint('[verifyEmail] Exception: $e\n$st');
+    final email = rawEmail.toLowerCase();
 
-    if (!mounted) return;
-    setState(() {
-      _isLoading = false;
-    });
+    try {
+      debugPrint('[verifyEmail] checking email and suspension status for: $email');
 
-    _showErrorDialog('Failed to verify email. Please check your network and database policies.');
+      // ENHANCED: Check both email existence AND suspension status
+      dynamic userData;
+      
+      // Try to get user data including status
+      try {
+        userData = await supabase
+            .from('app_users')
+            .select('id, email, status')
+            .ilike('email', email)
+            .maybeSingle();
+
+        if (userData == null) {
+          // Try exact match if ilike fails
+          userData = await supabase
+              .from('app_users')
+              .select('id, email, status')
+              .eq('email', email)
+              .maybeSingle();
+        }
+      } catch (e) {
+        debugPrint('[verifyEmail] Error querying user data: $e');
+        userData = null;
+      }
+
+      if (!mounted) return;
+
+      // Check if user exists
+      if (userData == null) {
+        setState(() {
+          _isLoading = false;
+          _showPasswordStep = false;
+          _passwordController.clear();
+          _emailError = 'No account found with this email. Please register first.';
+        });
+        _emailFocusNode.requestFocus();
+        return;
+      }
+
+      // ENHANCED: Check if user is suspended
+      final userId = userData['id'] as String?;
+      final status = userData['status'] as String?;
+      
+      if (userId != null && status == 'suspended') {
+        debugPrint('🚫 User is suspended - preventing password step');
+        setState(() {
+          _isLoading = false;
+          _showPasswordStep = false;
+          _passwordController.clear();
+          _showSuspendedPopup = true; // Show popup instead of inline error
+        });
+        return;
+      }
+
+      // User exists and is not suspended - proceed to password step
+      setState(() {
+        _isLoading = false;
+        _showPasswordStep = true;
+      });
+      _focusPasswordField();
+      
+    } catch (e, st) {
+      debugPrint('[verifyEmail] Exception: $e\n$st');
+
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+
+      _showErrorDialog('Failed to verify email. Please check your network and database policies.');
+    }
   }
-}
 
   bool _validateEmail(String email) {
     if (email.isEmpty) {
@@ -240,7 +247,7 @@ Future<void> _verifyEmail() async {
     });
   }
 
-  // Login logic
+  // ENHANCED: Login logic with final suspension check
   Future<void> _handleLogin() async {
     if (!mounted) return;
     
@@ -277,6 +284,17 @@ Future<void> _verifyEmail() async {
 
     if (user == null) {
       _handleAuthenticationFailure();
+      return;
+    }
+
+    // ENHANCED: Final suspension check before allowing access
+    final isSuspended = await _checkUserSuspended(user.id);
+    if (isSuspended) {
+      debugPrint('🚫 User is suspended - forcing sign out');
+      await _safeSignOut();
+      setState(() {
+        _showSuspendedPopup = true; // Show popup for suspended account
+      });
       return;
     }
 
@@ -346,6 +364,16 @@ Future<void> _verifyEmail() async {
           .eq('id', userId);
     } catch (e) {
       debugPrint('Error updating last active: $e');
+    }
+  }
+
+  // ENHANCED: Safe sign out method
+  Future<void> _safeSignOut() async {
+    try {
+      await supabase.auth.signOut();
+      debugPrint('✅ User signed out successfully');
+    } catch (e) {
+      debugPrint('❌ Error during sign out: $e');
     }
   }
 
@@ -435,13 +463,10 @@ Future<void> _verifyEmail() async {
     setState(() => _isLoading = true);
     
     try {
-    
-      final redirectUrl = 'com.projectradar://reset-password';
-
       await supabase.auth.resetPasswordForEmail(
-  email,
-  redirectTo: 'com.projectradar://reset-password',
-);
+        email,
+        redirectTo: 'com.projectradar://reset-password',
+      );
 
       if (!mounted) return;
       _showDialog('Password reset instructions have been sent to $email');
@@ -468,12 +493,287 @@ Future<void> _verifyEmail() async {
     return true;
   }
 
+ Widget _buildSuspendedPopup() {
+  return AnimatedOpacity(
+    opacity: _showSuspendedPopup ? 1.0 : 0.0,
+    duration: const Duration(milliseconds: 200),
+    child: Visibility(
+      visible: _showSuspendedPopup,
+      child: Stack(
+        children: [
+          // Translucent black background
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.6),
+            ),
+          ),
+          
+          // Dialog content
+          Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 400),
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 25,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header Icon
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.block_rounded,
+                        color: Colors.red.shade600,
+                        size: 40,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Title
+                    Text(
+                      'Account Suspended',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red.shade700,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Message
+                    Text(
+                      'Your account has been temporarily suspended by an administrator. '
+                      'This may be due to policy violations or security concerns.',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey.shade700,
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Contact Information - Fixed overflow
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.grey.shade300,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Support Header with Icon
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.support_agent_rounded,
+                                color: Colors.blue.shade700,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible( // FIX: Added Flexible to prevent overflow
+                                child: Text(
+                                  'Need Help? Contact Support',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          
+                          // Email Section
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.blue.shade100,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  'Email Support Team',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                
+                                // Email with copy functionality - FIXED OVERFLOW
+                                GestureDetector(
+                                  onTap: () {
+                                    Clipboard.setData(const ClipboardData(
+                                        text: 'radarconnects2025@gmail.com'));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: const Text('Email copied to clipboard'),
+                                        backgroundColor: Colors.green.shade50,
+                                        behavior: SnackBarBehavior.floating,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: double.infinity,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade50,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: Colors.blue.shade200,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min, // FIX: Use min size
+                                      children: [
+                                        Icon(
+                                          Icons.email_rounded,
+                                          color: Colors.blue.shade600,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Flexible( // FIX: Critical - Added Flexible here
+                                          child: Text(
+                                            'radarconnects2025@gmail.com',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.blue.shade800,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                            overflow: TextOverflow.ellipsis, // FIX: Handle overflow
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Icon(
+                                          Icons.content_copy_rounded,
+                                          color: Colors.blue.shade600,
+                                          size: 16,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Tap to copy email address',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          
+                          // Instructions
+                          Text(
+                            'Please include your account email and details for faster assistance',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                              height: 1.4,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Action Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _showSuspendedPopup = false;
+                            _emailController.clear();
+                            _passwordController.clear();
+                            _showPasswordStep = false;
+                            _emailError = null;
+                            _passwordError = null;
+                          });
+                        },
+                        child: const Text(
+                          'OK, I Understand',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
   // Dialog helpers
   void _showDialog(String message) {
     if (!mounted) return;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: const Text(
           'RADAR',
           style: TextStyle(color: Color(0xFF336699)),
@@ -494,6 +794,7 @@ Future<void> _verifyEmail() async {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: const Text('Error', style: TextStyle(color: Colors.red)),
         content: Text(message),
         actions: [
@@ -897,37 +1198,44 @@ Future<void> _verifyEmail() async {
     final isSmallScreen = screenHeight < 600;
 
     return Scaffold(
-      body: AnimatedBuilder(
-        animation: _colorAnimation,
-        builder: (context, child) {
-          return Container(
-            color: _colorAnimation.value,
-            child: SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    padding: EdgeInsets.only(
-                      bottom: MediaQuery.of(context).viewInsets.bottom,
-                    ),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
-                      ),
-                      child: IntrinsicHeight(
-                        child: Column(
-                          children: [
-                            _buildLogoSection(isSmallScreen),
-                            _buildFormSection(isSmallScreen),
-                          ],
+      body: Stack(
+        children: [
+          AnimatedBuilder(
+            animation: _colorAnimation,
+            builder: (context, child) {
+              return Container(
+                color: _colorAnimation.value,
+                child: SafeArea(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        padding: EdgeInsets.only(
+                          bottom: MediaQuery.of(context).viewInsets.bottom,
                         ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          );
-        },
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
+                          ),
+                          child: IntrinsicHeight(
+                            child: Column(
+                              children: [
+                                _buildLogoSection(isSmallScreen),
+                                _buildFormSection(isSmallScreen),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+          
+          // Suspended Account Popup
+          if (_showSuspendedPopup) _buildSuspendedPopup(),
+        ],
       ),
     );
   }
