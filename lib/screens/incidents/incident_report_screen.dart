@@ -539,7 +539,7 @@ Future<void> _submitForm() async {
     // Show appropriate success message
     String successMessage = 'Incident report submitted successfully!';
     if (aiAnalysis['ai_service_available'] == false) {
-      successMessage += ' (Note: AI analysis temporarily unavailable - using basic checks)';
+      successMessage += '';
     } else if (aiAnalysis['requires_review'] == true) {
       successMessage += ' It will be reviewed by admin due to content analysis.';
     }
