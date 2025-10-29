@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/alert_service.dart';
 import '../../services/emergency_contact_service.dart';
+import '../profile/account management files/edit_account_info.dart';
 import '../../widgets/emergency_buttons.dart';
 import '../incidents/incident_report_screen.dart';
 import '../alerts/report_tracker_screen.dart';
+import '../profile/profile navigation/account_information.dart';
 
 class AlertScreen extends StatefulWidget {
   const AlertScreen({super.key});
@@ -22,12 +26,189 @@ class _AlertScreenState extends State<AlertScreen> {
   bool _locationReady = false;
   bool _isRefreshing = false;
   String _currentTime = "";
+  final SupabaseClient _supabase = Supabase.instance.client;
+  Map<String, dynamic>? _userData;
 
   @override
   void initState() {
     super.initState();
     _fetchLocation();
     _setCurrentTime();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
+        final response = await _supabase
+            .from('app_users')
+            .select()
+            .eq('id', user.id)
+            .single();
+        
+        if (response != null) {
+          setState(() {
+            _userData = Map<String, dynamic>.from(response);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+    }
+  }
+
+  bool _isUserVerified() {
+    if (_userData == null) return false;
+    
+    // Check if user is verified in database
+    final isVerified = _userData!['is_verified'] ?? false;
+    if (!isVerified) return false;
+
+    // Check if profile is complete (same logic as other screens)
+    final dob = (_userData!['dob'] ?? '').toString().trim();
+    final hasDob = dob.isNotEmpty;
+    if (!hasDob) return false;
+
+    final residentAddress = _userData!['resident_address'] is Map 
+        ? Map<String, dynamic>.from(_userData!['resident_address']) 
+        : null;
+
+    if (residentAddress == null) return false;
+
+    final hasHouseNo = (residentAddress['house'] ?? '').toString().trim().isNotEmpty;
+    final hasStreet = (residentAddress['street'] ?? '').toString().trim().isNotEmpty;
+    final hasBarangay = (residentAddress['barangay'] ?? '').toString().trim().isNotEmpty;
+    final hasZipCode = (residentAddress['zip'] ?? '').toString().trim().isNotEmpty;
+    final hasCity = (residentAddress['city'] ?? '').toString().trim().isNotEmpty;
+
+    return hasHouseNo && hasStreet && hasBarangay && hasZipCode && hasCity;
+  }
+
+  void _showVerificationRequiredDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext context) {
+      return Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.verified_user_outlined,
+                      color: Colors.orange,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    "Verification Required",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "To report incidents, you need to complete your profile verification. Please fill in your date of birth and complete address information.",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade700,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      child: Text(
+                        "Cancel",
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        Navigator.of(context).pop();
+                        // Navigate to EditAccountinfo and wait for result
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const EditAccountinfo(),
+                          ),
+                        );
+                        
+                        // Reload user data when returning from edit screen
+                        if (result == true || result == 'updated') {
+                          await _loadUserData();
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF3F73A3),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
+                      child: const Text(
+                        "Verify Now",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+  void _handleIncidentReport() {
+    if (_isUserVerified()) {
+      _navigateToIncidentReport(context);
+    } else {
+      _showVerificationRequiredDialog();
+    }
   }
 
   Future<void> _fetchLocation() async {
@@ -107,6 +288,46 @@ class _AlertScreenState extends State<AlertScreen> {
       context,
       MaterialPageRoute(builder: (context) => const ReportTrackerScreen()),
     );
+  }
+
+  // New method to open phone's contact list
+  Future<void> _openPhoneContacts() async {
+    try {
+      const url = 'content://com.android.contacts/contacts';
+      final uri = Uri.parse(url);
+      
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        // Fallback: Try to open the dialer instead
+        const dialerUri = 'tel:';
+        if (await canLaunchUrl(Uri.parse(dialerUri))) {
+          await launchUrl(Uri.parse(dialerUri));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Cannot open contacts'),
+              backgroundColor: Colors.red[400],
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Cannot open contacts'),
+          backgroundColor: Colors.red[400],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -356,7 +577,7 @@ return Scaffold(
 
               SizedBox(height: sectionSpacing * 1.5),
 
-              // SOS Button (calls first saved contact)
+              // SOS Button (now opens phone contacts)
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: sidePadding),
                 child: Column(
@@ -385,38 +606,7 @@ return Scaffold(
                       child: buildFullWidthButton(
                         icon: 'assets/sos.png',
                         label: 'SOS EMERGENCY',
-                        onTap: () async {
-                          final contacts =
-                              await EmergencyContactService().loadContacts();
-                          if (contacts.isNotEmpty) {
-                            final firstPhone = contacts.first['phone'];
-                            if (firstPhone != null && firstPhone.isNotEmpty) {
-                              AlertService.launchPhone(context, firstPhone);
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text('No phone number available for SOS call.'),
-                                  backgroundColor: Colors.red[400],
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              );
-                            }
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text('No emergency contacts available.'),
-                                backgroundColor: Colors.red[400],
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            );
-                          }
-                        },
+                        onTap: _openPhoneContacts, // Changed to open contacts
                       ),
                     ),
                   ],
@@ -443,7 +633,7 @@ return Scaffold(
                     buildFullWidthButton(
                       icon: 'assets/report.png',
                       label: 'Incident Report',
-                      onTap: () => _navigateToIncidentReport(context),
+                      onTap: _handleIncidentReport,
                     ),
                   ],
                 ),

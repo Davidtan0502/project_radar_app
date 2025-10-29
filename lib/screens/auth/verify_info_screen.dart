@@ -8,10 +8,7 @@ class VerifyInfoScreen extends StatefulWidget {
   final String phone;
   final String password;
   final String? userCategory;
-  final Map<String, dynamic>? residentAddress;
-  final Map<String, dynamic>? workAddress;
-  final Map<String, dynamic>? homeAddress;
-  final Map<String, dynamic>? schoolAddress;
+  final Map<String, dynamic>? address; // Add this new parameter
   final VoidCallback onConfirm;
   final VoidCallback onEdit;
 
@@ -24,10 +21,7 @@ class VerifyInfoScreen extends StatefulWidget {
     required this.phone,
     required this.password,
     this.userCategory,
-    this.residentAddress,
-    this.workAddress,
-    this.homeAddress,
-    this.schoolAddress,
+    this.address, // Add this to constructor
     required this.onConfirm,
     required this.onEdit,
   });
@@ -159,12 +153,14 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
     return val.toString();
   }
 
+  // Check if address has any data
+  bool _hasAddressData(Map<String, dynamic>? address) {
+    if (address == null) return false;
+    return address.values.any((value) => value != null && value.toString().isNotEmpty);
+  }
+
  Widget _buildAddressBlock(String title, Map<String, dynamic> map) {
   final parts = <String>[];
-
-  // School name (for student)
-  final schoolName = _addr(map, 'school_name');
-  if (schoolName.isNotEmpty) parts.add(_capitalizeEachWord(schoolName));
 
   // House and street
   final house = _addr(map, 'house');
@@ -225,7 +221,7 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
   final country = _addr(map, 'country');
   if (country.isNotEmpty) parts.add(_capitalizeEachWord(country));
 
-  final inline = parts.isNotEmpty ? parts.join(', ') : '-';
+  final inline = parts.isNotEmpty ? parts.join(', ') : 'No address provided';
 
   return Container(
     width: double.infinity,
@@ -431,62 +427,18 @@ class _VerifyInfoScreenState extends State<VerifyInfoScreen>
 
                                     const SizedBox(height: 24),
 
-                                    // Address Sections
-                                    if (widget.residentAddress != null && widget.residentAddress!.isNotEmpty) ...[
-                                      Text(
-                                        'Resident Address',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 16,
-                                          color: Colors.grey.shade800,
-                                        ),
+                                    // Single Address Section - Display the new address parameter
+                                    Text(
+                                      'Address',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 16,
+                                        color: Colors.grey.shade800,
                                       ),
-                                      const SizedBox(height: 8),
-                                      _buildAddressBlock('Resident Address', widget.residentAddress!),
-                                      const SizedBox(height: 16),
-                                    ],
-
-                                    if (widget.workAddress != null && widget.workAddress!.isNotEmpty) ...[
-                                      Text(
-                                        'Work Address',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 16,
-                                          color: Colors.grey.shade800,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      _buildAddressBlock('Work Address', widget.workAddress!),
-                                      const SizedBox(height: 16),
-                                    ],
-
-                                    if (widget.homeAddress != null && widget.homeAddress!.isNotEmpty) ...[
-                                      Text(
-                                        'Home Address',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 16,
-                                          color: Colors.grey.shade800,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      _buildAddressBlock('Home Address', widget.homeAddress!),
-                                      const SizedBox(height: 16),
-                                    ],
-
-                                    if (widget.schoolAddress != null && widget.schoolAddress!.isNotEmpty) ...[
-                                      Text(
-                                        'School Address',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 16,
-                                          color: Colors.grey.shade800,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      _buildAddressBlock('School Address', widget.schoolAddress!),
-                                      const SizedBox(height: 16),
-                                    ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    // Always show address block, but it will display "No address provided" when empty
+                                    _buildAddressBlock('Address', widget.address ?? {}),
 
                                     const SizedBox(height: 32),
 

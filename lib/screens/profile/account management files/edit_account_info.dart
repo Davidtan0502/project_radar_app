@@ -76,897 +76,14 @@ class _EditAccountinfoState extends State<EditAccountinfo> {
   final _heightController = TextEditingController();
   final _weightController = TextEditingController();
 
-  // Town options
-  final List<String> _towns = [
-    "Tondo",
-    "Binondo",
-    "Quiapo",
-    "Intramuros",
-    "Ermita",
-    "Malate",
-    "Paco",
-    "Pandacan",
-    "Port Area",
-    "San Nicolas",
-    "Santa Ana",
-    "Santa Cruz",
-    "Santa Mesa",
-    "San Miguel",
-    "San Andres Bukid",
-    "Sampaloc",
-  ];
-  // ZIP code mapping
-final Map<String, List<String>> _zipCodeMap = {
-  "Tondo": ["1012", "1013"],
-  "Binondo": ["1006"],
-  "Quiapo": ["1001"],
-  "Intramuros": ["1002"],
-  "Ermita": ["1000"],
-  "Malate": ["1004"],
-  "Paco": ["1007"],
-  "Pandacan": ["1011"],
-  "Port Area": ["1018", "1019"],
-  "San Nicolas": ["1010"],
-  "Santa Ana": ["1009"],
-  "Santa Cruz": ["1003"],
-  "Santa Mesa": ["1016"],
-  "San Miguel": ["1005"],
-  "San Andres Bukid": ["1017"],
-  "Sampaloc": ["1008"],
-};
-
-List<String> _getZipCodesForTown(String? town) {
-  if (town == null) return [];
-  return _zipCodeMap[town] ?? [];
-}
-
-String? _getFirstZipCodeForTown(String? town) {
-  final zipCodes = _getZipCodesForTown(town);
-  return zipCodes.isNotEmpty ? zipCodes.first : null;
-}
-
-  //barangay
-  final String _barangayCsv = r'''
-district,barangay
-Tondo,Barangay 1
-Tondo,Barangay 2
-Tondo,Barangay 3
-Tondo,Barangay 4
-Tondo,Barangay 5
-Tondo,Barangay 6
-Tondo,Barangay 7
-Tondo,Barangay 8
-Tondo,Barangay 9
-Tondo,Barangay 10
-Tondo,Barangay 11
-Tondo,Barangay 12
-Tondo,Barangay 13
-Tondo,Barangay 14
-Tondo,Barangay 15
-Tondo,Barangay 16
-Tondo,Barangay 17
-Tondo,Barangay 18
-Tondo,Barangay 19
-Tondo,Barangay 20
-Tondo,Barangay 21
-Tondo,Barangay 22
-Tondo,Barangay 23
-Tondo,Barangay 24
-Tondo,Barangay 25
-Tondo,Barangay 26
-Tondo,Barangay 27
-Tondo,Barangay 28
-Tondo,Barangay 29
-Tondo,Barangay 30
-Tondo,Barangay 31
-Tondo,Barangay 32
-Tondo,Barangay 33
-Tondo,Barangay 34
-Tondo,Barangay 35
-Tondo,Barangay 36
-Tondo,Barangay 37
-Tondo,Barangay 38
-Tondo,Barangay 39
-Tondo,Barangay 40
-Tondo,Barangay 41
-Tondo,Barangay 42
-Tondo,Barangay 43
-Tondo,Barangay 44
-Tondo,Barangay 45
-Tondo,Barangay 46
-Tondo,Barangay 47
-Tondo,Barangay 48
-Tondo,Barangay 49
-Tondo,Barangay 50
-Tondo,Barangay 51
-Tondo,Barangay 52
-Tondo,Barangay 53
-Tondo,Barangay 54
-Tondo,Barangay 55
-Tondo,Barangay 56
-Tondo,Barangay 57
-Tondo,Barangay 58
-Tondo,Barangay 59
-Tondo,Barangay 60
-Tondo,Barangay 61
-Tondo,Barangay 62
-Tondo,Barangay 63
-Tondo,Barangay 64
-Tondo,Barangay 65
-Tondo,Barangay 66
-Tondo,Barangay 67
-Tondo,Barangay 68
-Tondo,Barangay 69
-Tondo,Barangay 70
-Tondo,Barangay 71
-Tondo,Barangay 72
-Tondo,Barangay 73
-Tondo,Barangay 74
-Tondo,Barangay 75
-Tondo,Barangay 76
-Tondo,Barangay 77
-Tondo,Barangay 78
-Tondo,Barangay 79
-Tondo,Barangay 80
-Tondo,Barangay 81
-Tondo,Barangay 82
-Tondo,Barangay 83
-Tondo,Barangay 84
-Tondo,Barangay 85
-Tondo,Barangay 86
-Tondo,Barangay 87
-Tondo,Barangay 88
-Tondo,Barangay 89
-Tondo,Barangay 90
-Tondo,Barangay 91
-Tondo,Barangay 92
-Tondo,Barangay 93
-Tondo,Barangay 94
-Tondo,Barangay 95
-Tondo,Barangay 96
-Tondo,Barangay 97
-Tondo,Barangay 98
-Tondo,Barangay 99
-Tondo,Barangay 100
-Tondo,Barangay 101
-Tondo,Barangay 102
-Tondo,Barangay 103
-Tondo,Barangay 104
-Tondo,Barangay 105
-Tondo,Barangay 106
-Tondo,Barangay 107
-Tondo,Barangay 108
-Tondo,Barangay 109
-Tondo,Barangay 110
-Tondo,Barangay 111
-Tondo,Barangay 112
-Tondo,Barangay 113
-Tondo,Barangay 114
-Tondo,Barangay 115
-Tondo,Barangay 116
-Tondo,Barangay 117
-Tondo,Barangay 118
-Tondo,Barangay 119
-Tondo,Barangay 120
-Tondo,Barangay 121
-Tondo,Barangay 122
-Tondo,Barangay 123
-Tondo,Barangay 124
-Tondo,Barangay 125
-Tondo,Barangay 126
-Tondo,Barangay 127
-Tondo,Barangay 128
-Tondo,Barangay 129
-Tondo,Barangay 130
-Tondo,Barangay 131
-Tondo,Barangay 132
-Tondo,Barangay 133
-Tondo,Barangay 134
-Tondo,Barangay 135
-Tondo,Barangay 136
-Tondo,Barangay 137
-Tondo,Barangay 138
-Tondo,Barangay 139
-Tondo,Barangay 140
-Tondo,Barangay 141
-Tondo,Barangay 142
-Tondo,Barangay 143
-Tondo,Barangay 144
-Tondo,Barangay 145
-Tondo,Barangay 146
-Tondo,Barangay 147
-Tondo,Barangay 148
-Tondo,Barangay 149
-Tondo,Barangay 150
-Tondo,Barangay 151
-Tondo,Barangay 152
-Tondo,Barangay 153
-Tondo,Barangay 154
-Tondo,Barangay 155
-Tondo,Barangay 156
-Tondo,Barangay 157
-Tondo,Barangay 158
-Tondo,Barangay 159
-Tondo,Barangay 160
-Tondo,Barangay 161
-Tondo,Barangay 162
-Tondo,Barangay 163
-Tondo,Barangay 164
-Tondo,Barangay 165
-Tondo,Barangay 166
-Tondo,Barangay 167
-Tondo,Barangay 168
-Tondo,Barangay 169
-Tondo,Barangay 170
-Tondo,Barangay 171
-Tondo,Barangay 172
-Tondo,Barangay 173
-Tondo,Barangay 174
-Tondo,Barangay 175
-Tondo,Barangay 176
-Tondo,Barangay 177
-Tondo,Barangay 178
-Tondo,Barangay 179
-Tondo,Barangay 180
-Tondo,Barangay 181
-Tondo,Barangay 182
-Tondo,Barangay 183
-Tondo,Barangay 184
-Tondo,Barangay 185
-Tondo,Barangay 186
-Tondo,Barangay 187
-Tondo,Barangay 188
-Tondo,Barangay 189
-Tondo,Barangay 190
-Tondo,Barangay 191
-Tondo,Barangay 192
-Tondo,Barangay 193
-Tondo,Barangay 194
-Tondo,Barangay 195
-Tondo,Barangay 196
-Tondo,Barangay 197
-Tondo,Barangay 198
-Tondo,Barangay 199
-Tondo,Barangay 200
-Tondo,Barangay 201
-Tondo,Barangay 202
-Tondo,Barangay 203
-Tondo,Barangay 204
-Tondo,Barangay 205
-Tondo,Barangay 206
-Tondo,Barangay 207
-Tondo,Barangay 208
-Tondo,Barangay 209
-Tondo,Barangay 210
-Tondo,Barangay 211
-Tondo,Barangay 212
-Tondo,Barangay 213
-Tondo,Barangay 214
-Tondo,Barangay 215
-Tondo,Barangay 216
-Tondo,Barangay 217
-Tondo,Barangay 218
-Tondo,Barangay 219
-Tondo,Barangay 220
-Tondo,Barangay 221
-Tondo,Barangay 222
-Tondo,Barangay 223
-Tondo,Barangay 224
-Tondo,Barangay 225
-Tondo,Barangay 226
-Tondo,Barangay 227
-Tondo,Barangay 228
-Tondo,Barangay 229
-Tondo,Barangay 230
-Tondo,Barangay 231
-Tondo,Barangay 232
-Tondo,Barangay 233
-Tondo,Barangay 234
-Tondo,Barangay 235
-Tondo,Barangay 236
-Tondo,Barangay 237
-Tondo,Barangay 238
-Tondo,Barangay 239
-Tondo,Barangay 240
-Tondo,Barangay 241
-Tondo,Barangay 242
-Tondo,Barangay 243
-Tondo,Barangay 244
-Tondo,Barangay 245
-Tondo,Barangay 246
-Tondo,Barangay 247
-Tondo,Barangay 248
-Tondo,Barangay 249
-Tondo,Barangay 250
-Tondo,Barangay 251
-Tondo,Barangay 252
-Tondo,Barangay 253
-Tondo,Barangay 254
-Tondo,Barangay 255
-Tondo,Barangay 256
-Tondo,Barangay 257
-Tondo,Barangay 258
-Tondo,Barangay 259
-Tondo,Barangay 260
-Tondo,Barangay 261
-Tondo,Barangay 262
-Tondo,Barangay 263
-Tondo,Barangay 264
-Tondo,Barangay 265
-Tondo,Barangay 266
-Tondo,Barangay 267
-Binondo,Barangay 287
-Binondo,Barangay 288
-Binondo,Barangay 289
-Binondo,Barangay 290
-Binondo,Barangay 291
-Binondo,Barangay 292
-Binondo,Barangay 293
-Binondo,Barangay 294
-Binondo,Barangay 295
-Binondo,Barangay 296
-Quiapo,Barangay 306
-Quiapo,Barangay 307
-Quiapo,Barangay 308
-Quiapo,Barangay 309
-Quiapo,Barangay 383
-Quiapo,Barangay 384
-Quiapo,Barangay 385
-Quiapo,Barangay 386
-Quiapo,Barangay 387
-Quiapo,Barangay 388
-Quiapo,Barangay 389
-Quiapo,Barangay 390
-Quiapo,Barangay 391
-Quiapo,Barangay 392
-Quiapo,Barangay 393
-Quiapo,Barangay 394
-Intramuros,Barangay 654
-Intramuros,Barangay 655
-Intramuros,Barangay 656
-Intramuros,Barangay 657
-Intramuros,Barangay 658
-Ermita,Barangay 659
-Ermita,Barangay 659-A
-Ermita,Barangay 660
-Ermita,Barangay 660-A
-Ermita,Barangay 661
-Ermita,Barangay 663
-Ermita,Barangay 663-A
-Ermita,Barangay 664
-Ermita,Barangay 666
-Ermita,Barangay 667
-Ermita,Barangay 668
-Ermita,Barangay 669
-Ermita,Barangay 670
-Malate,Barangay 688
-Malate,Barangay 689
-Malate,Barangay 690
-Malate,Barangay 691
-Malate,Barangay 692
-Malate,Barangay 693
-Malate,Barangay 694
-Malate,Barangay 695
-Malate,Barangay 696
-Malate,Barangay 697
-Malate,Barangay 698
-Malate,Barangay 699
-Malate,Barangay 700
-Malate,Barangay 701
-Malate,Barangay 702
-Malate,Barangay 703
-Malate,Barangay 704
-Malate,Barangay 705
-Malate,Barangay 706
-Malate,Barangay 707
-Malate,Barangay 708
-Malate,Barangay 709
-Malate,Barangay 710
-Malate,Barangay 711
-Malate,Barangay 712
-Malate,Barangay 713
-Malate,Barangay 714
-Malate,Barangay 715
-Malate,Barangay 716
-Malate,Barangay 717
-Malate,Barangay 718
-Malate,Barangay 719
-Malate,Barangay 720
-Malate,Barangay 722
-Malate,Barangay 723
-Malate,Barangay 724
-Malate,Barangay 725
-Malate,Barangay 726
-Malate,Barangay 727
-Malate,Barangay 728
-Malate,Barangay 729
-Malate,Barangay 730
-Malate,Barangay 731
-Malate,Barangay 732
-Malate,Barangay 733
-Malate,Barangay 734
-Malate,Barangay 735
-Malate,Barangay 736
-Malate,Barangay 737
-Malate,Barangay 738
-Malate,Barangay 739
-Malate,Barangay 740
-Malate,Barangay 741
-Malate,Barangay 742
-Malate,Barangay 743
-Malate,Barangay 744
-Paco,Barangay 662
-Paco,Barangay 664-A
-Paco,Barangay 671
-Paco,Barangay 672
-Paco,Barangay 673
-Paco,Barangay 674
-Paco,Barangay 675
-Paco,Barangay 676
-Paco,Barangay 677
-Paco,Barangay 678
-Paco,Barangay 679
-Paco,Barangay 680
-Paco,Barangay 681
-Paco,Barangay 682
-Paco,Barangay 683
-Paco,Barangay 684
-Paco,Barangay 685
-Paco,Barangay 686
-Paco,Barangay 686
-Paco,Barangay 687
-Paco,Barangay 809
-Paco,Barangay 810
-Paco,Barangay 811
-Paco,Barangay 812
-Paco,Barangay 813
-Paco,Barangay 814
-Paco,Barangay 815
-Paco,Barangay 816
-Paco,Barangay 817
-Paco,Barangay 818
-Paco,Barangay 819
-Paco,Barangay 820
-Paco,Barangay 821
-Paco,Barangay 822
-Paco,Barangay 823
-Paco,Barangay 824
-Paco,Barangay 825
-Paco,Barangay 826
-Paco,Barangay 827
-Paco,Barangay 828
-Pandacan,Barangay 833
-Pandacan,Barangay 834
-Pandacan,Barangay 835
-Pandacan,Barangay 836
-Pandacan,Barangay 837
-Pandacan,Barangay 838
-Pandacan,Barangay 839
-Pandacan,Barangay 840
-Pandacan,Barangay 841
-Pandacan,Barangay 842
-Pandacan,Barangay 843
-Pandacan,Barangay 844
-Pandacan,Barangay 845
-Pandacan,Barangay 846
-Pandacan,Barangay 847
-Pandacan,Barangay 848
-Pandacan,Barangay 849
-Pandacan,Barangay 850
-Pandacan,Barangay 851
-Pandacan,Barangay 852
-Pandacan,Barangay 853
-Pandacan,Barangay 854
-Pandacan,Barangay 855
-Pandacan,Barangay 856
-Pandacan,Barangay 857
-Pandacan,Barangay 858
-Pandacan,Barangay 859
-Pandacan,Barangay 860
-Pandacan,Barangay 861
-Pandacan,Barangay 862
-Pandacan,Barangay 863
-Pandacan,Barangay 864
-Pandacan,Barangay 865
-Pandacan,Barangay 867
-Pandacan,Barangay 868
-Pandacan,Barangay 869
-Pandacan,Barangay 870
-Pandacan,Barangay 871
-Pandacan,Barangay 872
-Port Area,Barangay 649
-Port Area,Barangay 650
-Port Area,Barangay 651
-Port Area,Barangay 652
-Port Area,Barangay 653
-San Nicolas,Barangay 268
-San Nicolas,Barangay 269
-San Nicolas,Barangay 270
-San Nicolas,Barangay 271
-San Nicolas,Barangay 272
-San Nicolas,Barangay 273
-San Nicolas,Barangay 274
-San Nicolas,Barangay 275
-San Nicolas,Barangay 276
-San Nicolas,Barangay 281
-San Nicolas,Barangay 282
-San Nicolas,Barangay 283
-San Nicolas,Barangay 284
-San Nicolas,Barangay 285
-San Nicolas,Barangay 286
-Santa Ana,Barangay 866
-Santa Ana,Barangay 873
-Santa Ana,Barangay 874
-Santa Ana,Barangay 875
-Santa Ana,Barangay 876
-Santa Ana,Barangay 877
-Santa Ana,Barangay 878
-Santa Ana,Barangay 879
-Santa Ana,Barangay 880
-Santa Ana,Barangay 881
-Santa Ana,Barangay 882
-Santa Ana,Barangay 883
-Santa Ana,Barangay 884
-Santa Ana,Barangay 885
-Santa Ana,Barangay 886
-Santa Ana,Barangay 887
-Santa Ana,Barangay 888
-Santa Ana,Barangay 889
-Santa Ana,Barangay 890
-Santa Ana,Barangay 891
-Santa Ana,Barangay 892
-Santa Ana,Barangay 893
-Santa Ana,Barangay 894
-Santa Ana,Barangay 895
-Santa Ana,Barangay 896
-Santa Ana,Barangay 897
-Santa Ana,Barangay 898
-Santa Ana,Barangay 899
-Santa Ana,Barangay 900
-Santa Ana,Barangay 901
-Santa Ana,Barangay 902
-Santa Ana,Barangay 903
-Santa Ana,Barangay 904
-Santa Ana,Barangay 905
-Santa Cruz,Barangay 297
-Santa Cruz,Barangay 298
-Santa Cruz,Barangay 299
-Santa Cruz,Barangay 300
-Santa Cruz,Barangay 301
-Santa Cruz,Barangay 302
-Santa Cruz,Barangay 303
-Santa Cruz,Barangay 304
-Santa Cruz,Barangay 305
-Santa Cruz,Barangay 310
-Santa Cruz,Barangay 311
-Santa Cruz,Barangay 312
-Santa Cruz,Barangay 313
-Santa Cruz,Barangay 314
-Santa Cruz,Barangay 315
-Santa Cruz,Barangay 316
-Santa Cruz,Barangay 317
-Santa Cruz,Barangay 318
-Santa Cruz,Barangay 319
-Santa Cruz,Barangay 320
-Santa Cruz,Barangay 321
-Santa Cruz,Barangay 322
-Santa Cruz,Barangay 323
-Santa Cruz,Barangay 324
-Santa Cruz,Barangay 325
-Santa Cruz,Barangay 326
-Santa Cruz,Barangay 327
-Santa Cruz,Barangay 328
-Santa Cruz,Barangay 329
-Santa Cruz,Barangay 330
-Santa Cruz,Barangay 331
-Santa Cruz,Barangay 332
-Santa Cruz,Barangay 333
-Santa Cruz,Barangay 334
-Santa Cruz,Barangay 335
-Santa Cruz,Barangay 336
-Santa Cruz,Barangay 337
-Santa Cruz,Barangay 338
-Santa Cruz,Barangay 339
-Santa Cruz,Barangay 340
-Santa Cruz,Barangay 341
-Santa Cruz,Barangay 342
-Santa Cruz,Barangay 343
-Santa Cruz,Barangay 344
-Santa Cruz,Barangay 345
-Santa Cruz,Barangay 346
-Santa Cruz,Barangay 347
-Santa Cruz,Barangay 348
-Santa Cruz,Barangay 349
-Santa Cruz,Barangay 350
-Santa Cruz,Barangay 351
-Santa Cruz,Barangay 352
-Santa Cruz,Barangay 353
-Santa Cruz,Barangay 354
-Santa Cruz,Barangay 355
-Santa Cruz,Barangay 356
-Santa Cruz,Barangay 357
-Santa Cruz,Barangay 358
-Santa Cruz,Barangay 359
-Santa Cruz,Barangay 360
-Santa Cruz,Barangay 361
-Santa Cruz,Barangay 362
-Santa Mesa,Barangay 587
-Santa Mesa,Barangay 588
-Santa Mesa,Barangay 589
-Santa Mesa,Barangay 590
-Santa Mesa,Barangay 591
-Santa Mesa,Barangay 592
-Santa Mesa,Barangay 593
-Santa Mesa,Barangay 594
-Santa Mesa,Barangay 595
-Santa Mesa,Barangay 596
-Santa Mesa,Barangay 597
-Santa Mesa,Barangay 598
-Santa Mesa,Barangay 599
-Santa Mesa,Barangay 600
-Santa Mesa,Barangay 601
-Santa Mesa,Barangay 602
-Santa Mesa,Barangay 603
-Santa Mesa,Barangay 604
-Santa Mesa,Barangay 605
-Santa Mesa,Barangay 606
-Santa Mesa,Barangay 607
-Santa Mesa,Barangay 608
-Santa Mesa,Barangay 609
-Santa Mesa,Barangay 610
-Santa Mesa,Barangay 611
-Santa Mesa,Barangay 612
-Santa Mesa,Barangay 613
-Santa Mesa,Barangay 614
-Santa Mesa,Barangay 615
-Santa Mesa,Barangay 616
-Santa Mesa,Barangay 617
-Santa Mesa,Barangay 618
-Santa Mesa,Barangay 619
-Santa Mesa,Barangay 620
-Santa Mesa,Barangay 621
-Santa Mesa,Barangay 622
-Santa Mesa,Barangay 623
-Santa Mesa,Barangay 624
-Santa Mesa,Barangay 625
-Santa Mesa,Barangay 626
-Santa Mesa,Barangay 627
-Santa Mesa,Barangay 628
-Santa Mesa,Barangay 629
-Santa Mesa,Barangay 630
-Santa Mesa,Barangay 631
-Santa Mesa,Barangay 632
-Santa Mesa,Barangay 633
-Santa Mesa,Barangay 634
-Santa Mesa,Barangay 635
-Santa Mesa,Barangay 636
-San Miguel,Barangay 637
-San Miguel,Barangay 638
-San Miguel,Barangay 639
-San Miguel,Barangay 640
-San Miguel,Barangay 641
-San Miguel,Barangay 642
-San Miguel,Barangay 643
-San Miguel,Barangay 644
-San Miguel,Barangay 645
-San Miguel,Barangay 646
-San Miguel,Barangay 647
-San Miguel,Barangay 648
-San Andres Bukid,Barangay 745
-San Andres Bukid,Barangay 746
-San Andres Bukid,Barangay 747
-San Andres Bukid,Barangay 748
-San Andres Bukid,Barangay 749
-San Andres Bukid,Barangay 750
-San Andres Bukid,Barangay 751
-San Andres Bukid,Barangay 752
-San Andres Bukid,Barangay 753
-San Andres Bukid,Barangay 754
-San Andres Bukid,Barangay 755
-San Andres Bukid,Barangay 756
-San Andres Bukid,Barangay 757
-San Andres Bukid,Barangay 758
-San Andres Bukid,Barangay 759
-San Andres Bukid,Barangay 760
-San Andres Bukid,Barangay 761
-San Andres Bukid,Barangay 762
-San Andres Bukid,Barangay 763
-San Andres Bukid,Barangay 764
-San Andres Bukid,Barangay 765
-San Andres Bukid,Barangay 766
-San Andres Bukid,Barangay 767
-San Andres Bukid,Barangay 768
-San Andres Bukid,Barangay 769
-San Andres Bukid,Barangay 770
-San Andres Bukid,Barangay 771
-San Andres Bukid,Barangay 772
-San Andres Bukid,Barangay 773
-San Andres Bukid,Barangay 774
-San Andres Bukid,Barangay 775
-San Andres Bukid,Barangay 776
-San Andres Bukid,Barangay 777
-San Andres Bukid,Barangay 778
-San Andres Bukid,Barangay 779
-San Andres Bukid,Barangay 780
-San Andres Bukid,Barangay 781
-San Andres Bukid,Barangay 782
-San Andres Bukid,Barangay 783
-San Andres Bukid,Barangay 784
-San Andres Bukid,Barangay 785
-San Andres Bukid,Barangay 786
-San Andres Bukid,Barangay 787
-San Andres Bukid,Barangay 788
-Sampaloc,Barangay 395
-Sampaloc,Barangay 396
-Sampaloc,Barangay 397
-Sampaloc,Barangay 398
-Sampaloc,Barangay 399
-Sampaloc,Barangay 400
-Sampaloc,Barangay 401
-Sampaloc,Barangay 402
-Sampaloc,Barangay 403
-Sampaloc,Barangay 404
-Sampaloc,Barangay 405
-Sampaloc,Barangay 406
-Sampaloc,Barangay 407
-Sampaloc,Barangay 408
-Sampaloc,Barangay 409
-Sampaloc,Barangay 410
-Sampaloc,Barangay 411
-Sampaloc,Barangay 412
-Sampaloc,Barangay 413
-Sampaloc,Barangay 414
-Sampaloc,Barangay 415
-Sampaloc,Barangay 416
-Sampaloc,Barangay 417
-Sampaloc,Barangay 418
-Sampaloc,Barangay 419
-Sampaloc,Barangay 420
-Sampaloc,Barangay 421
-Sampaloc,Barangay 422
-Sampaloc,Barangay 423
-Sampaloc,Barangay 424
-Sampaloc,Barangay 425
-Sampaloc,Barangay 426
-Sampaloc,Barangay 427
-Sampaloc,Barangay 428
-Sampaloc,Barangay 429
-Sampaloc,Barangay 430
-Sampaloc,Barangay 431
-Sampaloc,Barangay 432
-Sampaloc,Barangay 433
-Sampaloc,Barangay 434
-Sampaloc,Barangay 435
-Sampaloc,Barangay 436
-Sampaloc,Barangay 437
-Sampaloc,Barangay 438
-Sampaloc,Barangay 439
-Sampaloc,Barangay 440
-Sampaloc,Barangay 441
-Sampaloc,Barangay 442
-Sampaloc,Barangay 443
-Sampaloc,Barangay 444
-Sampaloc,Barangay 445
-Sampaloc,Barangay 446
-Sampaloc,Barangay 447
-Sampaloc,Barangay 448
-Sampaloc,Barangay 449
-Sampaloc,Barangay 450
-Sampaloc,Barangay 451
-Sampaloc,Barangay 452
-Sampaloc,Barangay 453
-Sampaloc,Barangay 454
-Sampaloc,Barangay 455
-Sampaloc,Barangay 456
-Sampaloc,Barangay 457
-Sampaloc,Barangay 458
-Sampaloc,Barangay 459
-Sampaloc,Barangay 460
-Sampaloc,Barangay 461
-Sampaloc,Barangay 462
-Sampaloc,Barangay 463
-Sampaloc,Barangay 464
-Sampaloc,Barangay 465
-Sampaloc,Barangay 466
-Sampaloc,Barangay 467
-Sampaloc,Barangay 468
-Sampaloc,Barangay 469
-Sampaloc,Barangay 470
-Sampaloc,Barangay 471
-Sampaloc,Barangay 472
-Sampaloc,Barangay 473
-Sampaloc,Barangay 474
-Sampaloc,Barangay 475
-Sampaloc,Barangay 476
-Sampaloc,Barangay 477
-Sampaloc,Barangay 478
-Sampaloc,Barangay 479
-Sampaloc,Barangay 480
-Sampaloc,Barangay 481
-Sampaloc,Barangay 482
-Sampaloc,Barangay 483
-Sampaloc,Barangay 484
-Sampaloc,Barangay 485
-Sampaloc,Barangay 486
-''';
-
-  late Map<String, List<String>> _barangayMap;
-
-  List<String> _getBarangaysForTown(String? town) {
-    if (town == null) return [];
-    return _barangayMap[town] ?? [];
-  }
-
-  // call this during initState to populate _barangayMap (see note below)
-void _initializeBarangayMapFromCsv() {
-  _barangayMap = {};
-  final lines = _barangayCsv
-    .split('\n')
-    .map((l) => l.trim())
-    .where((l) => l.isNotEmpty)
-    .toList();
-  if (lines.isNotEmpty && lines.first.toLowerCase().startsWith('district')) {
-    lines.removeAt(0); // drop header if present
-  }
-  for (final line in lines) {
-    final parts = line.split(',');
-    if (parts.length >= 2) {
-      final town = parts[0].trim();
-      final barangay = parts.sublist(1).join(',').trim();
-      if (town.isEmpty || barangay.isEmpty) continue;
-      _barangayMap.putIfAbsent(town, () => <String>[]).add(barangay);
-    }
-  }
-  // keep consistent ordering
-  for (final k in _barangayMap.keys) {
-    _barangayMap[k]!.sort((a, b) => a.compareTo(b));
-  }
-}
-// --- END: copy from Registration ---
-
-  // New: address controllers for Resident
+  // Address controllers
   final _resHouseController = TextEditingController();
   final _resStreetController = TextEditingController();
   final _resBarangayController = TextEditingController();
   final _resTownController = TextEditingController();
-  final _resTownManualController = TextEditingController();
   final _resZipController = TextEditingController();
-  final _resCityController = TextEditingController(text: "Manila City");
+  final _resCityController = TextEditingController();
   final _resCountryController = TextEditingController(text: "Philippines");
-
-  // New: Work address controllers
-  final _workStreetController = TextEditingController();
-  final _workBarangayController = TextEditingController();
-  final _workTownController = TextEditingController();
-  final _workTownManualController = TextEditingController();
-  final _workZipController = TextEditingController();
-  final _workCityController = TextEditingController(text: "Manila City");
-  final _workCountryController = TextEditingController(text: "Philippines");
-
-  // New: Home address controllers (used by EMPLOYEE and STUDENT)
-  final _homeHouseController = TextEditingController();
-  final _homeStreetController = TextEditingController();
-  final _homeBarangayController = TextEditingController();
-  final _homeTownController = TextEditingController();
-  final _homeTownManualController = TextEditingController();
-  final _homeZipController = TextEditingController();
-  final _homeCityController = TextEditingController();
-  final _homeCountryController = TextEditingController(text: "Philippines");
-
-  // New: School address controllers
-  final _schoolNameController = TextEditingController();
-  final _schoolStreetController = TextEditingController();
-  final _schoolBarangayController = TextEditingController();
-  final _schoolTownController = TextEditingController();
-  final _schoolTownManualController = TextEditingController();
-  final _schoolZipController = TextEditingController();
-  final _schoolCityController = TextEditingController(text: "Manila City");
-  final _schoolCountryController = TextEditingController(text: "Philippines");
-
-  // track user category from supabase (RESIDENT / EMPLOYEE / STUDENT)
-  String? _userCategory;
-  // store initial category loaded from database to detect changes
-  String? _initialUserCategory;
 
   // NEW: optional middle name checkbox state
   bool _hasMiddleName = false;
@@ -978,9 +95,8 @@ void _initializeBarangayMapFromCsv() {
     super.initState();
     _initializeFormListeners();
     _addAddressCapitalizationListeners();
-    _initializeBarangayMapFromCsv(); // << add this
     _loadUserData();
-    _autoValidateMode = AutovalidateMode.onUserInteraction; //
+    _autoValidateMode = AutovalidateMode.onUserInteraction;
 
     _bloodTypeController.addListener(() {
       final input = _bloodTypeController.text.toUpperCase();
@@ -1011,8 +127,6 @@ void _initializeBarangayMapFromCsv() {
           .single();
       
       final data = response;
-      _userCategory = (data['user_category'] ?? '').toString().trim().toUpperCase();
-      _initialUserCategory = _userCategory;
       String composedAddress = '';
       if ((data['address'] ?? '').toString().trim().isNotEmpty) {
         composedAddress = data['address'].toString();
@@ -1024,9 +138,6 @@ void _initializeBarangayMapFromCsv() {
       }
 
       final residentMap = safeMap(data['resident_address']);
-      final homeMap = safeMap(data['home_address']);
-      final workMap = safeMap(data['work_address']);
-      final schoolMap = safeMap(data['school_address']);
 
       setState(() {
         _firstNameController.text = _capitalizeWords(data['first_name'] ?? '');
@@ -1056,58 +167,12 @@ void _initializeBarangayMapFromCsv() {
           _resCountryController.text = residentMap['country']?.toString() ?? 'Philippines';
         }
 
-        // Work
-        if (workMap != null && workMap.isNotEmpty) {
-          _workStreetController.text = workMap['street']?.toString() ?? '';
-          _workBarangayController.text = workMap['barangay']?.toString() ?? '';
-          _workTownController.text = workMap['town']?.toString() ?? '';
-          _workZipController.text = workMap['zip']?.toString() ?? '';
-          _workCityController.text = workMap['city']?.toString() ?? (_workCityController.text);
-          _workCountryController.text = workMap['country']?.toString() ?? 'Philippines';
-        }
-
-        // Home
-        if (homeMap != null && homeMap.isNotEmpty) {
-          _homeHouseController.text = homeMap['house']?.toString() ?? '';
-          _homeStreetController.text = homeMap['street']?.toString() ?? '';
-          _homeBarangayController.text = homeMap['barangay']?.toString() ?? '';
-          _homeTownController.text = homeMap['town']?.toString() ?? '';
-          _homeZipController.text = homeMap['zip']?.toString() ?? '';
-          _homeCityController.text = homeMap['city']?.toString() ?? _homeCityController.text;
-          _homeCountryController.text = homeMap['country']?.toString() ?? 'Philippines';
-        }
-
-        // School
-        if (schoolMap != null && schoolMap.isNotEmpty) {
-          _schoolNameController.text = schoolMap['school_name']?.toString() ?? '';
-          _schoolStreetController.text = schoolMap['street']?.toString() ?? '';
-          _schoolBarangayController.text = schoolMap['barangay']?.toString() ?? '';
-          _schoolTownController.text = schoolMap['town']?.toString() ?? '';
-          _schoolZipController.text = schoolMap['zip']?.toString() ?? '';
-          _schoolCityController.text = schoolMap['city']?.toString() ?? (_schoolCityController.text);
-          _schoolCountryController.text = schoolMap['country']?.toString() ?? 'Philippines';
-        }
-
-        _normalizeLoadedTownValue(_workTownController, _workTownManualController);
-        _normalizeLoadedTownValue(_schoolTownController, _schoolTownManualController);
-        _normalizeLoadedTownValue(_homeTownController, _homeTownManualController);
-
         _isFormDirty = false;
       });
     } catch (e) {
       debugPrint('Error loading user data: $e');
     }
   }
-
-  void _normalizeLoadedTownValue(TextEditingController main, TextEditingController manual) {
-  final val = main.text.trim();
-  if (val.isNotEmpty && !_towns.contains(val)) {
-    // keep the actual town value in main controller (so it can be shown)
-    // clear manual controller — we no longer use 'Other' flow
-    manual.text = '';
-    // main.text left as the actual value (no 'Other' sentinel)
-  }
-}
 
   void _initializeFormListeners() {
     for (final ctrl in [
@@ -1126,36 +191,9 @@ void _initializeBarangayMapFromCsv() {
       _resStreetController,
       _resBarangayController,
       _resTownController,
-      _resTownManualController,
       _resZipController,
       _resCityController,
       _resCountryController,
-      // work
-      _workStreetController,
-      _workBarangayController,
-      _workTownController,
-      _workTownManualController,
-      _workZipController,
-      _workCityController,
-      _workCountryController,
-      // home
-      _homeHouseController,
-      _homeStreetController,
-      _homeBarangayController,
-      _homeTownController,
-      _homeTownManualController,
-      _homeZipController,
-      _homeCityController,
-      _homeCountryController,
-      // school
-      _schoolNameController,
-      _schoolStreetController,
-      _schoolBarangayController,
-      _schoolTownController,
-      _schoolTownManualController,
-      _schoolZipController,
-      _schoolCityController,
-      _schoolCountryController,
     ]) {
       ctrl.addListener(_markFormDirty);
     }
@@ -1167,24 +205,7 @@ void _initializeBarangayMapFromCsv() {
       _resStreetController,
       _resBarangayController,
       _resTownController,
-      _workStreetController,
-      _workBarangayController,
-      _workTownController,
-      _homeHouseController,
-      _homeStreetController,
-      _homeBarangayController,
-      _workCityController,
-      _homeTownController,
-      _homeCityController,
-      _schoolNameController,
-      _schoolStreetController,
-      _schoolBarangayController,
-      _schoolTownController,
-      _schoolCityController,
-      _resTownManualController,
-      _workTownManualController,
-      _homeTownManualController,
-      _schoolTownManualController,
+      _resCityController,
     ];
 
     for (final ctrl in addressControllers) {
@@ -1225,36 +246,9 @@ void _initializeBarangayMapFromCsv() {
     _resStreetController.dispose();
     _resBarangayController.dispose();
     _resTownController.dispose();
-    _resTownManualController.dispose();
     _resZipController.dispose();
     _resCityController.dispose();
     _resCountryController.dispose();
-
-    _workStreetController.dispose();
-    _workBarangayController.dispose();
-    _workTownController.dispose();
-    _workTownManualController.dispose();
-    _workZipController.dispose();
-    _workCityController.dispose();
-    _workCountryController.dispose();
-
-    _homeHouseController.dispose();
-    _homeStreetController.dispose();
-    _homeBarangayController.dispose();
-    _homeTownController.dispose();
-    _homeTownManualController.dispose();
-    _homeZipController.dispose();
-    _homeCityController.dispose();
-    _homeCountryController.dispose();
-
-    _schoolNameController.dispose();
-    _schoolStreetController.dispose();
-    _schoolBarangayController.dispose();
-    _schoolTownController.dispose();
-    _schoolTownManualController.dispose();
-    _schoolZipController.dispose();
-    _schoolCityController.dispose();
-    _schoolCountryController.dispose();
 
     super.dispose();
   }
@@ -1277,7 +271,7 @@ void _initializeBarangayMapFromCsv() {
     try {
       await _supabase.storage.from('profiles').remove([fullPath]);
     } catch (e) {
-      debugPrint('No existing file to remove (that’s fine): $e');
+      debugPrint('No existing file to remove (that\'s fine): $e');
     }
 
     // Step 2: Upload file
@@ -1542,34 +536,16 @@ void _initializeBarangayMapFromCsv() {
     return phone;
   }
 
-  Map<String, dynamic> _collectAddressMap({
-    required TextEditingController house,
-    required TextEditingController street,
-    required TextEditingController barangay,
-    required TextEditingController townMain,
-    required TextEditingController townManual,
-    required TextEditingController zip,
-    required TextEditingController city,
-    required TextEditingController country,
-  }) {
-    final String townValue = _getTownValue(townMain, townManual);
+  Map<String, dynamic> _collectAddressMap() {
     return {
-      'house': house.text.trim(),
-      'street': street.text.trim(),
-      'barangay': barangay.text.trim(),
-      'town': townValue,
-      'zip': zip.text.trim(),
-      'city': city.text.trim(),
-      'country': country.text.trim(),
+      'house': _resHouseController.text.trim(),
+      'street': _resStreetController.text.trim(),
+      'barangay': _resBarangayController.text.trim(),
+      'town': _resTownController.text.trim(),
+      'zip': _resZipController.text.trim(),
+      'city': _resCityController.text.trim(),
+      'country': _resCountryController.text.trim(),
     };
-  }
-
-  String _getTownValue(TextEditingController main, TextEditingController manual) {
-    final mainVal = main.text.trim();
-    if (mainVal.toLowerCase() == 'other') {
-      return manual.text.trim();
-    }
-    return mainVal;
   }
 
   String _composeAddressStringFromMap(Map<String, dynamic> m) {
@@ -1585,7 +561,7 @@ void _initializeBarangayMapFromCsv() {
     }
     addIf(m['town']);
     addIf(m['city']);
-    if (m['zip'] != null && m['zip'].toString().trim().isNotEmpty) parts.add('ZIP ${m['zip'].toString().trim()}');
+    if (m['zip'] != null && m['zip'].toString().trim().isNotEmpty) parts.add('${m['zip'].toString().trim()}');
     return parts.join(', ');
   }
 
@@ -1645,7 +621,6 @@ debugPrint('=== _saveProfile() DEBUG RUN ===');
 debugPrint('_isSaving before start = $_isSaving');
 debugPrint('_autoValidateMode before start = $_autoValidateMode');
 debugPrint('_hasMiddleName = $_hasMiddleName');
-debugPrint('_userCategory = ${_userCategory ?? "<null>"}');
 
 // snapshot of controllers
 debugPrint('controllers snapshot:');
@@ -1658,9 +633,6 @@ final controllers = {
   'Res Street': _resStreetController.text,
   'Res Barangay': _resBarangayController.text,
   'Res City': _resCityController.text,
-  'Work Street': _workStreetController.text,
-  'Home Street': _homeStreetController.text,
-  'School Name': _schoolNameController.text,
 };
 controllers.forEach((k, v) => debugPrint('  $k => "${v}"'));
 
@@ -1679,9 +651,6 @@ _fieldErrors.forEach((ctrl, msg) {
   else if (identical(ctrl, _resStreetController)) label = 'Res Street';
   else if (identical(ctrl, _resBarangayController)) label = 'Res Barangay';
   else if (identical(ctrl, _resCityController)) label = 'Res City';
-  else if (identical(ctrl, _workStreetController)) label = 'Work Street';
-  else if (identical(ctrl, _homeStreetController)) label = 'Home Street';
-  else if (identical(ctrl, _schoolNameController)) label = 'School Name';
   else label = ctrl.toString(); // fallback
   debugPrint('  _fieldErrors["$label"] = "$msg"');
 });
@@ -1698,60 +667,6 @@ debugPrint('Form validate() returned: $formValid');
     // trigger phone field validator display (no SnackBar)
     if (mounted) {
       setState(() {}); // forces validators / UI update
-      _formKey.currentState!.validate();
-    }
-    return;
-  }
-
-  // 3) Address completeness guard based on category
-  final category = (_userCategory ?? '').toString().toUpperCase();
-
-  String? addressErrorMessage;
-
-  if (category == 'RESIDENT') {
-    if (_resHouseController.text.trim().isEmpty ||
-        _resStreetController.text.trim().isEmpty ||
-        _resBarangayController.text.trim().isEmpty ||
-        _resCityController.text.trim().isEmpty) {
-      addressErrorMessage = 'Please complete your resident address (House, Street, Barangay, City).';
-    }
-  } else if (category == 'EMPLOYEE') {
-    if (_workStreetController.text.trim().isEmpty ||
-        _workBarangayController.text.trim().isEmpty ||
-        _workCityController.text.trim().isEmpty) {
-      addressErrorMessage = 'Please complete your work address (Street, Barangay, City).';
-    } else if (_homeHouseController.text.trim().isEmpty ||
-        _homeStreetController.text.trim().isEmpty ||
-        _homeBarangayController.text.trim().isEmpty ||
-        _homeCityController.text.trim().isEmpty) {
-      addressErrorMessage = 'Please complete your home address (House, Street, Barangay, City).';
-    }
-  } else if (category == 'STUDENT') {
-    if (_schoolNameController.text.trim().isEmpty ||
-        _schoolStreetController.text.trim().isEmpty ||
-        _schoolBarangayController.text.trim().isEmpty ||
-        _schoolCityController.text.trim().isEmpty) {
-      addressErrorMessage = 'Please complete your school address (School name, Street, Barangay, City).';
-    } else if (_homeHouseController.text.trim().isEmpty ||
-        _homeStreetController.text.trim().isEmpty ||
-        _homeBarangayController.text.trim().isEmpty ||
-        _homeCityController.text.trim().isEmpty) {
-      addressErrorMessage = 'Please complete your home address (House, Street, Barangay, City).';
-    }
-  } else {
-    // fallback when category missing or other
-    if (_resHouseController.text.trim().isEmpty ||
-        _resStreetController.text.trim().isEmpty ||
-        _resBarangayController.text.trim().isEmpty ||
-        _resCityController.text.trim().isEmpty) {
-      addressErrorMessage = 'Please complete your address (House, Street, Barangay, City).';
-    }
-  }
-
-  if (addressErrorMessage != null) {
-    // Instead of SnackBar, show field-level errors via validators
-    if (mounted) {
-      setState(() {}); // validators should report empty-field errors under each affected TextFormField
       _formKey.currentState!.validate();
     }
     return;
@@ -1826,6 +741,19 @@ debugPrint('Form validate() returned: $formValid');
       }
     }
 
+        // Check if profile is complete (has DOB and ALL required address fields)
+    final hasDOB = _dobController.text.trim().isNotEmpty;
+
+    // Check if ALL required address fields are filled
+    final hasHouseNo = _resHouseController.text.trim().isNotEmpty;
+    final hasStreet = _resStreetController.text.trim().isNotEmpty;
+    final hasBarangay = _resBarangayController.text.trim().isNotEmpty;
+    final hasZipCode = _resZipController.text.trim().isNotEmpty;
+    final hasCity = _resCityController.text.trim().isNotEmpty;
+
+    final hasCompleteAddress = hasHouseNo && hasStreet && hasBarangay && hasZipCode && hasCity;
+    final isProfileComplete = hasDOB && hasCompleteAddress;
+
     final updates = <String, dynamic>{
       'first_name': _firstNameController.text.trim(),
       'middle_name': _hasMiddleName ? _middleNameController.text.trim() : '',
@@ -1837,6 +765,9 @@ debugPrint('Form validate() returned: $formValid');
       'height': _heightController.text.trim(),
       'weight': _weightController.text.trim(),
       'updated_at': DateTime.now().toIso8601String(),
+      
+      // Auto-verify ONLY when ALL required fields are complete
+      'is_verified': isProfileComplete,
     };
 
     if (profileUrl != null) {
@@ -1857,93 +788,15 @@ debugPrint('Form validate() returned: $formValid');
       updates['id_path'] = null;
     }
 
-    if ((_userCategory ?? '').isNotEmpty) {
-      updates['user_category'] = (_userCategory ?? '').toString().toUpperCase();
-    }
+    // Simple address handling
+    final addressMap = _collectAddressMap();
+    updates['resident_address'] = addressMap;
+    updates['address'] = _composeAddressStringFromMap(addressMap);
 
-    final newCat = (_userCategory ?? '').toString().toUpperCase();
-    final oldCat = (_initialUserCategory ?? '').toString().toUpperCase();
-
-    if (newCat == 'RESIDENT') {
-      final map = _collectAddressMap(
-        house: _resHouseController,
-        street: _resStreetController,
-        barangay: _resBarangayController,
-        townMain: _resTownController,
-        townManual: _resTownManualController,
-        zip: _resZipController,
-        city: _resCityController,
-        country: _resCountryController,
-      );
-      updates['resident_address'] = map;
-      updates['address'] = _composeAddressStringFromMap(map);
-    } else if (newCat == 'EMPLOYEE') {
-      final workMap = _collectAddressMap(
-        house: TextEditingController(),
-        street: _workStreetController,
-        barangay: _workBarangayController,
-        townMain: _workTownController,
-        townManual: _workTownManualController,
-        zip: _workZipController,
-        city: _workCityController,
-        country: _workCountryController,
-      );
-      final homeMap = _collectAddressMap(
-        house: _homeHouseController,
-        street: _homeStreetController,
-        barangay: _homeBarangayController,
-        townMain: _homeTownController,
-        townManual: _homeTownManualController,
-        zip: _homeZipController,
-        city: _homeCityController,
-        country: _homeCountryController,
-      );
-      updates['work_address'] = workMap;
-      updates['home_address'] = homeMap;
-      updates['address'] = _composeAddressStringFromMap(homeMap);
-    } else if (newCat == 'STUDENT') {
-      final schoolMap = {
-        'school_name': _schoolNameController.text.trim(),
-        'street': _schoolStreetController.text.trim(),
-        'barangay': _schoolBarangayController.text.trim(),
-        'town': _getTownValue(_schoolTownController, _schoolTownManualController),
-        'zip': _schoolZipController.text.trim(),
-        'city': _schoolCityController.text.trim(),
-        'country': _schoolCountryController.text.trim(),
-      };
-      final homeMap = _collectAddressMap(
-        house: _homeHouseController,
-        street: _homeStreetController,
-        barangay: _homeBarangayController,
-        townMain: _homeTownController,
-        townManual: _homeTownManualController,
-        zip: _homeZipController,
-        city: _homeCityController,
-        country: _homeCountryController,
-      );
-      updates['school_address'] = schoolMap;
-      updates['home_address'] = homeMap;
-      updates['address'] = _composeAddressStringFromMap(homeMap);
-    }
-
-    if (oldCat != newCat) {
-      if (newCat == 'RESIDENT') {
-        updates['work_address'] = null;
-        updates['home_address'] = null;
-        updates['school_address'] = null;
-      } else if (newCat == 'EMPLOYEE') {
-        updates['resident_address'] = null;
-        updates['school_address'] = null;
-      } else if (newCat == 'STUDENT') {
-        updates['resident_address'] = null;
-        updates['work_address'] = null;
-      } else {
-        updates['resident_address'] = null;
-        updates['work_address'] = null;
-        updates['school_address'] = null;
-        updates['home_address'] = null;
-      }
-    }
+    // Clear other address types since we're not using categories
+    updates['work_address'] = null;
+    updates['home_address'] = null;
+    updates['school_address'] = null;
 
     debugPrint('DEBUG: database updates prepared = $updates');
 
@@ -1970,37 +823,12 @@ debugPrint('Form validate() returned: $formValid');
       _fieldErrors[_phoneController] = 'Enter a valid 11-digit number starting with 0';
     }
 
-    // Address checks by category — set per-controller keys
-    final category = (_userCategory ?? '').toString().toUpperCase();
-if (category == 'RESIDENT') {
-if (_resHouseController.text.trim().isEmpty) _fieldErrors[_resHouseController] = 'Please enter House/Unit/Building No.';
-if (_resStreetController.text.trim().isEmpty) _fieldErrors[_resStreetController] = 'Please enter Street Name';
-if (_resBarangayController.text.trim().isEmpty) _fieldErrors[_resBarangayController] = 'Please enter Barangay/Subdivision';
-if (_resCityController.text.trim().isEmpty) _fieldErrors[_resCityController] = 'Please enter City/Municipality';
-} else if (category == 'EMPLOYEE') {
-if (_workStreetController.text.trim().isEmpty) _fieldErrors[_workStreetController] = 'Please enter Street/Building No.';
-if (_workBarangayController.text.trim().isEmpty) _fieldErrors[_workBarangayController] = 'Please enter Barangay/Subdivision';
-if (_workCityController.text.trim().isEmpty) _fieldErrors[_workCityController] = 'Please enter City/Municipality';
-if (_homeHouseController.text.trim().isEmpty) _fieldErrors[_homeHouseController] = 'Please enter House/Unit/Building No.';
-if (_homeStreetController.text.trim().isEmpty) _fieldErrors[_homeStreetController] = 'Please enter Street Name';
-if (_homeBarangayController.text.trim().isEmpty) _fieldErrors[_homeBarangayController] = 'Please enter Barangay/Subdivision';
-if (_homeCityController.text.trim().isEmpty) _fieldErrors[_homeCityController] = 'Please enter City/Municipality';
-} else if (category == 'STUDENT') {
-if (_schoolNameController.text.trim().isEmpty) _fieldErrors[_schoolNameController] = 'Please enter Full School Name';
-if (_schoolStreetController.text.trim().isEmpty) _fieldErrors[_schoolStreetController] = 'Please enter Street Name';
-if (_schoolBarangayController.text.trim().isEmpty) _fieldErrors[_schoolBarangayController] = 'Please enter Barangay/Subdivision';
-if (_schoolCityController.text.trim().isEmpty) _fieldErrors[_schoolCityController] = 'Please enter City/Municipality';
-if (_homeHouseController.text.trim().isEmpty) _fieldErrors[_homeHouseController] = 'Please enter House/Unit/Building No.';
-if (_homeStreetController.text.trim().isEmpty) _fieldErrors[_homeStreetController] = 'Please enter Street Name';
-if (_homeBarangayController.text.trim().isEmpty) _fieldErrors[_homeBarangayController] = 'Please enter Barangay/Subdivision';
-if (_homeCityController.text.trim().isEmpty) _fieldErrors[_homeCityController] = 'Please enter City/Municipality';
-} else {
-if (_resHouseController.text.trim().isEmpty) _fieldErrors[_resHouseController] = 'Please enter House/Unit/Building No.';
-if (_resStreetController.text.trim().isEmpty) _fieldErrors[_resStreetController] = 'Please enter Street Name';
-if (_resBarangayController.text.trim().isEmpty) _fieldErrors[_resBarangayController] = 'Please enter Barangay/Subdivision';
-if (_resCityController.text.trim().isEmpty) _fieldErrors[_resCityController] = 'Please enter City/Municipality';
-}
-
+    // Address fields are optional - no validation for empty fields
+    // Only validate format if field has content
+    final zip = _resZipController.text.trim();
+    if (zip.isNotEmpty && !RegExp(r'^\d{4}$').hasMatch(zip)) {
+      _fieldErrors[_resZipController] = 'ZIP must be 4 digits';
+    }
 
 if (_fieldErrors.isNotEmpty) {
 if (mounted) {
@@ -2060,7 +888,6 @@ debugPrint(' _fieldErrors[${ctrl.hashCode}] = "$msg"');
       debugPrint('Returned row: $returnedRow');
       debugPrint('DEBUG: Database update completed for user ${user.id}');
 
-      _initialUserCategory = _userCategory;
     } catch (e, st) {
       debugPrint('======== UPDATE ERROR ========');
       debugPrint('Error type: ${e.runtimeType}');
@@ -2467,457 +1294,86 @@ debugPrint(' _fieldErrors[${ctrl.hashCode}] = "$msg"');
             hint: 'MM/DD/YYYY',
             isDateField: true,
           ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: DropdownButtonFormField<String>(
-              value: (_userCategory != null && _userCategory!.isNotEmpty)
-                  ? _userCategory!.toUpperCase()
-                  : null,
-              autovalidateMode: _autoValidateMode, // ✅ add this line
-              decoration: InputDecoration(
-                labelText: 'Category',
-                filled: true,
-                fillColor: Colors.grey[50],
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'RESIDENT', child: Text('Resident')),
-                DropdownMenuItem(value: 'EMPLOYEE', child: Text('Employee')),
-                DropdownMenuItem(value: 'STUDENT', child: Text('Student')),
-              ],
-              onChanged: (val) {
-                setState(() {
-                  _userCategory = (val ?? '').toString().toUpperCase();
-                  _markFormDirty();
-
-                  // ✅ clear red indicator instantly when a valid option is picked
-                  if (_autoValidateMode == AutovalidateMode.always) {
-                    _autoValidateMode = AutovalidateMode.onUserInteraction;
-                  }
-                });
-              },
-            validator: (v) {
-              if ((_userCategory ?? '').isNotEmpty) return null; // already set from DB
-              if (v == null || v.isEmpty) return 'Please select a category';
-              return null;
-            },
-            ),
-          ),
         ],
       ),
     );
   }
 
   Widget _buildAddressSection() {
-    final cat = (_userCategory ?? 'RESIDENT').toUpperCase();
-    
-    Widget _buildAddressCard(String title, List<Widget> children) {
-      return Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 16),
-            ...children,
-          ],
-        ),
-      );
-    }
-
-    if (cat == 'EMPLOYEE') {
-      return Column(
-        children: [
-          _buildAddressCard('Work Address', [
-            // Work Address children — Town -> Barangay -> ZIP dropdowns
-              _buildEditableField('Street/Building No.', _workStreetController, hint: 'Street / Building'),
-
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: DropdownButtonFormField<String>(
-                  value: (_workTownController.text.isNotEmpty && _towns.contains(_workTownController.text))
-                      ? _workTownController.text
-                      : (_workTownController.text.isNotEmpty ? _workTownController.text : null),
-                  items: [
-                    ..._towns.map((t) => DropdownMenuItem(value: t, child: Text(t))),
-                    if (_workTownController.text.isNotEmpty && !_towns.contains(_workTownController.text))
-                      DropdownMenuItem(value: _workTownController.text, child: Text(_workTownController.text)),
-                  ],
-                  onChanged: (val) {
-                    setState(() {
-                      _workTownController.text = val ?? '';
-                      _workBarangayController.text = '';
-                      final zip = _getFirstZipCodeForTown(_workTownController.text);
-                      if (zip != null) _workZipController.text = zip;
-                      _markFormDirty();
-                    });
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Town',
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                  ),
-                  validator: (val) {
-                    if ((_workTownController.text ?? '').trim().isEmpty && (val == null || val.trim().isEmpty)) return 'Select town';
-                    return null;
-                  },
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: DropdownButtonFormField<String>(
-                  value: _getBarangaysForTown(_workTownController.text).contains(_workBarangayController.text) ? _workBarangayController.text : null,
-                  items: _getBarangaysForTown(_workTownController.text).map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
-                  onChanged: _getBarangaysForTown(_workTownController.text).isEmpty
-                      ? null
-                      : (val) {
-                          setState(() {
-                            _workBarangayController.text = val ?? '';
-                            _markFormDirty();
-                          });
-                        },
-                  decoration: InputDecoration(
-                    labelText: "Barangay/Subdivision",
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: DropdownButtonFormField<String>(
-                  value: _getZipCodesForTown(_workTownController.text).contains(_workZipController.text) ? _workZipController.text : _getFirstZipCodeForTown(_workTownController.text),
-                  items: _getZipCodesForTown(_workTownController.text).map((zip) => DropdownMenuItem(value: zip, child: Text(zip))).toList(),
-                  onChanged: _getZipCodesForTown(_workTownController.text).isEmpty
-                      ? null
-                      : (val) {
-                          setState(() {
-                            _workZipController.text = val ?? '';
-                            _markFormDirty();
-                          });
-                        },
-                  decoration: InputDecoration(
-                    labelText: "ZIP Code",
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) return 'ZIP code is required';
-                    return null;
-                  },
-                ),
-              ),
-
-              _buildEditableField('City/Municipality', _workCityController, hint: 'City', isReadOnly: false),
-              _buildEditableField('Country', _workCountryController, hint: 'Philippines', isReadOnly: true),
-            ]),
-          const SizedBox(height: 16),
-          
-          _buildAddressCard('Home Address', [
-            _buildEditableField('House/Unit/Building No.', _homeHouseController, hint: 'House/Unit'),
-            _buildEditableField('Street Name', _homeStreetController, hint: 'Street Name'),
-            _buildEditableField('Barangay/Subdivision', _homeBarangayController, hint: 'Barangay Name'),
-            _buildEditableField('Town (Optional)', _homeTownController, hint: 'Town Name', validator: (val) { return null; }),
-            _buildEditableField('ZIP Code', _homeZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
-              if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
-              if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
-              return null;
-            }),
-            _buildEditableField('City/Municipality', _homeCityController, hint: 'City'),
-            _buildEditableField('Country', _homeCountryController, hint: 'Philippines', isReadOnly: true),
-          ]),
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
-      );
-    } else if (cat == 'STUDENT') {
-      return Column(
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildAddressCard('School Address', [
-            // School Address children replacement
-            // School Address
-_buildEditableField('Full School Name', _schoolNameController, hint: 'Full School Name'),
-_buildEditableField('Street Name', _schoolStreetController, hint: 'Street Name'),
-
-Padding(
-  padding: const EdgeInsets.only(bottom: 12),
-  child: DropdownButtonFormField<String>(
-    value: (_schoolTownController.text.isNotEmpty && _towns.contains(_schoolTownController.text))
-        ? _schoolTownController.text
-        : (_schoolTownController.text.isNotEmpty ? _schoolTownController.text : null),
-    items: [
-      ..._towns.map((t) => DropdownMenuItem(value: t, child: Text(t))),
-      if (_schoolTownController.text.isNotEmpty && !_towns.contains(_schoolTownController.text))
-        DropdownMenuItem(value: _schoolTownController.text, child: Text(_schoolTownController.text)),
-    ],
-    onChanged: (val) {
-      setState(() {
-        _schoolTownController.text = val ?? '';
-        _schoolBarangayController.text = '';
-        final zip = _getFirstZipCodeForTown(_schoolTownController.text);
-        if (zip != null) _schoolZipController.text = zip;
-        _markFormDirty();
-      });
-    },
-    decoration: InputDecoration(
-      labelText: 'Town',
-      filled: true,
-      fillColor: Colors.grey[50],
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-    ),
-    validator: (val) {
-      if ((_schoolTownController.text ?? '').trim().isEmpty && (val == null || val.trim().isEmpty)) return 'Select town';
-      return null;
-    },
-  ),
-),
-
-const SizedBox(height: 12),
-
-Padding(
-  padding: const EdgeInsets.only(bottom: 12),
-  child: DropdownButtonFormField<String>(
-    value: _getBarangaysForTown(_schoolTownController.text).contains(_schoolBarangayController.text) ? _schoolBarangayController.text : null,
-    items: _getBarangaysForTown(_schoolTownController.text).map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
-    onChanged: _getBarangaysForTown(_schoolTownController.text).isEmpty
-        ? null
-        : (val) {
-            setState(() {
-              _schoolBarangayController.text = val ?? '';
-              _markFormDirty();
-            });
-          },
-    decoration: InputDecoration(
-      labelText: "Barangay/Subdivision",
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-    ),
-    validator: (val) {
-      if (_getBarangaysForTown(_schoolTownController.text).isNotEmpty) {
-        if (val == null || val.trim().isEmpty) return 'Enter school barangay/subdivision';
-      } else {
-        if (_schoolBarangayController.text.trim().isEmpty) return 'Enter school barangay/subdivision';
-      }
-      return null;
-    },
-  ),
-),
-
-const SizedBox(height: 12),
-
-Padding(
-  padding: const EdgeInsets.only(bottom: 12),
-  child: DropdownButtonFormField<String>(
-    value: _getZipCodesForTown(_schoolTownController.text).contains(_schoolZipController.text) ? _schoolZipController.text : _getFirstZipCodeForTown(_schoolTownController.text),
-    items: _getZipCodesForTown(_schoolTownController.text).map((zip) => DropdownMenuItem(value: zip, child: Text(zip))).toList(),
-    onChanged: _getZipCodesForTown(_schoolTownController.text).isEmpty
-        ? null
-        : (val) {
-            setState(() {
-              _schoolZipController.text = val ?? '';
-              _markFormDirty();
-            });
-          },
-    decoration: InputDecoration(
-      labelText: "ZIP Code",
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-    ),
-    validator: (val) {
-      if (val == null || val.trim().isEmpty) return 'ZIP code is required';
-      return null;
-    },
-  ),
-),
-
-_buildEditableField('City/Municipality', _schoolCityController, hint: 'City', isReadOnly: false),
-_buildEditableField('Country', _schoolCountryController, hint: 'Philippines', isReadOnly: true),
-
-          ]),
+          _buildSectionTitle('Address'),
           const SizedBox(height: 16),
-          _buildAddressCard('Home Address', [
-            _buildEditableField('House/Unit/Building No.', _homeHouseController, hint: 'House/Unit'),
-            _buildEditableField('Street Name', _homeStreetController, hint: 'Street Name'),
-            _buildEditableField('Barangay/Subdivision', _homeBarangayController, hint: 'Barangay Name'),
-            _buildEditableField('Town (Optional)', _homeTownController, hint: 'Town Name', validator: (val) {return null;}),
-            _buildEditableField('ZIP Code', _homeZipController, hint: '1000', keyboardType: TextInputType.number, validator: (val) {
-              if (val == null || val.trim().isEmpty) return 'Enter ZIP code';
-              if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) return 'ZIP must be 4 digits';
+          _buildEditableField(
+            'House/Unit/Building No.', 
+            _resHouseController, 
+            hint: 'House/Unit',
+            validator: (val) => null, // No validation for optional fields
+          ),
+          _buildEditableField(
+            'Street Name', 
+            _resStreetController, 
+            hint: 'Street Name',
+            validator: (val) => null,
+          ),
+          _buildEditableField(
+            'Barangay/Subdivision', 
+            _resBarangayController, 
+            hint: 'Barangay Name',
+            validator: (val) => null,
+          ),
+          _buildEditableField(
+            'Town (Optional)', 
+            _resTownController, 
+            hint: 'Town Name',
+            validator: (val) => null,
+          ),
+          _buildEditableField(
+            'ZIP Code', 
+            _resZipController, 
+            hint: '1000', 
+            keyboardType: TextInputType.number,
+            validator: (val) {
+              // Optional validation - only validate if field has content
+              if (val != null && val.trim().isNotEmpty) {
+                if (!RegExp(r'^\d{4}$').hasMatch(val.trim())) {
+                  return 'ZIP must be 4 digits';
+                }
+              }
               return null;
-            }),
-            _buildEditableField('City/Municipality', _homeCityController, hint: 'City'),
-            _buildEditableField('Country', _homeCountryController, hint: 'Philippines', isReadOnly: true),
-          ]),
+            },
+          ),
+          _buildEditableField(
+            'City/Municipality', 
+            _resCityController, 
+            hint: 'Manila',
+            validator: (val) => null,
+          ),
+          _buildEditableField(
+            'Country', 
+            _resCountryController, 
+            hint: 'Philippines', 
+            isReadOnly: true,
+            validator: (val) => null,
+          ),
         ],
-      );
-    } else {
-
-      // ===== Replace resident branch with this chunk =====
-final List<DropdownMenuItem<String>> residentTownItems = _towns
-    .map((town) => DropdownMenuItem(value: town, child: Text(town)))
-    .toList();
-
-final currentResTown = _resTownController.text.trim();
-if (currentResTown.isNotEmpty && !_towns.contains(currentResTown)) {
-  residentTownItems.add(DropdownMenuItem(value: currentResTown, child: Text(currentResTown)));
-}
-
-return _buildAddressCard('Address', [
-  _buildEditableField('House/Unit/Building No.', _resHouseController, hint: 'House/Unit'),
-  _buildEditableField('Street Name', _resStreetController, hint: 'Street Name'),
-
-Padding(
-  padding: const EdgeInsets.only(bottom: 12),
-  child: DropdownButtonFormField<String>(
-    // effective current town (keep DB-only towns visible)
-    value: _resTownController.text.isNotEmpty ? _resTownController.text : null,
-    items: [
-      ..._towns.map((t) => DropdownMenuItem(value: t, child: Text(t))),
-      if (_resTownController.text.isNotEmpty && !_towns.contains(_resTownController.text))
-        DropdownMenuItem(value: _resTownController.text, child: Text(_resTownController.text)),
-    ],
-    onChanged: (val) {
-      setState(() {
-        _resTownController.text = val ?? '';
-        // when town changes: clear barangay & auto-set ZIP
-        _resBarangayController.text = '';
-        final zip = _getFirstZipCodeForTown(_resTownController.text);
-        if (zip != null) _resZipController.text = zip;
-        _markFormDirty();
-      });
-    },
-    decoration: InputDecoration(
-      labelText: 'Town',
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      filled: true,
-      fillColor: Colors.grey[50],
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-    ),
-    validator: (val) {
-      if (_resTownController.text.trim().isEmpty && (val == null || val.trim().isEmpty)) return 'Select town';
-      return null;
-    },
-  ),
-),
-
-  const SizedBox(height: 12),
-
-  // Barangay (dependent on effective town)
-  Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: DropdownButtonFormField<String>(
-      value: _getBarangaysForTown(_resTownController.text)
-          .contains(_resBarangayController.text) ? _resBarangayController.text : null,
-      items: _getBarangaysForTown(_resTownController.text)
-          .map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
-      onChanged: _getBarangaysForTown(_resTownController.text).isEmpty
-          ? null
-          : (val) {
-              setState(() {
-                _resBarangayController.text = val ?? '';
-                _markFormDirty();
-              });
-            },
-      decoration: InputDecoration(
-        labelText: "Barangay/Subdivision",
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
-    ),
-  ),
-
-  const SizedBox(height: 12),
-
-  Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: DropdownButtonFormField<String>(
-      value: _getZipCodesForTown((_resTownController.text != 'Other') ? _resTownController.text : (_resTownManualController.text.isNotEmpty ? _resTownManualController.text : null))
-          .contains(_resZipController.text) ? _resZipController.text : (_getFirstZipCodeForTown((_resTownController.text != 'Other') ? _resTownController.text : (_resTownManualController.text.isNotEmpty ? _resTownManualController.text : null))),
-      items: _getZipCodesForTown((_resTownController.text != 'Other') ? _resTownController.text : (_resTownManualController.text.isNotEmpty ? _resTownManualController.text : null))
-          .map((zip) => DropdownMenuItem(value: zip, child: Text(zip))).toList(),
-      onChanged: _getZipCodesForTown((_resTownController.text != 'Other') ? _resTownController.text : (_resTownManualController.text.isNotEmpty ? _resTownManualController.text : null)).isEmpty
-          ? null
-          : (val) {
-              setState(() {
-                _resZipController.text = val ?? '';
-              });
-            },
-      decoration: InputDecoration(
-        labelText: "ZIP Code",
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      validator: (val) {
-        if (val == null || val.trim().isEmpty) return 'ZIP code is required';
-        return null;
-      },
-    ),
-  ),
-
-  _buildEditableField('City/Municipality', _resCityController, hint: 'Manila', isReadOnly: true),
-  _buildEditableField('Country', _resCountryController, hint: 'Philippines', isReadOnly: true),
-  ]);
+    );
   }
-  }
-
-    Widget _buildTownDropdown(TextEditingController mainController, TextEditingController manualController, String label) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: DropdownButtonFormField<String>(
-      value: mainController.text.isNotEmpty ? mainController.text : null,
-      items: _towns.map((town) => DropdownMenuItem(value: town, child: Text(town))).toList(),
-      onChanged: (val) {
-        setState(() {
-          mainController.text = val ?? '';
-          _markFormDirty();
-        });
-      },
-      decoration: InputDecoration(
-        labelText: label,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        filled: true,
-        fillColor: Colors.grey[50],
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-      ),
-    ),
-  );
-}
 
   Widget _buildIdUploadSection() {
     return Container(
@@ -3239,13 +1695,6 @@ Padding(
     'Last Name',
     'Phone Number',
     'Date of Birth',
-    // address-related required labels
-    'House/Unit/Building No.',
-    'Street Name',
-    'Barangay/Subdivision',
-    'Street/Building No.',
-    'City/Municipality',
-    'Full School Name',
   };
 
  return Padding(
@@ -3393,7 +1842,7 @@ Padding(
           padding: const EdgeInsets.all(20.0),
           child: Form(
             key: _formKey,
-            autovalidateMode: _autoValidateMode, // <-- add this
+            autovalidateMode: _autoValidateMode,
             child: ListView(
               children: [
                 _buildProfileImageSection(),

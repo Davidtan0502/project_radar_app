@@ -345,61 +345,33 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
       ),
       child: Column(
         children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: primaryColor.withOpacity(0.2), width: 3),
-                ),
-                child: ClipOval(
-                  child: _isHttpUrl(photoUrl)
-                      ? Image.network(
-                          photoUrl,
+          // Removed the Stack and Positioned edit icon - now just showing the profile picture
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: primaryColor.withOpacity(0.2), width: 3),
+            ),
+            child: ClipOval(
+              child: _isHttpUrl(photoUrl)
+                  ? Image.network(
+                      photoUrl,
+                      width: 94,
+                      height: 94,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        // fallback to simple gray placeholder with icon if image fails to load
+                        return Container(
                           width: 94,
                           height: 94,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            // fallback to simple gray placeholder with icon if image fails to load
-                            return Container(
-                              width: 94,
-                              height: 94,
-                              color: Colors.grey[200],
-                              child: Icon(Icons.account_circle, size: 94, color: Colors.grey[600]),
-                            );
-                          },
-                        )
-                      : _grayPlaceholder(94),
-                ),
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: GestureDetector(
-                  onTap: () async {
-                    final result = await Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(builder: (_) => const EditAccountinfo()),
-                    );
-                    if (result == true) {
-                      setState(() => _userData = _fetchUserData());
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: primaryColor,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: const Icon(Icons.edit, size: 16, color: Colors.white),
-                  ),
-                ),
-              ),
-            ],
+                          color: Colors.grey[200],
+                          child: Icon(Icons.account_circle, size: 94, color: Colors.grey[600]),
+                        );
+                      },
+                    )
+                  : _grayPlaceholder(94),
+            ),
           ),
           const SizedBox(height: 16),
           Text(
@@ -436,13 +408,6 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
     String joinedDate,
     Map<String, dynamic> userData,
   ) {
-    final category = (userData['user_category'] ?? '').toString().toUpperCase();
-    final displayCategory = category.isNotEmpty
-        ? (category.length == 1
-            ? category.toUpperCase()
-            : category[0].toUpperCase() + category.substring(1).toLowerCase())
-        : '';
-
     final residentMap = userData['resident_address'] is Map
         ? Map<String, dynamic>.from(userData['resident_address'])
         : null;
@@ -458,62 +423,26 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
 
     final List<Widget> addressWidgets = [];
 
-    if (category == 'RESIDENT') {
-      final addrText = (residentMap != null && residentMap.isNotEmpty)
-          ? _composeAddressFromMap(residentMap)
-          : (fallbackAddress.isNotEmpty ? fallbackAddress : '--');
-      addressWidgets.addAll([
-        _buildInfoTile(context, icon: Icons.home_outlined, label: 'Address', value: addrText),
-        const Divider(height: 1, indent: 16, endIndent: 16),
-      ]);
-    } else if (category == 'STUDENT') {
-      if (schoolMap != null && schoolMap.isNotEmpty) {
-        final schoolText = _composeAddressFromMap(schoolMap);
-        addressWidgets.addAll([
-          _buildInfoTile(context, icon: Icons.school_outlined, label: 'School Address', value: schoolText.isNotEmpty ? schoolText : '--'),
-          const Divider(height: 1, indent: 16, endIndent: 16),
-        ]);
-      }
-      if (homeMap != null && homeMap.isNotEmpty) {
-        final homeText = _composeAddressFromMap(homeMap, isHomeCitySuffix: true);
-        addressWidgets.addAll([
-          _buildInfoTile(context, icon: Icons.home_outlined, label: 'Home Address', value: homeText.isNotEmpty ? homeText : '--'),
-          const Divider(height: 1, indent: 16, endIndent: 16),
-        ]);
-      }
-      if (addressWidgets.isEmpty) {
-        addressWidgets.addAll([
-          _buildInfoTile(context, icon: Icons.home_outlined, label: 'Address', value: fallbackAddress.isNotEmpty ? fallbackAddress : '--'),
-          const Divider(height: 1, indent: 16, endIndent: 16),
-        ]);
-      }
-    } else if (category == 'EMPLOYEE') {
-      if (workMap != null && workMap.isNotEmpty) {
-        final workText = _composeAddressFromMap(workMap);
-        addressWidgets.addAll([
-          _buildInfoTile(context, icon: Icons.work_outline, label: 'Work Address', value: workText.isNotEmpty ? workText : '--'),
-          const Divider(height: 1, indent: 16, endIndent: 16),
-        ]);
-      }
-      if (homeMap != null && homeMap.isNotEmpty) {
-        final homeText = _composeAddressFromMap(homeMap, isHomeCitySuffix: true);
-        addressWidgets.addAll([
-          _buildInfoTile(context, icon: Icons.home_outlined, label: 'Home Address', value: homeText.isNotEmpty ? homeText : '--'),
-          const Divider(height: 1, indent: 16, endIndent: 16),
-        ]);
-      }
-      if (addressWidgets.isEmpty) {
-        addressWidgets.addAll([
-          _buildInfoTile(context, icon: Icons.home_outlined, label: 'Address', value: fallbackAddress.isNotEmpty ? fallbackAddress : '--'),
-          const Divider(height: 1, indent: 16, endIndent: 16),
-        ]);
-      }
-    } else {
-      addressWidgets.addAll([
-        _buildInfoTile(context, icon: Icons.home_outlined, label: 'Address', value: fallbackAddress.isNotEmpty ? fallbackAddress : '--'),
-        const Divider(height: 1, indent: 16, endIndent: 16),
-      ]);
+    // Simplified address logic - always show a single address field
+    String addressText = '--';
+    
+    // Try to get address in this order: home, resident, work, school, fallback
+    if (homeMap != null && homeMap.isNotEmpty) {
+      addressText = _composeAddressFromMap(homeMap, isHomeCitySuffix: true);
+    } else if (residentMap != null && residentMap.isNotEmpty) {
+      addressText = _composeAddressFromMap(residentMap);
+    } else if (workMap != null && workMap.isNotEmpty) {
+      addressText = _composeAddressFromMap(workMap);
+    } else if (schoolMap != null && schoolMap.isNotEmpty) {
+      addressText = _composeAddressFromMap(schoolMap);
+    } else if (fallbackAddress.isNotEmpty) {
+      addressText = fallbackAddress;
     }
+
+    addressWidgets.addAll([
+      _buildInfoTile(context, icon: Icons.home_outlined, label: 'Address', value: addressText),
+      const Divider(height: 1, indent: 16, endIndent: 16),
+    ]);
 
     final String idUrl = (userData['id_url'] ?? '').toString();
 
@@ -547,15 +476,6 @@ class _AccountInformationScreenState extends State<AccountInformationScreen> {
       ),
       child: Column(
         children: [
-          // Category tile
-          _buildInfoTile(
-            context,
-            icon: Icons.category_outlined,
-            label: 'Category',
-            value: displayCategory.isNotEmpty ? displayCategory : '-',
-          ),
-          const Divider(height: 1, indent: 16, endIndent: 16),
-
           _buildInfoTile(context, icon: Icons.person_outline, label: 'Full Name', value: fullName),
           const Divider(height: 1, indent: 16, endIndent: 16),
           _buildInfoTile(context, icon: Icons.email_outlined, label: 'Email', value: email),

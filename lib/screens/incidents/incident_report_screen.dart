@@ -28,7 +28,6 @@ class _IncidentReportPageState extends State<IncidentReportPage>
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
-  final _landmarkController = TextEditingController();
   final _cellphoneController = TextEditingController();
   final _concernController = TextEditingController();
   final _otherIncidentTypeController = TextEditingController();
@@ -38,7 +37,20 @@ class _IncidentReportPageState extends State<IncidentReportPage>
   final _streetController = TextEditingController();
 
   String? _incidentType;
+  // Updated incident types with new options
   final List<String> _incidentTypes = ['Fire', 'Flood', 'Accident', 'Other'];
+  final List<String> _otherIncidentTypes = [
+    'Medical Assistance',
+    'Medical Attention',
+    'Landslide',
+    'Earthquake',
+    'Building Collapse',
+    'Mass Panic',
+    'Riot',
+    'Food Poisoning'
+  ];
+  String? _selectedOtherIncidentType;
+  
   final Color _primaryColor = const Color(0xFF3F73A3);
   final Color _backgroundColor = const Color(0xFFF0F4F8);
   late AnimationController _animationController;
@@ -47,7 +59,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
   bool _isSubmitting = false;
   bool _isLoadingLocation = true;
   Timer? _addressTypingTimer;
-  bool _isConfirmed = false; // NEW: Checkbox state
+  bool _isConfirmed = false; // Checkbox state
 
   // Replace Firebase with Supabase
   final SupabaseClient supabase = Supabase.instance.client;
@@ -58,7 +70,7 @@ class _IncidentReportPageState extends State<IncidentReportPage>
   final Set<Marker> _markers = {};
   bool _isMapInitialized = false;
 
-  // NEW: suppression flag to avoid loops when setting address programmatically
+  // suppression flag to avoid loops when setting address programmatically
   bool _suppressAddressController = false;
 
   @override
@@ -404,7 +416,6 @@ Future<List<String>> _uploadImages(String incidentId) async {
     _animationController.dispose();
     _nameController.dispose();
     _addressController.dispose();
-    _landmarkController.dispose();
     _cellphoneController.dispose();
     _concernController.dispose();
     _otherIncidentTypeController.dispose();
@@ -425,7 +436,6 @@ Future<List<String>> _uploadImages(String incidentId) async {
   void _resetForm() {
     _formKey.currentState?.reset();
     _addressController.clear();
-    _landmarkController.clear();
     _concernController.clear();
     _otherIncidentTypeController.clear();
     _latitudeController.clear();
@@ -434,11 +444,13 @@ Future<List<String>> _uploadImages(String incidentId) async {
     _streetController.clear();
     setState(() {
       _incidentType = null;
+      _selectedOtherIncidentType = null;
       _isSubmitting = false;
       _selectedImages.clear();
-      _isConfirmed = false; // NEW: Reset checkbox state
+      _isConfirmed = false; // Reset checkbox state
     });
   }
+
 Future<void> _triggerWebSpamAnalysis(String incidentId) async {
   try {
     // This will trigger the web spam filter to re-analyze with AI data
@@ -457,7 +469,19 @@ Future<void> _triggerWebSpamAnalysis(String incidentId) async {
 }
 
 Future<void> _submitForm() async {
-  if (!_isConfirmed) return;
+  // NEW: Check if checkbox is checked
+  if (!_isConfirmed) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Please confirm that the information is true and accurate'),
+        backgroundColor: Colors.orange,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+    return;
+  }
+
   if (!(_formKey.currentState?.validate() ?? false)) return;
 
   setState(() => _isSubmitting = true);
@@ -487,18 +511,23 @@ Future<void> _submitForm() async {
       imageUrls = await _uploadImages(incidentId);
     }
 
+    // Determine the final incident type
+    String finalIncidentType;
+    if (_incidentType == 'Other') {
+      finalIncidentType = _selectedOtherIncidentType ?? 'Other';
+    } else {
+      finalIncidentType = _incidentType ?? '';
+    }
+
     // Prepare data for insertion
     final Map<String, dynamic> incidentData = {
       'name': _nameController.text.trim(),
       'address': _addressController.text.trim(),
-      'landmark': _landmarkController.text.trim(),
       'contact_number': _cellphoneController.text.trim(),
-      'incident_type': _incidentType == 'Other'
-          ? _otherIncidentTypeController.text.trim()
-          : _incidentType,
+      'incident_type': finalIncidentType,
       'description': _concernController.text.trim(),
       'timestamp': DateTime.now().toIso8601String(),
-      'status': 'pending', // ← CHANGED: Use lowercase 'pending'
+      'status': 'pending', // Use lowercase 'pending'
       'latitude': double.tryParse(_latitudeController.text) ?? 0.0,
       'longitude': double.tryParse(_longitudeController.text) ?? 0.0,
       'barangay': _barangayController.text.trim(),
@@ -848,10 +877,12 @@ Future<void> _submitForm() async {
     required IconData icon,
     required String validator,
     TextInputType keyboardType = TextInputType.text,
+    bool readOnly = false,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      readOnly: readOnly,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: _primaryColor),
@@ -865,8 +896,12 @@ Future<void> _submitForm() async {
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
         labelStyle: TextStyle(color: Colors.grey.shade600),
+        filled: readOnly,
+        fillColor: readOnly ? Colors.grey.shade50 : Colors.white,
       ),
       validator: (v) => v == null || v.isEmpty ? validator : null,
+      enableInteractiveSelection: !readOnly,
+      focusNode: readOnly ? AlwaysDisabledFocusNode() : null,
     );
   }
 
@@ -890,7 +925,7 @@ Future<void> _submitForm() async {
     );
   }
 
-  // NEW: Build confirmation checkbox
+  // Build confirmation checkbox
   Widget _buildConfirmationCheckbox() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1101,47 +1136,60 @@ Future<void> _submitForm() async {
                               ),
                               const SizedBox(height: 24),
 
+                              // Name field - now read-only
                               _buildTextField(
                                 controller: _nameController,
                                 label: 'Full Name',
                                 icon: Icons.person_outline,
                                 validator: 'Please enter your name',
+                                readOnly: true, // NEW: Made read-only
                               ),
                               const SizedBox(height: 16),
 
                               _buildLocationPickerSection(),
                               const SizedBox(height: 16),
 
-                              _buildTextField(
-                                controller: _landmarkController,
-                                label: 'Landmark',
-                                icon: Icons.place_outlined,
-                                validator: 'Please enter a nearby landmark',
-                              ),
-                              const SizedBox(height: 16),
-
+                              // Contact Number field
                               TextFormField(
                                 controller: _cellphoneController,
                                 keyboardType: TextInputType.phone,
+                                readOnly: true, // NEW: Made read-only
                                 decoration: InputDecoration(
                                   labelText: 'Contact Number',
                                   prefixIcon: Icon(Icons.phone_outlined, color: _primaryColor),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: _primaryColor, width: 2)),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12), 
+                                    borderSide: BorderSide(color: Colors.grey.shade300)
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12), 
+                                    borderSide: BorderSide(color: _primaryColor, width: 2)
+                                  ),
                                   contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                                   labelStyle: TextStyle(color: Colors.grey.shade600),
+                                  filled: true,
+                                  fillColor: Colors.grey.shade50,
                                 ),
                                 validator: _validatePhone,
+                                enableInteractiveSelection: false,
+                                focusNode: AlwaysDisabledFocusNode(),
                               ),
                               const SizedBox(height: 16),
 
+                              // Incident Type dropdown
                               DropdownButtonFormField<String>(
-                                initialValue: _incidentType,
+                                value: _incidentType,
                                 decoration: InputDecoration(
                                   labelText: 'Incident Type',
                                   prefixIcon: Icon(Icons.warning_amber_outlined, color: _primaryColor),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: _primaryColor, width: 2)),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12), 
+                                    borderSide: BorderSide(color: Colors.grey.shade300)
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12), 
+                                    borderSide: BorderSide(color: _primaryColor, width: 2)
+                                  ),
                                   contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
                                   labelStyle: TextStyle(color: Colors.grey.shade600),
                                 ),
@@ -1155,13 +1203,33 @@ Future<void> _submitForm() async {
                                 style: TextStyle(color: Colors.grey.shade800, fontWeight: FontWeight.w500),
                               ),
 
+                              // Other Incident Type dropdown (replaced text field)
                               if (_incidentType == 'Other') ...[
                                 const SizedBox(height: 16),
-                                _buildTextField(
-                                  controller: _otherIncidentTypeController,
-                                  label: 'Specify Incident Type',
-                                  icon: Icons.edit_outlined,
-                                  validator: 'Please specify the incident type',
+                                DropdownButtonFormField<String>(
+                                  value: _selectedOtherIncidentType,
+                                  decoration: InputDecoration(
+                                    labelText: 'Specify Incident Type',
+                                    prefixIcon: Icon(Icons.list_outlined, color: _primaryColor),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12), 
+                                      borderSide: BorderSide(color: Colors.grey.shade300)
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12), 
+                                      borderSide: BorderSide(color: _primaryColor, width: 2)
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+                                    labelStyle: TextStyle(color: Colors.grey.shade600),
+                                  ),
+                                  dropdownColor: Colors.white,
+                                  items: _otherIncidentTypes.map((type) => DropdownMenuItem(
+                                    value: type,
+                                    child: Text(type, style: TextStyle(color: Colors.grey.shade800, fontWeight: FontWeight.w500)),
+                                  )).toList(),
+                                  onChanged: (v) => setState(() => _selectedOtherIncidentType = v),
+                                  validator: (v) => v == null ? 'Please select an incident type' : null,
+                                  style: TextStyle(color: Colors.grey.shade800, fontWeight: FontWeight.w500),
                                 ),
                               ],
                               const SizedBox(height: 16),
@@ -1169,7 +1237,7 @@ Future<void> _submitForm() async {
                               _buildConcernField(),
                               const SizedBox(height: 16),
 
-                              // NEW: Confirmation checkbox added here
+                              // Confirmation checkbox
                               _buildConfirmationCheckbox(),
                               const SizedBox(height: 16),
 

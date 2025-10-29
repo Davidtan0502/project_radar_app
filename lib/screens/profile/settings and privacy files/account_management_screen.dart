@@ -11,7 +11,7 @@ import 'package:project_radar_app/screens/auth/login_screen.dart';
 import 'package:project_radar_app/notification/notification_service.dart';
 
 // Replace with your actual Supabase project URL (example: https://xyz.supabase.co)
-const String PROJECT_URL = 'https://zqfcmpewoernuorvxzle.supabase.co/functions/v1/smart-responder';
+const String PROJECT_URL = 'https://zqfcmpewoernuorvxzle.supabase.co';
 
 /// Live-updating progress dialog used during deletion.
 /// Provide a ValueNotifier<String> to update the shown message during the flow.
@@ -222,11 +222,11 @@ class AccountManagementScreen extends StatelessWidget {
                             final efResponse = await supabase.functions.invoke(
                               'delete-user-account',
                               body: {'userId': uid},
-                              headers: {'Authorization': 'Bearer ${token ?? ''}'},
                             );
                             status = efResponse.status ?? 0;
                             efData = efResponse.data;
                             efBody = efData is Map ? Map<String, dynamic>.from(efData) : {'data': efData};
+                            debugPrint('Supabase function response - status: $status, data: $efBody');
                           } catch (e) {
                             debugPrint('supabase.functions.invoke failed: $e');
                             // network fallback: try raw HTTP to see exact status/body (helps diagnose network issues)

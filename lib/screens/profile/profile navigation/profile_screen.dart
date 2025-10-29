@@ -292,80 +292,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
   );
 }
 
-  bool _hasAnyCityLike(Map<String, dynamic>? m) {
-    if (m == null) return false;
-    final keys = [
-      'city',
-      'municipality',
-      'cityMunicipality',
-      'city_municipality',
-      'homeCity',
-      'workCity',
-      'schoolCity'
-    ];
-    for (final k in keys) {
-      final v = (m[k] ?? '').toString().trim();
-      if (v.isNotEmpty) return true;
-    }
-    return false;
-  }
-
-  bool _hasTownOrCity(Map<String, dynamic>? m) {
-    if (m == null) return false;
-    final town = (m['town'] ?? '').toString().trim();
-    if (town.isNotEmpty) return true;
-    return _hasAnyCityLike(m);
-  }
-
-  bool _hasNonEmpty(Map<String, dynamic>? m, List<String> keys) {
-    if (m == null) return false;
-    for (final k in keys) {
-      final v = (m[k] ?? '').toString().trim();
-      if (v.isEmpty) return false;
-    }
-    return true;
-  }
-
   bool _isProfileCompleteForCategory(Map<String, dynamic>? data) {
-    if (data == null) return false;
+  if (data == null) return false;
 
-    final dob = (data['dob'] ?? '').toString().trim();
-    final hasDob = dob.isNotEmpty;
-    if (!hasDob) return false;
+  // Check if DOB is filled (required)
+  final dob = (data['dob'] ?? '').toString().trim();
+  final hasDob = dob.isNotEmpty;
+  if (!hasDob) return false;
 
-    final category = (data['user_category'] ?? '').toString().toUpperCase();
+  // Check if ALL required address fields are filled (same logic as EditAccountinfo)
+  final residentAddress = data['resident_address'] is Map 
+      ? Map<String, dynamic>.from(data['resident_address']) 
+      : null;
 
-    if (category == 'RESIDENT') {
-      final resident = data['resident_address'] is Map ? Map<String, dynamic>.from(data['resident_address']) : null;
-      return _hasNonEmpty(resident, ['house', 'street', 'barangay', 'zip']) && _hasTownOrCity(resident);
-    } else if (category == 'EMPLOYEE') {
-      final work = data['work_address'] is Map ? Map<String, dynamic>.from(data['work_address']) : null;
-      final home = data['home_address'] is Map ? Map<String, dynamic>.from(data['home_address']) : null;
-      return _hasNonEmpty(work, ['street', 'barangay', 'zip']) && _hasTownOrCity(work) &&
-             _hasNonEmpty(home, ['house', 'street', 'barangay', 'zip']) && _hasTownOrCity(home);
-    } else if (category == 'STUDENT') {
-      final school = data['school_address'] is Map ? Map<String, dynamic>.from(data['school_address']) : null;
-      final home = data['home_address'] is Map ? Map<String, dynamic>.from(data['home_address']) : null;
-      return _hasNonEmpty(school, ['school_name', 'street', 'barangay', 'zip']) && _hasTownOrCity(school) &&
-             _hasNonEmpty(home, ['house', 'street', 'barangay', 'zip']) && _hasTownOrCity(home);
-    } else {
-      final fallback = (data['address'] ?? '').toString().trim();
-      final anyMapPresent = (data['resident_address'] is Map && (data['resident_address'] as Map).isNotEmpty) ||
-                           (data['work_address'] is Map && (data['work_address'] as Map).isNotEmpty) ||
-                           (data['school_address'] is Map && (data['school_address'] as Map).isNotEmpty) ||
-                           (data['home_address'] is Map && (data['home_address'] as Map).isNotEmpty);
-      return fallback.isNotEmpty || anyMapPresent;
-    }
-  }
+  if (residentAddress == null) return false;
+
+  final hasHouseNo = (residentAddress['house'] ?? '').toString().trim().isNotEmpty;
+  final hasStreet = (residentAddress['street'] ?? '').toString().trim().isNotEmpty;
+  final hasBarangay = (residentAddress['barangay'] ?? '').toString().trim().isNotEmpty;
+  final hasZipCode = (residentAddress['zip'] ?? '').toString().trim().isNotEmpty;
+  final hasCity = (residentAddress['city'] ?? '').toString().trim().isNotEmpty;
+
+  final hasCompleteAddress = hasHouseNo && hasStreet && hasBarangay && hasZipCode && hasCity;
+  
+  return hasCompleteAddress;
+}
+
+// Remove the _hasAnyAddressInformation method completely since we don't need it anymore
 
       @override
       Widget build(BuildContext context) {
         const backgroundColor = Color(0xFFF8F9FA);
 
         final fullName = '$_firstName $_lastName'.trim();
-        final dbIsVerified = (_userDataMap != null) ? (_userDataMap!['is_verified'] ?? false) : _isVerified;
+        final dbIsVerified = _isVerified;
         final profileIsComplete = _isProfileCompleteForCategory(_userDataMap);
-        final shouldShowVerified = profileIsComplete || dbIsVerified;
+        final shouldShowVerified = dbIsVerified && profileIsComplete;
         final dobRaw = (_userDataMap != null) ? (_userDataMap!['dob'] ?? '') : '';
         final dobDisplay = (dobRaw != null && dobRaw.toString().trim().isNotEmpty) ? dobRaw.toString() : '-';
 
@@ -575,17 +537,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                             _buildDivider(),
-                            _buildOptionTile(
-                              icon: Icons.contact_phone_outlined,
-                              title: 'Emergency Contacts',
-                              subtitle: 'Manage your emergency contacts',
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const EmergencyContactsScreen(),
-                                ),
-                              ),
-                            ),
                           ],
                         ),
 

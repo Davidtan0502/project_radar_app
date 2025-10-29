@@ -360,54 +360,28 @@ class _HomeScreenState extends State<HomeScreen> {
     return composed.isNotEmpty ? composed : fallback;
   }
 
-  bool _isProfileCompleteForCategory(Map<String, dynamic> data) {
-    final category = (data['user_category'] ?? '').toString().toUpperCase();
+    bool _isProfileCompleteForCategory(Map<String, dynamic> data) {
+    // Check if DOB is filled (required)
     final dob = (data['dob'] ?? '').toString().trim();
-    if (dob.isEmpty) return false;
+    final hasDob = dob.isNotEmpty;
+    if (!hasDob) return false;
 
-    bool hasNonEmpty(Map<String, dynamic>? m, List<String> keys) {
-      if (m == null) return false;
-      for (final k in keys) {
-        final v = (m[k] ?? '').toString().trim();
-        if (v.isEmpty) return false;
-      }
-      return true;
-    }
+    // Check if ALL required address fields are filled (same logic as EditAccountinfo)
+    final residentAddress = data['resident_address'] is Map 
+        ? Map<String, dynamic>.from(data['resident_address']) 
+        : null;
 
-    bool hasTownOrCity(Map<String, dynamic>? m) {
-      if (m == null) return false;
-      final town = (m['town'] ?? '').toString().trim();
-      if (town.isNotEmpty) return true;
+    if (residentAddress == null) return false;
 
-      final cityKeys = ['city', 'municipality', 'cityMunicipality', 'city_municipality'];
-      for (final k in cityKeys) {
-        final v = (m[k] ?? '').toString().trim();
-        if (v.isNotEmpty) return true;
-      }
-      return false;
-    }
+    final hasHouseNo = (residentAddress['house'] ?? '').toString().trim().isNotEmpty;
+    final hasStreet = (residentAddress['street'] ?? '').toString().trim().isNotEmpty;
+    final hasBarangay = (residentAddress['barangay'] ?? '').toString().trim().isNotEmpty;
+    final hasZipCode = (residentAddress['zip'] ?? '').toString().trim().isNotEmpty;
+    final hasCity = (residentAddress['city'] ?? '').toString().trim().isNotEmpty;
 
-    if (category == 'RESIDENT') {
-      final resident = data['resident_address'] is Map ? Map<String, dynamic>.from(data['resident_address']) : null;
-      return hasNonEmpty(resident, ['house', 'street', 'barangay', 'zip']) && hasTownOrCity(resident);
-    } else if (category == 'EMPLOYEE') {
-      final work = data['work_address'] is Map ? Map<String, dynamic>.from(data['work_address']) : null;
-      final home = data['home_address'] is Map ? Map<String, dynamic>.from(data['home_address']) : null;
-      return hasNonEmpty(work, ['street', 'barangay', 'zip']) && hasTownOrCity(work) &&
-             hasNonEmpty(home, ['house', 'street', 'barangay', 'zip']) && hasTownOrCity(home);
-    } else if (category == 'STUDENT') {
-      final school = data['school_address'] is Map ? Map<String, dynamic>.from(data['school_address']) : null;
-      final home = data['home_address'] is Map ? Map<String, dynamic>.from(data['home_address']) : null;
-      return hasNonEmpty(school, ['schoolName', 'street', 'barangay', 'zip']) && hasTownOrCity(school) &&
-             hasNonEmpty(home, ['house', 'street', 'barangay', 'zip']) && hasTownOrCity(home);
-    } else {
-      final fallback = (data['address'] ?? '').toString().trim();
-      final anyMapPresent = (data['resident_address'] is Map && (data['resident_address'] as Map).isNotEmpty) ||
-                           (data['work_address'] is Map && (data['work_address'] as Map).isNotEmpty) ||
-                           (data['school_address'] is Map && (data['school_address'] as Map).isNotEmpty) ||
-                           (data['home_address'] is Map && (data['home_address'] as Map).isNotEmpty);
-      return fallback.isNotEmpty || anyMapPresent;
-    }
+    final hasCompleteAddress = hasHouseNo && hasStreet && hasBarangay && hasZipCode && hasCity;
+    
+    return hasCompleteAddress;
   }
 
   @override
@@ -1199,218 +1173,187 @@ Widget _buildRecentIncidents(bool isSmallScreen) {
   }
 
   Widget _buildProfileCard(bool isSmallScreen) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AccountInformationScreen()),
-        );
-      },
-      child: _cardContainer(
-        child: FutureBuilder<Map<String, dynamic>?>(
-          future: _getUserProfile(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return _buildProfileShimmer(isSmallScreen);
-            }
+  return InkWell(
+    borderRadius: BorderRadius.circular(16),
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const AccountInformationScreen()),
+      );
+    },
+    child: _cardContainer(
+      child: FutureBuilder<Map<String, dynamic>?>(
+        future: _getUserProfile(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return _buildProfileShimmer(isSmallScreen);
+          }
 
-            final data = snapshot.data;
-            if (data == null) {
-              return _buildNoUserData(isSmallScreen);
-            }
+          final data = snapshot.data;
+          if (data == null) {
+            return _buildNoUserData(isSmallScreen);
+          }
 
-            final photo = (data['photoURL'] ?? '').toString().trim();
-            final name = [data['first_name'], data['last_name']]
-                .where((e) => (e ?? '').toString().trim().isNotEmpty)
-                .map((e) => capitalizeName(e.toString()))
-                .join(' ');
+          final photo = (data['photoURL'] ?? '').toString().trim();
+          final name = [data['first_name'], data['last_name']]
+              .where((e) => (e ?? '').toString().trim().isNotEmpty)
+              .map((e) => capitalizeName(e.toString()))
+              .join(' ');
 
-            final category = (data['user_category'] ?? '').toString().toUpperCase();
-            final fallback = (data['address'] ?? "No address set").toString();
+          final category = (data['user_category'] ?? '').toString().toUpperCase();
+          final fallback = (data['address'] ?? "No address set").toString();
 
-            String displayedAddress = fallback;
-            if (category == 'RESIDENT') {
-              final addr = data['resident_address'] is Map ? Map<String, dynamic>.from(data['resident_address']) : null;
-              displayedAddress = _composeShortAddress(addr, fallback: fallback);
-            } else if (category == 'STUDENT') {
-              final addr = data['school_address'] is Map ? Map<String, dynamic>.from(data['school_address']) : null;
-              displayedAddress = _composeShortAddress(addr, fallback: fallback);
-            } else if (category == 'EMPLOYEE') {
-              final addr = data['work_address'] is Map ? Map<String, dynamic>.from(data['work_address']) : null;
-              displayedAddress = _composeShortAddress(addr, fallback: fallback);
-            }
+          String displayedAddress = fallback;
+          if (category == 'RESIDENT') {
+            final addr = data['resident_address'] is Map ? Map<String, dynamic>.from(data['resident_address']) : null;
+            displayedAddress = _composeShortAddress(addr, fallback: fallback);
+          } else if (category == 'STUDENT') {
+            final addr = data['school_address'] is Map ? Map<String, dynamic>.from(data['school_address']) : null;
+            displayedAddress = _composeShortAddress(addr, fallback: fallback);
+          } else if (category == 'EMPLOYEE') {
+            final addr = data['work_address'] is Map ? Map<String, dynamic>.from(data['work_address']) : null;
+            displayedAddress = _composeShortAddress(addr, fallback: fallback);
+          }
 
-            final storedVerifiedRaw = data['is_verified'];
-            final bool storedVerified = storedVerifiedRaw == true ||
-                storedVerifiedRaw == 1 ||
-                storedVerifiedRaw == '1' ||
-                (storedVerifiedRaw is String && ['true', 'yes'].contains(storedVerifiedRaw.toLowerCase().trim()));
+          final storedVerifiedRaw = data['is_verified'];
+          final bool storedVerified = storedVerifiedRaw == true ||
+              storedVerifiedRaw == 1 ||
+              storedVerifiedRaw == '1' ||
+              (storedVerifiedRaw is String && ['true', 'yes'].contains(storedVerifiedRaw.toLowerCase().trim()));
 
-            final shouldShowVerified = storedVerified || (data['dob']?.toString().trim().isNotEmpty ?? false);
+          final shouldShowVerified = storedVerified && _isProfileCompleteForCategory(data);
 
-            final addressLabel = category == 'RESIDENT'
-                ? 'Address:'
-                : category == 'STUDENT'
-                    ? 'School Address:'
-                    : category == 'EMPLOYEE'
-                        ? 'Work Address:'
-                        : 'Address:';
+          final addressLabel = 'Address:';
 
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Avatar + category
-                Column(
-                  children: [
-                    Container(
-                      width: isSmallScreen ? 56 : 60,
-                      height: isSmallScreen ? 56 : 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.grey[300]!,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: ClipOval(
-                        child: photo.isEmpty
-                            ? Container(
-                                color: Colors.grey[100],
-                                child: Icon(
-                                  Icons.account_circle,
-                                  size: isSmallScreen ? 56 : 60,
-                                  color: Colors.grey[400],
-                                ),
-                              )
-                            : Image.network(
-                                photo,
-                                width: isSmallScreen ? 56 : 60,
-                                height: isSmallScreen ? 56 : 60,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) {
-                                  return Container(
-                                    color: Colors.grey[100],
-                                    child: Icon(
-                                      Icons.account_circle,
-                                      size: isSmallScreen ? 56 : 60,
-                                      color: Colors.grey[400],
-                                    ),
-                                  );
-                                },
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Avatar only (category removed)
+              Container(
+                width: isSmallScreen ? 56 : 60,
+                height: isSmallScreen ? 56 : 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.grey[300]!,
+                    width: 1.5,
+                  ),
+                ),
+                child: ClipOval(
+                  child: photo.isEmpty
+                      ? Container(
+                          color: Colors.grey[100],
+                          child: Icon(
+                            Icons.account_circle,
+                            size: isSmallScreen ? 56 : 60,
+                            color: Colors.grey[400],
+                          ),
+                        )
+                      : Image.network(
+                          photo,
+                          width: isSmallScreen ? 56 : 60,
+                          height: isSmallScreen ? 56 : 60,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) {
+                            return Container(
+                              color: Colors.grey[100],
+                              child: Icon(
+                                Icons.account_circle,
+                                size: isSmallScreen ? 56 : 60,
+                                color: Colors.grey[400],
                               ),
-                      ),
+                            );
+                          },
+                        ),
+                ),
+              ),
+              SizedBox(width: isSmallScreen ? 12 : 16),
+
+              // Details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          fit: FlexFit.loose,
+                          child: Text(
+                            name.isNotEmpty ? name : 'Unknown User',
+                            style: GoogleFonts.poppins(
+                              fontSize: isSmallScreen ? 16 : 17,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: true,
+                          ),
+                        ),
+                        if (shouldShowVerified) ...[
+                          SizedBox(width: isSmallScreen ? 3 : 3),
+                          Icon(
+                            Icons.verified,
+                            size: isSmallScreen ? 15 : 16,
+                            color: Colors.blueAccent[400],
+                          ),
+                        ],
+                      ],
                     ),
-                    SizedBox(height: isSmallScreen ? 6 : 8),
+                    SizedBox(height: isSmallScreen ? 1 : 1),
+
+                    // Address container: left padding removed so label + address align with name's left start
                     Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isSmallScreen ? 8 : 10,
-                        vertical: isSmallScreen ? 3 : 4,
+                      padding: EdgeInsets.only(
+                        left: 0,
+                        top: isSmallScreen ? 5 : 5,
+                        right: isSmallScreen ? 10 : 12,
+                        bottom: isSmallScreen ? 10 : 12,
                       ),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.blue[500]!, Colors.blue[700]!],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Text(
-                        category.isNotEmpty ? category : 'UNSET',
-                        style: TextStyle(
-                          fontSize: isSmallScreen ? 10 : 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.place_outlined,
+                                size: isSmallScreen ? 12 : 14,
+                                color: Colors.grey[600],
+                              ),
+                              SizedBox(width: isSmallScreen ? 4 : 6),
+                              Text(
+                                addressLabel,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[700],
+                                  fontSize: isSmallScreen ? 12 : 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: isSmallScreen ? 4 : 6),
+                          Text(
+                            displayedAddress.isNotEmpty ? displayedAddress : 'No address provided',
+                            style: TextStyle(fontSize: isSmallScreen ? 13 : 14),
+                            softWrap: true,
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                SizedBox(width: isSmallScreen ? 12 : 16),
-
-                // Details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Flexible(
-                            fit: FlexFit.loose,
-                            child: Text(
-                              name.isNotEmpty ? name : 'Unknown User',
-                              style: GoogleFonts.poppins(
-                                fontSize: isSmallScreen ? 16 : 17,
-                                fontWeight: FontWeight.w700,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              softWrap: true,
-                            ),
-                          ),
-                          if (shouldShowVerified) ...[
-                            SizedBox(width: isSmallScreen ? 3 : 3),
-                            Icon(
-                              Icons.verified,
-                              size: isSmallScreen ? 15 : 16,
-                              color: Colors.blueAccent[400],
-                            ),
-                          ],
-                        ],
-                      ),
-                      SizedBox(height: isSmallScreen ? 1 : 1),
-
-                      // Address container: left padding removed so label + address align with name's left start
-                      Container(
-                        padding: EdgeInsets.only(
-                          left: 0,
-                          top: isSmallScreen ? 5 : 5,
-                          right: isSmallScreen ? 10 : 12,
-                          bottom: isSmallScreen ? 10 : 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.place_outlined,
-                                  size: isSmallScreen ? 12 : 14,
-                                  color: Colors.grey[600],
-                                ),
-                                SizedBox(width: isSmallScreen ? 4 : 6),
-                                Text(
-                                  addressLabel,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey[700],
-                                    fontSize: isSmallScreen ? 12 : 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: isSmallScreen ? 4 : 6),
-                            Text(
-                              displayedAddress.isNotEmpty ? displayedAddress : 'No address provided',
-                              style: TextStyle(fontSize: isSmallScreen ? 13 : 14),
-                              softWrap: true,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
+              ),
+            ],
+          );
+        },
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildProfileShimmer(bool isSmallScreen) {
     return Row(
